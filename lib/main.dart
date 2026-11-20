@@ -183,7 +183,7 @@ class _CheckoutPageState extends State<CheckoutPage>{
   Widget field(TextEditingController c,String label,{TextInputType type=TextInputType.text})=>Padding(padding:const EdgeInsets.only(bottom:10),child:TextFormField(controller:c,keyboardType:type,decoration:InputDecoration(labelText:label,border:const OutlineInputBorder()),validator:(v)=>v==null||v.trim().isEmpty?'Enter '+label:null));
   Future<void> submit()async{
     if(!keyForm.currentState!.validate())return;if(nonce==null||nonce!.isEmpty){setState(()=>error='Store cart is not ready. Retry.');return;}
-    setState(()=>{busy=true,error=null;});
+    setState(() { busy = true; error = null; });
     try{
       final billing={'first_name':first.text.trim(),'last_name':last.text.trim(),'email':email.text.trim(),'phone':phone.text.trim(),'address_1':address.text.trim(),'city':city.text.trim(),'state':state.text.trim(),'postcode':pin.text.trim(),'country':'IN'};
       final body={'billing_address':billing,'shipping_address':billing,'payment_method':payment,'payment_data':<Map<String,dynamic>>[]};
