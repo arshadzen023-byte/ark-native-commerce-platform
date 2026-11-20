@@ -190,7 +190,7 @@ class _CheckoutPageState extends State<CheckoutPage>{
       final r=await StoreApi.post('checkout',body,nonce!);
       final id=r['order_id']??r['id']??'';
       if(!mounted)return;
-      await showDialog<void>(context:context,builder:(_)=>AlertDialog(title:const Text('Order response received'),content:Text('Order reference: '+id.toString()+'\n'+(r['payment_result']??r).toString().substring(0,((r['payment_result']??r).toString().length).clamp(0,240))),actions:[FilledButton(onPressed:()=>Navigator.pop(context),child:const Text('Done'))]));
+      await showDialog<void>(context:context,builder:(_)=>AlertDialog(title:const Text('Order response received'),content:Text('Order reference: '+id.toString()),actions:[FilledButton(onPressed:()=>Navigator.pop(context),child:const Text('Done'))]));
       if(mounted)Navigator.pop(context,true);
     }catch(e){if(mounted)setState(()=>error=e.toString());}
     finally{if(mounted)setState(()=>busy=false);}
