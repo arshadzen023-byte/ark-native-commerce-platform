@@ -19,8 +19,32 @@ jobs:
           cache: true
       - name: Generate Android project
         run: flutter create --project-name glowhit_shopping --org shop.pluginstore --platforms android .
-      - name: Verify Android internet permission
-        run: grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml
+      - name: Ensure Android internet permission
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          if not manifest.is_file():
+              raise SystemExit(f"Android manifest was not generated: {manifest}")
+
+          text = manifest.read_text(encoding="utf-8")
+          permission = '    <uses-permission android:name="android.permission.INTERNET" />'
+
+          if "android.permission.INTERNET" not in text:
+              match = re.search(r"<manifest\\b[^>]*>", text)
+              if not match:
+                  raise SystemExit("Could not find the opening <manifest> tag")
+              text = text[:match.end()] + "\\n" + permission + text[match.end():]
+              manifest.write_text(text, encoding="utf-8")
+
+          verified = manifest.read_text(encoding="utf-8")
+          if "android.permission.INTERNET" not in verified:
+              raise SystemExit("INTERNET permission was not added")
+          print("Verified INTERNET permission in AndroidManifest.xml")
+          PY
       - name: Get dependencies
         run: flutter pub get
       - name: Analyze
