@@ -19,18 +19,8 @@ jobs:
           cache: true
       - name: Generate Android project
         run: flutter create --project-name glowhit_shopping --org shop.pluginstore --platforms android .
-      - name: Ensure Internet permission
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('android/app/src/main/AndroidManifest.xml')
-          s = p.read_text()
-          permission = '<uses-permission android:name="android.permission.INTERNET" />'
-          if permission not in s:
-              s = s.replace('<application', permission + '\\n    <application', 1)
-              p.write_text(s)
-          assert 'android.permission.INTERNET' in p.read_text()
-          PY
+      - name: Verify Android internet permission
+        run: grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml
       - name: Get dependencies
         run: flutter pub get
       - name: Analyze
