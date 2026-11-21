@@ -70,7 +70,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
   }
   String _money(dynamic value) {
     if (value is! Map) return '';
-    final raw = int.tryParse((value['total_price'] ?? '0').toString()) ?? 0;
+    final raw = int.tryParse((value['total_price'] ?? value['line_total'] ?? value['price'] ?? '0').toString()) ?? 0;
     final digits = (value['currency_minor_unit'] as num?)?.toInt() ?? 2;
     final divisor = digits == 0 ? 1 : (digits == 1 ? 10 : 100);
     return '${value['currency_symbol'] ?? '₹'}${(raw / divisor).toStringAsFixed(digits)}';
