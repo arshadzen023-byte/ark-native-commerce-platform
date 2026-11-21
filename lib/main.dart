@@ -157,14 +157,14 @@ class _ProductPageState extends State<ProductPage>{
   List<dynamic> get pics=>widget.product['images'] is List?widget.product['images'] as List:[];
   String get description{
     var t=(widget.product['description']??widget.product['short_description']??'').toString();
-    t=t.replaceAll(RegExp(r'<(script|style)[^>]*>[\\s\\S]*?</\\1>',caseSensitive:false),' ');
-    t=t.replaceAll(RegExp(r'<br\\s*/?>|</p>|</div>|</li>',caseSensitive:false),' ').replaceAll(RegExp(r'<[^>]+>'),' ');
+    t=t.replaceAll(RegExp(r'<(script|style)[^>]*>[\s\S]*?</\1>',caseSensitive:false),' ');
+    t=t.replaceAll(RegExp(r'<br\s*/?>|</p>|</div>|</li>',caseSensitive:false),' ').replaceAll(RegExp(r'<[^>]+>'),' ');
     for(final e in {'&nbsp;':' ','&amp;':'&','&quot;':'"','&#39;':"'",'&lt;':'<','&gt;':'>'}.entries){t=t.replaceAll(e.key,e.value);}
-    return t.replaceAll(RegExp(r'\\s+'),' ').trim();
+    return t.replaceAll(RegExp(r'\s+'),' ').trim();
   }
   List<String> get descriptionImages{
     final h=(widget.product['description']??'').toString();
-    return RegExp(r'<img[^>]+(?:src|data-src)=["\\x27]([^"\\x27]+)',caseSensitive:false).allMatches(h).map((m)=>m.group(1)??'').where((v)=>v.startsWith('http')).toSet().toList();
+    return RegExp(r'<img[^>]+(?:src|data-src)=["\x27]([^"\x27]+)',caseSensitive:false).allMatches(h).map((m)=>m.group(1)??'').where((v)=>v.startsWith('http')).toSet().toList();
   }
   String get category{final c=widget.product['categories'];return c is List&&c.isNotEmpty&&c.first is Map?(c.first['name']??'—').toString():'—';}
   String get vendor{final b=widget.product['brands'];if(b is List&&b.isNotEmpty&&b.first is Map)return(b.first['name']??'').toString();final x=widget.product['extensions'];return x is Map&&x['vendor']!=null?x['vendor'].toString():'Not provided by store';}
@@ -267,7 +267,7 @@ class _CheckoutPageState extends State<CheckoutPage>{
     try{
       final updated=await StoreApi.updateCustomer(addressData,nonce??'');nonce=StoreApi.nonce??nonce;
       final cart=await StoreApi.cart();nonce=StoreApi.nonce??nonce;
-      if(mounted)setState(()=>{cartData=cart,shippingRates=extractRates(cart),shippingRateId=shippingRates.isNotEmpty?(shippingRates.first['rate_id']??shippingRates.first['id']??'').toString():null,error=null});
+      if(mounted)setState((){cartData=cart;shippingRates=extractRates(cart);shippingRateId=shippingRates.isNotEmpty?(shippingRates.first['rate_id']??shippingRates.first['id']??'').toString():null;error=null;});
     }catch(e){if(mounted)setState(()=>error='Shipping calculation failed: '+e.toString());}
     finally{if(mounted)setState(()=>busy=false);}
   }
