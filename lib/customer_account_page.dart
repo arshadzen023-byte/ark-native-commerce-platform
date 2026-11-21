@@ -105,7 +105,7 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
       if (item is! Map) return const SizedBox.shrink();
       if (widget.section == 'My Orders') {
         final lines = (item['items'] as List? ?? []).whereType<Map>().map((e) => '${e['name']} × ${e['quantity']}').join(', ');
-        return Card(child: ListTile(leading: const Icon(Icons.receipt_long, color: _accountPurple), title: Text('Order #${item['number'] ?? item['id']}'), subtitle: Text('${item['status'] ?? ''} • ${item['date_created'] ?? ''}\\n$lines'), isThreeLine: true, trailing: Text(_money(item['total'], item['currency']), style: const TextStyle(fontWeight: FontWeight.bold))));
+        return Card(child: ListTile(leading: const Icon(Icons.receipt_long, color: _accountPurple), title: Text('Order #${item['number'] ?? item['id']}'), subtitle: Text('${item['status'] ?? ''} • ${item['date_created'] ?? ''}\n$lines'), isThreeLine: true, trailing: Text(_money(item['total'], item['currency']), style: const TextStyle(fontWeight: FontWeight.bold))));
       }
       if (widget.section == 'Downloads') {
         return Card(child: ListTile(leading: const Icon(Icons.download, color: _accountPurple), title: Text((item['download_name'] ?? item['product_name'] ?? 'Download').toString()), subtitle: Text('Remaining: ${item['downloads_remaining'] ?? '—'}'), trailing: IconButton(icon: const Icon(Icons.open_in_new), onPressed: () { final uri = Uri.tryParse((item['download_url'] ?? '').toString()); if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication); })));
