@@ -266,7 +266,7 @@ class _CheckoutPageState extends State<CheckoutPage>{
     if(!keyForm.currentState!.validate())return;
     setState(()=>busy=true);
     try{
-      final updated=await StoreApi.updateCustomer(addressData,nonce??'');nonce=StoreApi.nonce??nonce;
+      await StoreApi.updateCustomer(addressData,nonce??'');nonce=StoreApi.nonce??nonce;
       final cart=await StoreApi.cart();nonce=StoreApi.nonce??nonce;
       if(mounted)setState((){cartData=cart;shippingRates=extractRates(cart);shippingRateId=shippingRates.isNotEmpty?(shippingRates.first['rate_id']??shippingRates.first['id']??'').toString():null;error=null;});
     }catch(e){if(mounted)setState(()=>error='Shipping calculation failed: '+e.toString());}
