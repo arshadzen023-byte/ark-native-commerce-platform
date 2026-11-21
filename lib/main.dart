@@ -140,7 +140,7 @@ class _StoreHomeState extends State<StoreHome> {
     finally { if (mounted) setState(() => cartBusy = false); }
   }
   Future<void> _openCheckout() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => WooCheckoutPage(api: woo)));
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => WooCheckoutPage(api: woo, customerToken: customerToken)));
     await _refreshCart();
   }
   Widget _cartPage() {
