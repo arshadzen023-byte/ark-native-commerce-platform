@@ -4,7 +4,7 @@ on:
     branches: [main, 'feature/**']
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: glowhit-release-${{ github.ref }}
   cancel-in-progress: false
@@ -59,7 +59,17 @@ jobs:
         run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
-          name: glowhit-checkout-v1-build-81
+          name: glowhit-checkout-v1-build-82
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
+      - name: Publish installable APK release
+        if: startsWith(github.ref, 'refs/heads/feature/glowhit-account-product-checkout-v1')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: glowhit-v1.0.2-build82
+          name: GlowHit v1.0.2 — Checkout and order confirmation
+          prerelease: true
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: build/app/outputs/flutter-apk/app-release.apk
