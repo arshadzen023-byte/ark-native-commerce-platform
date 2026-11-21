@@ -36,12 +36,15 @@ class _PaymentPageState extends State<PaymentPage> {
 
   Future<void> loadMethods() async {
     try {
-      final results = await Future.wait([
-        widget.api.getCheckout(),
-        widget.api.getNativePaymentConfig(),
-      ]);
-      final checkout = results[0];
-      final config = results[1];
+      final checkout = await widget.api.getCheckout();
+      // The bridge adds UPI-specific settings. Its temporary failure must not
+      // hide a working WooCommerce COD method returned by Store API.
+      Map<String, dynamic> config = {};
+      try {
+        config = await widget.api.getNativePaymentConfig();
+      } catch (_) {
+        config = {};
+      }
       final raw = (checkout['payment_methods'] as List? ?? const []);
       final list = raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
       final gatewayList = (config['gateways'] as List? ?? const [])
