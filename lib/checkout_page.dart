@@ -158,7 +158,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
           Row(children: [Expanded(child: _field(_city, 'City')), const SizedBox(width: 10), Expanded(child: _field(_state, 'State'))]),
           Row(children: [Expanded(child: _field(_postcode, 'PIN code', type: TextInputType.number)), const SizedBox(width: 10), Expanded(child: _field(_country, 'Country code'))]),
           OutlinedButton.icon(onPressed: working ? null : _calculateShipping, icon: const Icon(Icons.local_shipping_outlined), label: const Text('CALCULATE SHIPPING')),
-        ]),
+        ])),
         const Divider(height: 32),
         Text('Shipping', style: Theme.of(context).textTheme.titleLarge),
         if (shippingRates.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('Enter your address and calculate available shipping rates.'))
