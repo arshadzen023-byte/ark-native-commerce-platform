@@ -23,8 +23,10 @@ class OrderConfirmationPage extends StatelessWidget {
     final id = order['order_id'] ?? order['id'] ?? order['number'] ?? '—';
     final payment = order['payment_result'] is Map ? order['payment_result'] as Map : const {};
     final status = (order['status'] ?? payment['payment_status'] ?? 'Received').toString();
-    final message = status.toLowerCase().contains('pending')
-        ? 'Your order has been received. Payment is awaiting confirmation.'
+    final normalizedStatus = status.toLowerCase().replaceAll('_', '-');
+    final awaitingVerification = normalizedStatus.contains('pending') || normalizedStatus.contains('on-hold');
+    final message = awaitingVerification
+        ? 'Your order has been received. UPI payment is awaiting store verification; your order is not marked as paid yet.'
         : 'Thank you! Your order has been sent to the store.';
     return Scaffold(
       appBar: AppBar(title: const Text('Order confirmation'), automaticallyImplyLeading: false),
@@ -36,7 +38,7 @@ class OrderConfirmationPage extends StatelessWidget {
           errorBuilder: (context, error, stack) => const Center(child: Icon(Icons.check_circle_rounded, color: Colors.green, size: 112)),
         )),
         const SizedBox(height: 8),
-        const Text('Order placed successfully!', textAlign: TextAlign.center, style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
+        Text(awaitingVerification ? 'Order received!' : 'Order placed successfully!', textAlign: TextAlign.center, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
         Text(message, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade700, height: 1.4)),
         const SizedBox(height: 24),
