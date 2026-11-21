@@ -52,11 +52,12 @@ final class ARK_Native_Customer_API_Bridge {
             return new WP_Error('ark_auth_required', 'Please sign in to your customer account.', ['status' => 401]);
         }
         $token = trim($match[1]);
-        $users = get_users(['meta_key' => self::TOKEN_HASH, 'number' => 100, 'fields' => 'all']);
+        $token_hash = hash('sha256', $token);
+        $users = get_users(['meta_key' => self::TOKEN_HASH, 'meta_value' => $token_hash, 'number' => 1, 'fields' => 'all']);
         foreach ($users as $user) {
             $hash = get_user_meta($user->ID, self::TOKEN_HASH, true);
             $expires = (int) get_user_meta($user->ID, self::TOKEN_EXP, true);
-            if ($hash && $expires > time() && wp_check_password($token, $hash, $user->ID)) {
+            if ($hash && $expires > time() && hash_equals($hash, $token_hash)) {
                 $request->set_param('_ark_user_id', (int) $user->ID);
                 return true;
             }
@@ -71,6 +72,7 @@ final class ARK_Native_Customer_API_Bridge {
         if ($login === '' || $password === '') {
             return new WP_Error('ark_login_fields', 'Enter your email or username and password.', ['status' => 400]);
         }
+        if (is_email($login)) { $found = get_user_by('email', $login); if ($found) $login = $found->user_login; }
         $user = wp_authenticate($login, $password);
         if (is_wp_error($user)) {
             return new WP_Error('ark_login_failed', 'Incorrect username/email or password.', ['status' => 401]);
@@ -79,7 +81,7 @@ final class ARK_Native_Customer_API_Bridge {
             return new WP_Error('ark_woocommerce_missing', 'WooCommerce is required.', ['status' => 503]);
         }
         $token = bin2hex(random_bytes(32));
-        update_user_meta($user->ID, self::TOKEN_HASH, wp_hash_password($token));
+        update_user_meta($user->ID, self::TOKEN_HASH, hash('sha256', $token));
         update_user_meta($user->ID, self::TOKEN_EXP, time() + (30 * DAY_IN_SECONDS));
         return rest_ensure_response([
             'session' => ['token' => $token, 'expires_in' => 30 * DAY_IN_SECONDS],
