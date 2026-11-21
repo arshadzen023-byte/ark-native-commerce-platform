@@ -125,6 +125,9 @@ class _PaymentPageState extends State<PaymentPage> {
     try {
       final mode = (upi['upi_address_mode'] ?? 'hide').toString();
       final payerVpa = _payerUpiController.text.trim();
+      if (selected == 'wc-upi' && (upi['merchant_vpa'] ?? '').toString().trim().isEmpty) {
+        throw Exception('The store has not configured its UPI merchant address. Please contact the store.');
+      }
       if (selected == 'wc-upi' && upi['require_upi'] == true && mode != 'hide' && payerVpa.isEmpty) {
         throw Exception('Enter your UPI ID to continue.');
       }
@@ -346,12 +349,13 @@ class _PaymentPageState extends State<PaymentPage> {
       else
         _notice('The store has not configured a merchant UPI address.', Icons.warning_amber),
       const SizedBox(height: 12),
-      TextField(
-        controller: _utrController,
-        keyboardType: TextInputType.number,
-        maxLength: 12,
-        decoration: const InputDecoration(labelText: 'UPI UTR / Transaction ID', hintText: 'Enter 12-digit UTR', border: OutlineInputBorder(), prefixIcon: Icon(Icons.receipt_long)),
-      ),
+      if ((upi['transaction_id_mode'] ?? 'show_require') != 'hide')
+        TextField(
+          controller: _utrController,
+          keyboardType: TextInputType.number,
+          maxLength: 12,
+          decoration: const InputDecoration(labelText: 'UPI UTR / Transaction ID', hintText: 'Enter 12-digit UTR', border: OutlineInputBorder(), prefixIcon: Icon(Icons.receipt_long)),
+        ),
       OutlinedButton.icon(
         onPressed: submittingUpi ? null : chooseScreenshot,
         icon: const Icon(Icons.photo_library_outlined),
