@@ -43,7 +43,41 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     };
   }
 
-  Future<void> _loadSavedAddresses() async {\n    final prefs = await SharedPreferences.getInstance();\n    final raw = prefs.getString(_savedAddressKey);\n    if (raw != null) {\n      try { final list = jsonDecode(raw) as List; if (mounted) setState(() => savedAddresses = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()); } catch (_) { /* Ignore malformed local cache. */ }\n    }\n    final token = widget.customerToken;\n    if (token != null) {\n      try { final remote = await ArkCustomerApi(token).request('customer/addresses'); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses)); if (mounted) setState(() {}); } } catch (_) { /* Keep locally saved addresses available while offline. */ }\n    }\n  }\n\n  Future<void> _saveCurrentAddress() async {\n    final value = address;\n    value['label'] = addressLabel;\n    final key = _savedAddressKey;\n    final prefs = await SharedPreferences.getInstance();\n    final index = savedAddresses.indexWhere((e) => e['address_1'] == value['address_1'] && e['postcode'] == value['postcode'] && e['first_name'] == value['first_name']);\n    if (index >= 0) { savedAddresses[index] = value; } else { savedAddresses.add(value); }\n    await prefs.setString(key, jsonEncode(savedAddresses));\n    final token = widget.customerToken;\n    if (token != null) {\n      try { final remote = await ArkCustomerApi(token).request('customer/addresses', method: 'POST', body: value); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(key, jsonEncode(savedAddresses)); } } catch (_) { /* Local copy is retained if the API is temporarily unavailable. */ }\n    }\n    if (mounted) setState(() {});\n  }\n\n  void _applySavedAddress(Map<String, dynamic> value) {\n    for (final entry in fields.entries) {\n      entry.value.text = (value[entry.key] ?? '').toString();\n    }\n    setState(() { addressLabel = (value['label'] ?? 'Home').toString(); selectedSavedAddress = savedAddresses.indexOf(value); });\n  }\n\n  TextEditingController _controller(String key, {String fallback = ''}) =>
+  Future<void> _loadSavedAddresses() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_savedAddressKey);
+    if (raw != null) {
+      try { final list = jsonDecode(raw) as List; if (mounted) setState(() => savedAddresses = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()); } catch (_) { /* Ignore malformed local cache. */ }
+    }
+    final token = widget.customerToken;
+    if (token != null) {
+      try { final remote = await ArkCustomerApi(token).request('customer/addresses'); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses)); if (mounted) setState(() {}); } } catch (_) { /* Keep locally saved addresses available while offline. */ }
+    }
+  }
+
+  Future<void> _saveCurrentAddress() async {
+    final value = address;
+    value['label'] = addressLabel;
+    final key = _savedAddressKey;
+    final prefs = await SharedPreferences.getInstance();
+    final index = savedAddresses.indexWhere((e) => e['address_1'] == value['address_1'] && e['postcode'] == value['postcode'] && e['first_name'] == value['first_name']);
+    if (index >= 0) { savedAddresses[index] = value; } else { savedAddresses.add(value); }
+    await prefs.setString(key, jsonEncode(savedAddresses));
+    final token = widget.customerToken;
+    if (token != null) {
+      try { final remote = await ArkCustomerApi(token).request('customer/addresses', method: 'POST', body: value); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(key, jsonEncode(savedAddresses)); } } catch (_) { /* Local copy is retained if the API is temporarily unavailable. */ }
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _applySavedAddress(Map<String, dynamic> value) {
+    for (final entry in fields.entries) {
+      entry.value.text = (value[entry.key] ?? '').toString();
+    }
+    setState(() { addressLabel = (value['label'] ?? 'Home').toString(); selectedSavedAddress = savedAddresses.indexOf(value); });
+  }
+
+  TextEditingController _controller(String key, {String fallback = ''}) =>
       TextEditingController(text: (widget.initialAddress[key] ?? fallback).toString());
 
   @override
