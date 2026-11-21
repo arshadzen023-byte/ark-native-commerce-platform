@@ -6,38 +6,35 @@ const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
 
 class StoreApi {
-  static Uri uri(String path, [Map<String, String>? query]) =>
-      Uri.parse(storeUrl).resolve('wp-json/wc/store/v1/' + path).replace(queryParameters: query);
-  static Future<dynamic> get(String path, [Map<String, String>? query]) async {
-    final r = await http.get(uri(path, query), headers: const {'Accept':'application/json'}).timeout(const Duration(seconds: 25));
-    if (r.statusCode < 200 || r.statusCode >= 300) throw Exception('Store API ' + r.statusCode.toString() + ': ' + message(r.body));
-    return jsonDecode(r.body);
+  static String? nonce;
+  static final Map<String,String> cookies={};
+  static Uri uri(String path,[Map<String,String>? query])=>Uri.parse(storeUrl).resolve('wp-json/wc/store/v1/'+path).replace(queryParameters:query);
+  static Map<String,String> get headers=>{'Accept':'application/json',if(cookies.isNotEmpty)'Cookie':cookies.entries.map((e)=>e.key+'='+e.value).join('; ')};
+  static void capture(http.Response r){
+    final n=r.headers['nonce']??r.headers['x-wc-store-api-nonce'];if(n!=null&&n.isNotEmpty)nonce=n;
+    final c=r.headers['set-cookie'];if(c!=null){final first=c.split(';').first;final i=first.indexOf('=');if(i>0)cookies[first.substring(0,i).trim()]=first.substring(i+1).trim();}
   }
-  static Future<dynamic> post(String path, Map<String, dynamic> body, String nonce) async {
-    final r = await http.post(uri(path), headers: {'Accept':'application/json','Content-Type':'application/json','Nonce':nonce}, body:jsonEncode(body)).timeout(const Duration(seconds:30));
-    if (r.statusCode < 200 || r.statusCode >= 300) throw Exception('Store API ' + r.statusCode.toString() + ': ' + message(r.body));
-    return jsonDecode(r.body);
+  static String message(String body){try{final d=jsonDecode(body);if(d is Map)return(d['message']??d['error']??body).toString();}catch(_){}return body.length>260?body.substring(0,260):body;}
+  static Future<http.Response> getResponse(String path,[Map<String,String>? query])async{
+    final r=await http.get(uri(path,query),headers:headers).timeout(const Duration(seconds:25));capture(r);
+    if(r.statusCode<200||r.statusCode>=300)throw Exception('Store API '+r.statusCode.toString()+': '+message(r.body));return r;
   }
-  static String message(String body) {
-    try { final d=jsonDecode(body); if (d is Map) return (d['message'] ?? d['error'] ?? body).toString(); } catch (_) {}
-    return body.length > 240 ? body.substring(0,240) : body;
+  static Future<dynamic> get(String path,[Map<String,String>? query])async=>jsonDecode((await getResponse(path,query)).body);
+  static Future<dynamic> post(String path,Map<String,dynamic> body,String nonceValue)async{
+    if(nonce==null||nonce!.isEmpty)await getResponse('cart');
+    final h=<String,String>{...headers,'Content-Type':'application/json'};
+    final n=nonceValue.isNotEmpty?nonceValue:nonce;if(n!=null&&n.isNotEmpty)h['Nonce']=n;
+    final r=await http.post(uri(path),headers:h,body:jsonEncode(body)).timeout(const Duration(seconds:35));capture(r);
+    if(r.statusCode<200||r.statusCode>=300)throw Exception('Store API '+r.statusCode.toString()+': '+message(r.body));return jsonDecode(r.body);
   }
-  static Future<List<Map<String,dynamic>>> products({String search='', int? category, String order='date'}) async {
+  static Future<List<Map<String,dynamic>>> products({String search='',int? category,String order='date',int? exclude})async{
     final q=<String,String>{'page':'1','per_page':'40','orderby':order,'order':'desc','catalog_visibility':'visible'};
-    if(search.trim().isNotEmpty) q['search']=search.trim();
-    if(category!=null) q['category']=category.toString();
-    final v=await get('products',q);
-    if(v is! List) throw Exception('Invalid products response');
-    return v.whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).toList();
+    if(search.trim().isNotEmpty)q['search']=search.trim();if(category!=null)q['category']=category.toString();if(exclude!=null)q['exclude']=exclude.toString();
+    final v=await get('products',q);if(v is! List)throw Exception('Invalid products response');return v.whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).toList();
   }
-  static Future<List<Map<String,dynamic>>> categories() async {
-    final v=await get('products/categories',{'page':'1','per_page':'100','hide_empty':'true','orderby':'name'});
-    if(v is! List) throw Exception('Invalid categories response');
-    return v.whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).toList();
-  }
-  static Future<Map<String,dynamic>> cart() async => Map<String,dynamic>.from(await get('cart') as Map);
-  static Future<Map<String,dynamic>> add(int id,int qty,String nonce) async =>
-      Map<String,dynamic>.from(await post('cart/add-item',{'id':id,'quantity':qty},nonce) as Map);
+  static Future<List<Map<String,dynamic>>> categories()async{final v=await get('products/categories',{'page':'1','per_page':'100','hide_empty':'true','orderby':'name'});if(v is! List)throw Exception('Invalid categories response');return v.whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).toList();}
+  static Future<Map<String,dynamic>> cart()async=>Map<String,dynamic>.from(await get('cart') as Map);
+  static Future<Map<String,dynamic>> add(int id,int qty,String n)async=>Map<String,dynamic>.from(await post('cart/add-item',{'id':id,'quantity':qty},n) as Map);
 }
 
 void main()=>runApp(const GlowHitApp());
@@ -92,7 +89,7 @@ class _StoreHomeState extends State<StoreHome> {
   }
   Widget card(Map<String,dynamic> p){
     final id=(p['id'] as num?)?.toInt()??0;final liked=wishlist.any((e)=>e['id']==id);
-    return Card(clipBehavior:Clip.antiAlias,child:InkWell(onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ProductPage(product:p,price:price,image:image,onAdd:()=>add(p)))),
+    return Card(clipBehavior:Clip.antiAlias,child:InkWell(onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ProductPage(product:p,price:price,image:image,onAdd:()=>add(p),onBuyNow:(){add(p);Navigator.pop(context);setState(()=>tab=3);}))),
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Expanded(child:Stack(fit:StackFit.expand,children:[
           Container(color:Colors.white,child:image(p).isEmpty?const Icon(Icons.image_outlined,size:42):Image.network(image(p),fit:BoxFit.contain,errorBuilder:(_,__,___)=>const Icon(Icons.broken_image))),
@@ -148,24 +145,87 @@ class _StoreHomeState extends State<StoreHome> {
   }
 }
 
-class ProductPage extends StatelessWidget{
-  const ProductPage({super.key,required this.product,required this.price,required this.image,required this.onAdd});
-  final Map<String,dynamic> product;final String Function(Map) price;final String Function(Map,[int]) image;final VoidCallback onAdd;
+class ProductPage extends StatefulWidget{
+  const ProductPage({super.key,required this.product,required this.price,required this.image,required this.onAdd,required this.onBuyNow});
+  final Map<String,dynamic> product;final String Function(Map) price;final String Function(Map,[int]) image;final VoidCallback onAdd,onBuyNow;
+  @override State<ProductPage> createState()=>_ProductPageState();
+}
+class _ProductPageState extends State<ProductPage>{
+  final PageController page=PageController();Timer? timer;int index=0;bool expanded=false,similarLoading=true;List<Map<String,dynamic>> similar=[];
+  List<dynamic> get pics=>widget.product['images'] is List?widget.product['images'] as List:[];
+  String get description{
+    var t=(widget.product['description']??widget.product['short_description']??'').toString();
+    t=t.replaceAll(RegExp(r'<(script|style)[^>]*>[\\s\\S]*?</\\1>',caseSensitive:false),' ');
+    t=t.replaceAll(RegExp(r'<br\\s*/?>|</p>|</div>|</li>',caseSensitive:false),' ').replaceAll(RegExp(r'<[^>]+>'),' ');
+    for(final e in {'&nbsp;':' ','&amp;':'&','&quot;':'"','&#39;':"'",'&lt;':'<','&gt;':'>'}.entries){t=t.replaceAll(e.key,e.value);}
+    return t.replaceAll(RegExp(r'\\s+'),' ').trim();
+  }
+  List<String> get descriptionImages{
+    final h=(widget.product['description']??'').toString();
+    return RegExp(r'<img[^>]+(?:src|data-src)=["\\x27]([^"\\x27]+)',caseSensitive:false).allMatches(h).map((m)=>m.group(1)??'').where((v)=>v.startsWith('http')).toSet().toList();
+  }
+  String get category{final c=widget.product['categories'];return c is List&&c.isNotEmpty&&c.first is Map?(c.first['name']??'—').toString():'—';}
+  String get vendor{final b=widget.product['brands'];if(b is List&&b.isNotEmpty&&b.first is Map)return(b.first['name']??'').toString();final x=widget.product['extensions'];return x is Map&&x['vendor']!=null?x['vendor'].toString():'Not provided by store';}
+  @override void initState(){super.initState();if(pics.length>1)timer=Timer.periodic(const Duration(seconds:4),(_){if(mounted&&page.hasClients)page.animateToPage((index+1)%pics.length,duration:const Duration(milliseconds:450),curve:Curves.easeInOut);});loadSimilar();}
+  Future<void> loadSimilar()async{try{final c=widget.product['categories'];if(c is List&&c.isNotEmpty&&c.first is Map){final id=(c.first['id'] as num?)?.toInt();if(id!=null){final p=await StoreApi.products(category:id,exclude:(widget.product['id'] as num?)?.toInt());if(mounted)setState(()=>similar=p.take(8).toList());}}}catch(_){}if(mounted)setState(()=>similarLoading=false);}
+  @override void dispose(){timer?.cancel();page.dispose();super.dispose();}
+  void openFull(int i)=>showDialog<void>(context:context,barrierColor:Colors.black,builder:(_)=>_FullImageDialog(images:pics,index:i));
+  Widget gallery()=>Column(children:[
+    SizedBox(height:350,child:pics.isEmpty?const Center(child:Icon(Icons.image_outlined,size:80,color:Colors.grey)):PageView.builder(controller:page,itemCount:pics.length,onPageChanged:(i)=>setState(()=>index=i),itemBuilder:(c,i){final src=(pics[i] is Map?(pics[i]['src']??pics[i]['thumbnail']??''):'').toString();return GestureDetector(onTap:()=>openFull(i),child:Container(color:Colors.white,padding:const EdgeInsets.all(10),child:Image.network(src,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const Icon(Icons.broken_image,size:60))));})),
+    if(pics.length>1)Padding(padding:const EdgeInsets.only(top:8),child:Row(mainAxisAlignment:MainAxisAlignment.center,children:[for(int i=0;i<pics.length;i++)GestureDetector(onTap:()=>page.animateToPage(i,duration:const Duration(milliseconds:250),curve:Curves.ease),child:Container(width:8,height:8,margin:const EdgeInsets.symmetric(horizontal:4),decoration:BoxDecoration(shape:BoxShape.circle,color:i==index?purple:Colors.grey.shade400)))])),
+    if(pics.length>1)SizedBox(height:78,child:ListView.separated(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(vertical:8),itemCount:pics.length,separatorBuilder:(_,__)=>const SizedBox(width:8),itemBuilder:(c,i){final src=(pics[i] is Map?(pics[i]['thumbnail']??pics[i]['src']??''):'').toString();return GestureDetector(onTap:()=>page.animateToPage(i,duration:const Duration(milliseconds:250),curve:Curves.ease),child:Container(width:68,padding:const EdgeInsets.all(3),decoration:BoxDecoration(color:Colors.white,border:Border.all(color:i==index?purple:Colors.black12,width:i==index?2:1),borderRadius:BorderRadius.circular(8)),child:Image.network(src,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const Icon(Icons.image))));}))
+  ]);
+  Widget info(IconData icon,String label,String value)=>Padding(padding:const EdgeInsets.symmetric(vertical:7),child:Row(children:[Icon(icon,size:19,color:purple),const SizedBox(width:10),SizedBox(width:88,child:Text(label,style:const TextStyle(color:Colors.black54))),Expanded(child:Text(value.isEmpty?'—':value,style:const TextStyle(fontWeight:FontWeight.w600)))]));
+  Widget descriptionBlock()=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+    Text('Product description',style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold)),const SizedBox(height:8),
+    Text(description.isEmpty?'No description provided by store.':(!expanded&&description.length>100?description.substring(0,100)+'…':description)),
+    if(description.length>100)Align(alignment:Alignment.centerLeft,child:TextButton.icon(onPressed:()=>setState(()=>expanded=!expanded),icon:Icon(expanded?Icons.expand_less:Icons.expand_more),label:Text(expanded?'Read Less':'More Read'))),
+    for(final src in descriptionImages)Padding(padding:const EdgeInsets.only(top:10),child:ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(src,width:double.infinity,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const SizedBox.shrink())))
+  ]);
+  Widget similarBlock(){
+    if(similarLoading)return const Padding(padding:EdgeInsets.all(18),child:Center(child:CircularProgressIndicator()));if(similar.isEmpty)return const SizedBox.shrink();
+    return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Text('Similar products',style:Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight:FontWeight.bold)),const SizedBox(height:10),
+      SizedBox(height:210,child:ListView.separated(scrollDirection:Axis.horizontal,itemCount:similar.length,separatorBuilder:(_,__)=>const SizedBox(width:10),itemBuilder:(c,i){
+        final p=similar[i],imgs=p['images'];final src=imgs is List&&imgs.isNotEmpty&&imgs.first is Map?(imgs.first['thumbnail']??imgs.first['src']??'').toString():'';
+        final pr=p['prices'];var priceText='';if(pr is Map){final raw=int.tryParse((pr['price']??'').toString())??0;final d=(pr['currency_minor_unit'] as num?)?.toInt()??2;priceText=(pr['currency_symbol']??'₹').toString()+(raw/(d==0?1:(d==1?10:100))).toStringAsFixed(d);}
+        return SizedBox(width:145,child:Card(clipBehavior:Clip.antiAlias,child:InkWell(onTap:()=>Navigator.pushReplacement(context,MaterialPageRoute(builder:(_)=>ProductPage(product:p,price:widget.price,image:widget.image,onAdd:widget.onAdd,onBuyNow:widget.onBuyNow))),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Expanded(child:Container(color:Colors.white,child:src.isEmpty?const Icon(Icons.image):Image.network(src,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const Icon(Icons.image_not_supported)))),
+          Padding(padding:const EdgeInsets.all(7),child:Text((p['name']??'Product').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:12))),
+          Padding(padding:const EdgeInsets.fromLTRB(7,0,7,7),child:Text(priceText,style:const TextStyle(color:purple,fontWeight:FontWeight.bold)))
+        ]))));
+      }))
+    ]);
+  }
   @override Widget build(BuildContext context){
-    final pics=product['images'] is List?product['images'] as List:const [];
-    final desc=(product['description']??product['short_description']??'').toString().replaceAll(RegExp(r'<[^>]*>'),' ').replaceAll('&nbsp;',' ').trim();
-    return Scaffold(appBar:AppBar(title:const Text('Product details')),body:ListView(padding:const EdgeInsets.all(16),children:[
-      SizedBox(height:300,child:pics.isEmpty?const Icon(Icons.image,size:80):PageView(children:[for(final p in pics)Image.network((p is Map?(p['src']??p['thumbnail']??''):'').toString(),fit:BoxFit.contain,errorBuilder:(_,__,___)=>const Icon(Icons.broken_image,size:60))])),
-      const SizedBox(height:16),Text((product['name']??'Product').toString(),style:Theme.of(context).textTheme.titleLarge),
-      const SizedBox(height:8),Text(price(product),style:const TextStyle(fontSize:24,color:purple,fontWeight:FontWeight.bold)),
-      const SizedBox(height:12),Text(product['is_in_stock']==true?'In stock':'Availability may vary'),
-      const Divider(height:28),const Text('Product description',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
-      Text(desc.isEmpty?'Product details are supplied by the store.':desc),
-      const SizedBox(height:20),FilledButton.icon(onPressed:product['is_purchasable']==false?null:onAdd,icon:const Icon(Icons.shopping_cart),label:const Text('ADD TO CART')),
-    ]));
+    final canBuy=widget.product['is_purchasable']!=false&&widget.product['is_in_stock']!=false;final sku=(widget.product['sku']??'').toString();
+    return Scaffold(appBar:AppBar(title:const Text('Product details'),actions:[IconButton(onPressed:()=>openFull(index),icon:const Icon(Icons.fullscreen))]),
+      body:ListView(padding:const EdgeInsets.fromLTRB(16,12,16,110),children:[
+        gallery(),const SizedBox(height:18),Text((widget.product['name']??'Product').toString(),style:Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight:FontWeight.w700)),
+        const SizedBox(height:10),Text(widget.price(widget.product),style:const TextStyle(fontSize:28,color:purple,fontWeight:FontWeight.bold)),
+        const SizedBox(height:8),Row(children:[Icon(canBuy?Icons.check_circle:Icons.cancel,color:canBuy?Colors.green:Colors.red,size:18),const SizedBox(width:7),Text(canBuy?'In stock':'Currently unavailable')]),
+        const Divider(height:28),info(Icons.qr_code,'SKU',sku.isEmpty?'Not available':sku),info(Icons.category_outlined,'Category',category),info(Icons.storefront_outlined,'Vendor',vendor),
+        const Divider(height:28),descriptionBlock(),const Divider(height:30),similarBlock()
+      ]),
+      bottomNavigationBar:SafeArea(top:false,child:Container(padding:const EdgeInsets.fromLTRB(12,10,12,10),decoration:BoxDecoration(color:Theme.of(context).colorScheme.surface,boxShadow:[BoxShadow(color:Colors.black.withOpacity(.10),blurRadius:12,offset:const Offset(0,-3))]),child:Row(children:[
+        SizedBox(width:58,height:52,child:OutlinedButton(onPressed:canBuy?widget.onAdd:null,style:OutlinedButton.styleFrom(padding:EdgeInsets.zero),child:const Icon(Icons.shopping_cart_outlined))),const SizedBox(width:10),
+        Expanded(child:SizedBox(height:52,child:FilledButton(onPressed:canBuy?widget.onBuyNow:null,style:FilledButton.styleFrom(backgroundColor:purple,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(12))),child:const Text('BUY NOW',style:TextStyle(fontWeight:FontWeight.bold,letterSpacing:.5)))))
+      ])))
+    );
   }
 }
-
+class _FullImageDialog extends StatefulWidget{
+  const _FullImageDialog({required this.images,required this.index});final List<dynamic> images;final int index;
+  @override State<_FullImageDialog> createState()=>_FullImageDialogState();
+}
+class _FullImageDialogState extends State<_FullImageDialog>{
+  late final PageController controller=PageController(initialPage:widget.index);
+  @override void dispose(){controller.dispose();super.dispose();}
+  @override Widget build(BuildContext context)=>Dialog.fullscreen(backgroundColor:Colors.black,child:Stack(children:[
+    PageView.builder(controller:controller,itemCount:widget.images.length,itemBuilder:(c,i){final src=(widget.images[i] is Map?(widget.images[i]['src']??widget.images[i]['thumbnail']??''):'').toString();return Center(child:InteractiveViewer(minScale:1,maxScale:5,child:Image.network(src,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const Icon(Icons.broken_image,color:Colors.white,size:60))));}),
+    Positioned(top:24,right:12,child:IconButton(onPressed:()=>Navigator.pop(context),icon:const Icon(Icons.close,color:Colors.white,size:30)))
+  ]));
+}
 class CheckoutPage extends StatefulWidget{
   const CheckoutPage({super.key,required this.items});final List<Map<String,dynamic>> items;
   @override State<CheckoutPage> createState()=>_CheckoutPageState();
