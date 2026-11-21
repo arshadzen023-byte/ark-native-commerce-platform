@@ -162,6 +162,22 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       key: formKey,
       child: ListView(padding: const EdgeInsets.all(16), children: [
         const Text('Where should we deliver?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 12),
+        if (savedAddresses.isNotEmpty) ...[
+          DropdownButtonFormField<int>(
+            value: selectedSavedAddress,
+            decoration: const InputDecoration(labelText: 'Choose a saved address', border: OutlineInputBorder()),
+            items: [const DropdownMenuItem(value: -1, child: Text('Enter a new address')), ...List.generate(savedAddresses.length, (i) => DropdownMenuItem(value: i, child: Text((savedAddresses[i]['label'] ?? 'Address ${i + 1}').toString())))],
+            onChanged: (index) { if (index == null) return; if (index == -1) { setState(() => selectedSavedAddress = -1); } else { _applySavedAddress(savedAddresses[index]); } },
+          ),
+          const SizedBox(height: 12),
+        ],
+        DropdownButtonFormField<String>(
+          value: addressLabel,
+          decoration: const InputDecoration(labelText: 'Address type', border: OutlineInputBorder()),
+          items: const [DropdownMenuItem(value: 'Home', child: Text('Home')), DropdownMenuItem(value: 'Work', child: Text('Work')), DropdownMenuItem(value: 'Other', child: Text('Other'))],
+          onChanged: (value) { if (value != null) setState(() => addressLabel = value); },
+        ),
         const SizedBox(height: 16),
         Row(children: [Expanded(child: field('first_name', 'First name')), const SizedBox(width: 10), Expanded(child: field('last_name', 'Last name'))]),
         field('email', 'Email address', type: TextInputType.emailAddress),
@@ -185,10 +201,13 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
             );
           }),
         ],
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(onPressed: busy ? null : () async { if (!formKey.currentState!.validate()) return; await _saveCurrentAddress(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address saved'))); }, icon: const Icon(Icons.bookmark_add_outlined), label: const Text('SAVE THIS ADDRESS')),
+        const SizedBox(height: 8),
         SizedBox(height: 54, child: FilledButton(
-          onPressed: busy ? null : () {
+          onPressed: busy ? null : () async {
             if (!formKey.currentState!.validate()) return;
+            await _saveCurrentAddress();
             if (rates.isNotEmpty && selectedRate == null) {
               setState(() => error = 'Please select a shipping method.');
               return;
