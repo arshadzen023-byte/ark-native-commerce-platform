@@ -170,9 +170,18 @@ final class ARK_Native_Customer_API_Bridge {
         }
         $items = get_user_meta($id, '_ark_native_saved_addresses', true);
         $items = is_array($items) ? array_values($items) : [];
-        $address['id'] = wp_generate_uuid4();
         $address['label'] = $label;
-        $items[] = $address;
+        $matched = false;
+        foreach ($items as &$existing) {
+            if (($existing['address_1'] ?? '') === $address['address_1'] && ($existing['postcode'] ?? '') === $address['postcode'] && ($existing['first_name'] ?? '') === $address['first_name']) {
+                $address['id'] = $existing['id'] ?? wp_generate_uuid4();
+                $existing = $address;
+                $matched = true;
+                break;
+            }
+        }
+        unset($existing);
+        if (!$matched) { $address['id'] = wp_generate_uuid4(); $items[] = $address; }
         update_user_meta($id, '_ark_native_saved_addresses', $items);
         return rest_ensure_response($items);
     }
