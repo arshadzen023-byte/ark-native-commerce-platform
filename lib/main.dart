@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'product_details_page.dart';
+import 'customer_account_page.dart';
 import 'checkout_page.dart';
 import 'woo_store_api.dart';
 
@@ -194,7 +195,7 @@ class _StoreHomeState extends State<StoreHome> {
     else if (products.isEmpty) const Expanded(child: Center(child: Text('No products found. Try another search.')))
     else Expanded(child: GridView.builder(padding: const EdgeInsets.fromLTRB(12, 0, 12, 18), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .66, crossAxisSpacing: 10, mainAxisSpacing: 10), itemCount: products.length, itemBuilder: (_, i) => productCard(products[i]))),
   ]);
-  Widget account() => AccountPanel(onLogin: (token) => setState(() => customerToken = token), onLogout: () async { final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() => customerToken = null); }, token: customerToken);
+  Widget account() => AccountPanel(onLogin: (token) => setState(() => customerToken = token), onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() => customerToken = null); }, token: customerToken);
   @override Widget build(BuildContext context) {
     final titles = ['Shopping', 'Categories', 'Wishlist', 'Cart', 'Account'];
     Widget page;
@@ -248,7 +249,7 @@ class _AccountPanelState extends State<AccountPanel> {
       const Padding(padding: EdgeInsets.only(top: 20), child: Icon(Icons.verified_user, size: 56, color: Colors.green)),
       const SizedBox(height: 20),
       for (final item in [(Icons.receipt_long_outlined, 'My Orders'), (Icons.download_outlined, 'Downloads'), (Icons.location_on_outlined, 'Saved Addresses'), (Icons.person_outline, 'Edit Profile')])
-        Card(child: ListTile(leading: Icon(item.$1, color: purple), title: Text(item.$2), trailing: const Icon(Icons.chevron_right), onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${item.$2} needs the authenticated ARK customer API bridge enabled on the store.'))))),
+        Card(child: ListTile(leading: Icon(item.$1, color: purple), title: Text(item.$2), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: item.$2))))),
       const SizedBox(height: 8),
       OutlinedButton.icon(onPressed: widget.onLogout, icon: const Icon(Icons.logout), label: const Text('LOG OUT')),
     ],
