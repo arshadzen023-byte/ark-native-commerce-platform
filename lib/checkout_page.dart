@@ -34,7 +34,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
     try {
       final c = await widget.api.getCart();
       final checkout = await widget.api.getCheckout();
-      final methods = (checkout['payment_methods'] as List? ?? []).whereType<Map>().map((e) => Map<String,dynamic>.from(e)).toList();
+      final methods = (c['payment_methods'] as List? ?? checkout['payment_methods'] as List? ?? []).map((e) => e is Map ? Map<String,dynamic>.from(e) : {'id': e.toString(), 'title': e.toString()}).toList();
       final packages = (c['shipping_rates'] as List? ?? c['packages'] as List? ?? []);
       final rates = <Map<String,dynamic>>[];
       for (final pkg in packages.whereType<Map>()) {
@@ -53,7 +53,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
       if (_city.text.isEmpty) _city.text = (customer['city'] ?? '').toString();
       if (_state.text.isEmpty) _state.text = (customer['state'] ?? '').toString();
       if (_postcode.text.isEmpty) _postcode.text = (customer['postcode'] ?? '').toString();
-      if (mounted) setState(() { cart = c; paymentMethods = methods; shippingRates = rates; selectedPayment = methods.isEmpty ? null : methods.first['id']?.toString(); loading = false; });
+      if (mounted) setState(() { cart = c; paymentMethods = methods; shippingRates = rates; selectedPayment = methods.isEmpty ? null : methods.first['id']?.toString(); selectedRate = rates.where((r) => r['selected'] == true).map((r) => (r['rate_id'] ?? '').toString()).firstOrNull; loading = false; });
     } catch (e) { if (mounted) setState(() { error = e.toString().replaceFirst('Exception: ', ''); loading = false; }); }
   }
   Map<String,dynamic> _addressData() => {
@@ -89,7 +89,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
           rates.add({...Map<String,dynamic>.from(item), 'package_id': packageId});
         }
       }
-      setState(() { cart = updated; shippingRates = rates; selectedRate = null; });
+      setState(() { cart = updated; shippingRates = rates; selectedRate = rates.where((r) => r['selected'] == true).map((r) => (r['rate_id'] ?? '').toString()).firstOrNull; });
       if (rates.isEmpty) setState(() => error = 'No shipping rates returned for this address. Check WooCommerce shipping zones and methods for this PIN code.');
     } catch (e) { setState(() => error = e.toString().replaceFirst('Exception: ', '')); }
     finally { if (mounted) setState(() => working = false); }
