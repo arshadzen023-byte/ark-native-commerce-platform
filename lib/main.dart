@@ -130,9 +130,9 @@ class _StoreHomeState extends State<StoreHome> {
     try { final value = await woo.getCart(); if (mounted) setState(() => liveCart = value); }
     catch (e) { if (mounted) setState(() => error = 'Cart: ' + e.toString().replaceFirst('Exception: ', '')); }
   }
-  Future<void> _addToCart(Map<String,dynamic> product) async {
+  Future<bool> _addToCart(Map<String,dynamic> product) async {
     final id = (product['id'] as num?)?.toInt();
-    if (id == null) return;
+    if (id == null) return false;
     setState(() => cartBusy = true);
     try { final value = await woo.addItem(id); if (mounted) { setState(() => liveCart = value); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added to cart'))); } }
     catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')))); }
