@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'woo_store_api.dart';
 
 class PaymentPage extends StatefulWidget {
@@ -327,10 +328,11 @@ class _PaymentPageState extends State<PaymentPage> {
               OutlinedButton.icon(
                 onPressed: () async {
                   final uri = Uri.tryParse(upiUri);
-                  if (uri != null) {
-                    // UPI deep links are opened by installed payment apps.
+                  if (uri == null) return;
+                  final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  if (!opened && mounted) {
                     await Clipboard.setData(ClipboardData(text: upiUri));
-                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('UPI payment link copied. Open your UPI app to pay.')));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No UPI app opened. Payment link copied instead.')));
                   }
                 },
                 icon: const Icon(Icons.open_in_new),
