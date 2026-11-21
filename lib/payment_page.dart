@@ -229,7 +229,15 @@ class _PaymentPageState extends State<PaymentPage> {
           if (createdOrder == null) ...[
             if (methods.isEmpty)
               _notice(error ?? 'No active payment methods were returned. Enable COD or UPI in WooCommerce and check the ARK Native API Bridge.', Icons.info_outline),
-            if (isUpi && (upi['upi_address_mode'] ?? 'hide') != 'hide') ...[\n            TextField(\n              controller: _payerUpiController,\n              keyboardType: TextInputType.emailAddress,\n              decoration: const InputDecoration(labelText: 'Your UPI ID', hintText: 'name@bank', border: OutlineInputBorder(), prefixIcon: Icon(Icons.alternate_email)),\n            ),\n            const SizedBox(height: 12),\n          ],\n          ...methods.map((method) {
+            if (isUpi && (upi['upi_address_mode'] ?? 'hide') != 'hide') ...[
+            TextField(
+              controller: _payerUpiController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Your UPI ID', hintText: 'name@bank', border: OutlineInputBorder(), prefixIcon: Icon(Icons.alternate_email)),
+            ),
+            const SizedBox(height: 12),
+          ],
+          ...methods.map((method) {
               final id = (method['id'] ?? '').toString();
               final active = selected == id;
               final isCod = id == 'cod';
