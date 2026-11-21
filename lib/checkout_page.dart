@@ -6,8 +6,9 @@ import 'payment_page.dart';
 import 'woo_store_api.dart';
 
 class WooCheckoutPage extends StatefulWidget {
-  const WooCheckoutPage({super.key, required this.api});
+  const WooCheckoutPage({super.key, required this.api, this.customerToken});
   final WooStoreApi api;
+  final String? customerToken;
   @override
   State<WooCheckoutPage> createState() => _WooCheckoutPageState();
 }
@@ -35,7 +36,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
 
   Future<void> openAddress() async {
     final result = await Navigator.push<Map<String, dynamic>>(context, MaterialPageRoute(
-      builder: (_) => DeliveryAddressPage(api: widget.api, initialAddress: address),
+      builder: (_) => DeliveryAddressPage(api: widget.api, initialAddress: address, customerToken: widget.customerToken),
     ));
     if (result == null || !mounted) return;
     address = Map<String, dynamic>.from(result['address'] as Map);
