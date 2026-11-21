@@ -24,12 +24,10 @@ class WooStoreApi {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_tokenKey, token);
     }
-    final nextNonce = _header(response, 'Nonce');
-    if (nextNonce != null && nextNonce.isNotEmpty) nonce = nextNonce;
+    nonce = _header(response, 'Nonce') ?? _header(response, 'X-WC-Store-API-Nonce') ?? nonce;
   }
 
-  Future<Map<String, dynamic>> _send(
-    String path, {
+  Future<Map<String, dynamic>> _send(String path, {
     String method = 'GET',
     Map<String, String>? query,
     Map<String, dynamic>? body,
@@ -40,7 +38,10 @@ class WooStoreApi {
     final headers = <String, String>{'Accept': 'application/json'};
     if (body != null) headers['Content-Type'] = 'application/json';
     if (_cartToken != null) headers['Cart-Token'] = _cartToken!;
-    if (nonce != null) headers['Nonce'] = nonce!;
+    if (nonce != null) {
+      headers['Nonce'] = nonce!;
+      headers['X-WC-Store-API-Nonce'] = nonce!;
+    }
     final request = http.Request(method, uri)..headers.addAll(headers);
     if (body != null) request.body = jsonEncode(body);
     final client = http.Client();
@@ -52,11 +53,11 @@ class WooStoreApi {
       try {
         decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
       } catch (_) {
-        throw Exception('WooCommerce returned an invalid response (HTTP ' + response.statusCode.toString() + ').');
+        throw Exception('WooCommerce returned an invalid response (HTTP \${response.statusCode}).');
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final message = decoded is Map ? (decoded['message'] ?? decoded['code'] ?? response.body) : response.body;
-        throw Exception('Store API ' + response.statusCode.toString() + ': ' + message.toString());
+        throw Exception('Store API \${response.statusCode}: $message');
       }
       if (decoded is Map<String, dynamic>) return decoded;
       throw Exception('Unexpected WooCommerce response format.');
@@ -90,19 +91,11 @@ class WooStoreApi {
   Future<Map<String, dynamic>> removeItem(String key) =>
       _send('cart/remove-item', method: 'POST', body: {'key': key});
 
-  Future<Map<String, dynamic>> updateCustomer({
-    required Map<String, dynamic> billing,
-    required Map<String, dynamic> shipping,
-  }) => _send('cart/update-customer', method: 'POST', body: {
-    'billing_address': billing,
-    'shipping_address': shipping,
-  });
+  Future<Map<String, dynamic>> updateCustomer({required Map<String, dynamic> billing, required Map<String, dynamic> shipping}) =>
+      _send('cart/update-customer', method: 'POST', body: {'billing_address': billing, 'shipping_address': shipping});
 
   Future<Map<String, dynamic>> selectShippingRate(int packageId, String rateId) =>
-      _send('cart/select-shipping-rate', method: 'POST', body: {
-        'package_id': packageId,
-        'rate_id': rateId,
-      });
+      _send('cart/select-shipping-rate', method: 'POST', body: {'package_id': packageId, 'rate_id': rateId});
 
   Future<Map<String, dynamic>> getCheckout() => _send('checkout');
 
@@ -110,7 +103,6 @@ class WooStoreApi {
     required Map<String, dynamic> billing,
     required Map<String, dynamic> shipping,
     required String paymentMethod,
-    required String expectedTotal,
     String customerNote = '',
     List<Map<String, dynamic>> paymentData = const [],
   }) => _send('checkout', method: 'POST', body: {
@@ -119,6 +111,5 @@ class WooStoreApi {
     'payment_method': paymentMethod,
     'payment_data': paymentData,
     'customer_note': customerNote,
-    'expected_total': expectedTotal,
   });
 }
