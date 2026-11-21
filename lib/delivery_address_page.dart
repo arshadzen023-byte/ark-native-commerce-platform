@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'woo_store_api.dart';
 
 class DeliveryAddressPage extends StatefulWidget {
@@ -17,6 +19,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   bool busy = false;
   String? error;
   Map<String, dynamic> updatedCart = {};
+  List<Map<String, dynamic>> savedAddresses = [];
+  String addressLabel = 'Home';
+  static const _savedAddressKey = 'glowhit_saved_delivery_addresses';
 
   @override
   void initState() {
@@ -35,7 +40,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     };
   }
 
-  TextEditingController _controller(String key, {String fallback = ''}) =>
+  Future<void> _loadSavedAddresses() async {\n    final prefs = await SharedPreferences.getInstance();\n    final raw = prefs.getString(_savedAddressKey);\n    if (raw == null) return;\n    try {\n      final list = jsonDecode(raw) as List;\n      if (mounted) setState(() => savedAddresses = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList());\n    } catch (_) { /* Ignore an old or malformed local cache. */ }\n  }\n\n  Future<void> _saveCurrentAddress() async {\n    final value = address;\n    value['label'] = addressLabel;\n    final key = _savedAddressKey;\n    final prefs = await SharedPreferences.getInstance();\n    final index = savedAddresses.indexWhere((e) => e['address_1'] == value['address_1'] && e['postcode'] == value['postcode'] && e['first_name'] == value['first_name']);\n    if (index >= 0) { savedAddresses[index] = value; } else { savedAddresses.add(value); }\n    await prefs.setString(key, jsonEncode(savedAddresses));\n    if (mounted) setState(() {});\n  }\n\n  void _applySavedAddress(Map<String, dynamic> value) {\n    for (final entry in fields.entries) {\n      entry.value.text = (value[entry.key] ?? '').toString();\n    }\n    setState(() => addressLabel = (value['label'] ?? 'Home').toString());\n  }\n\n  TextEditingController _controller(String key, {String fallback = ''}) =>
       TextEditingController(text: (widget.initialAddress[key] ?? fallback).toString());
 
   @override
