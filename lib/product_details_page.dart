@@ -21,8 +21,8 @@ class ProductDetailsPage extends StatelessWidget {
 
   String _plainText(dynamic value) => (value ?? '')
       .toString()
-      .replaceAll(RegExp(r'<br\\s*/?>', caseSensitive: false), '\\n')
-      .replaceAll(RegExp(r'</p>', caseSensitive: false), '\\n\\n')
+      .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n\n')
       .replaceAll(RegExp(r'<[^>]*>'), '')
       .replaceAll('&nbsp;', ' ')
       .replaceAll('&amp;', '&')
@@ -49,7 +49,7 @@ class ProductDetailsPage extends StatelessWidget {
         title: const Text('Product details'),
         actions: [
           IconButton(onPressed: onWishlist, icon: Icon(isWishlisted ? Icons.favorite : Icons.favorite_border, color: isWishlisted ? Colors.red : null)),
-          IconButton(onPressed: () => Share.share('$name\\n${product['permalink'] ?? ''}'), icon: const Icon(Icons.share_outlined)),
+          IconButton(onPressed: () => Share.share('$name\n${product['permalink'] ?? ''}'), icon: const Icon(Icons.share_outlined)),
         ],
       ),
       body: ListView(
