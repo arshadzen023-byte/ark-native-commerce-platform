@@ -12,10 +12,10 @@ class OrderConfirmationPage extends StatelessWidget {
 
   String amount() {
     final totals = order['totals'] is Map ? order['totals'] as Map : (cart['totals'] is Map ? cart['totals'] as Map : const {});
-    final raw = int.tryParse('\${totals['total_price'] ?? '0'}') ?? 0;
+    final raw = int.tryParse('${totals['total_price'] ?? '0'}') ?? 0;
     final digits = (totals['currency_minor_unit'] as num?)?.toInt() ?? 2;
     final divisor = digits == 0 ? 1 : (digits == 1 ? 10 : 100);
-    return '\${totals['currency_symbol'] ?? '₹'}\${(raw / divisor).toStringAsFixed(digits)}';
+    return '${totals['currency_symbol'] ?? '₹'}${(raw / divisor).toStringAsFixed(digits)}';
   }
 
   @override

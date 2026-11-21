@@ -32,10 +32,10 @@ class _PaymentPageState extends State<PaymentPage> {
 
   String money(Map? data) {
     if (data == null) return '';
-    final raw = int.tryParse('\${data['total_price'] ?? '0'}') ?? 0;
+    final raw = int.tryParse('${data['total_price'] ?? '0'}') ?? 0;
     final digits = (data['currency_minor_unit'] as num?)?.toInt() ?? 2;
     final divisor = digits == 0 ? 1 : (digits == 1 ? 10 : 100);
-    return '\${data['currency_symbol'] ?? '₹'}\${(raw / divisor).toStringAsFixed(digits)}';
+    return '${data['currency_symbol'] ?? '₹'}${(raw / divisor).toStringAsFixed(digits)}';
   }
 
   Future<void> placeOrder() async {

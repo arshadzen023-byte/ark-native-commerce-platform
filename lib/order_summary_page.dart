@@ -7,10 +7,10 @@ class OrderSummaryPage extends StatelessWidget {
 
   String money(dynamic data) {
     if (data is! Map) return '';
-    final raw = int.tryParse('\${data['total_price'] ?? data['line_total'] ?? '0'}') ?? 0;
+    final raw = int.tryParse('${data['total_price'] ?? data['line_total'] ?? '0'}') ?? 0;
     final digits = (data['currency_minor_unit'] as num?)?.toInt() ?? 2;
     final divisor = digits == 0 ? 1 : (digits == 1 ? 10 : 100);
-    return '\${data['currency_symbol'] ?? '₹'}\${(raw / divisor).toStringAsFixed(digits)}';
+    return '${data['currency_symbol'] ?? '₹'}${(raw / divisor).toStringAsFixed(digits)}';
   }
 
   @override
@@ -22,7 +22,7 @@ class OrderSummaryPage extends StatelessWidget {
       body: ListView(padding: const EdgeInsets.all(16), children: [
         const Text('Review your order', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
         const SizedBox(height: 6),
-        Text('\${items.length} product\${items.length == 1 ? '' : 's'} in your cart', style: TextStyle(color: Colors.grey.shade700)),
+        Text('${items.length} product${items.length == 1 ? '' : 's'} in your cart', style: TextStyle(color: Colors.grey.shade700)),
         const SizedBox(height: 14),
         ...items.map((item) {
           final images = item['images'] as List? ?? [];
@@ -38,7 +38,7 @@ class OrderSummaryPage extends StatelessWidget {
                   ? const Icon(Icons.shopping_bag_outlined)
                   : Image.network(image, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined))),
               title: Text((item['name'] ?? 'Product').toString(), maxLines: 2, overflow: TextOverflow.ellipsis),
-              subtitle: Text('Quantity: \${item['quantity'] ?? 1}'),
+              subtitle: Text('Quantity: ${item['quantity'] ?? 1}'),
               trailing: Text(money(lineTotals), style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
           );

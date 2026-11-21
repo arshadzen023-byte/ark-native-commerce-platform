@@ -53,11 +53,11 @@ class WooStoreApi {
       try {
         decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
       } catch (_) {
-        throw Exception('WooCommerce returned an invalid response (HTTP \${response.statusCode}).');
+        throw Exception('WooCommerce returned an invalid response (HTTP ${response.statusCode}).');
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final message = decoded is Map ? (decoded['message'] ?? decoded['code'] ?? response.body) : response.body;
-        throw Exception('Store API \${response.statusCode}: $message');
+        throw Exception('Store API ${response.statusCode}: $message');
       }
       if (decoded is Map<String, dynamic>) return decoded;
       throw Exception('Unexpected WooCommerce response format.');

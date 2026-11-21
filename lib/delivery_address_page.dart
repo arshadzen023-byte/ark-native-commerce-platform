@@ -89,10 +89,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   }
 
   String ratePrice(Map<String, dynamic> rate) {
-    final raw = int.tryParse('\${rate['price'] ?? rate['cost'] ?? '0'}') ?? 0;
+    final raw = int.tryParse('${rate['price'] ?? rate['cost'] ?? '0'}') ?? 0;
     final digits = (rate['currency_minor_unit'] as num?)?.toInt() ?? 2;
     final divisor = digits == 0 ? 1 : (digits == 1 ? 10 : 100);
-    return '\${rate['currency_symbol'] ?? '₹'}\${(raw / divisor).toStringAsFixed(digits)}';
+    return '${rate['currency_symbol'] ?? '₹'}${(raw / divisor).toStringAsFixed(digits)}';
   }
 
   Widget field(String key, String label, {TextInputType type = TextInputType.text, bool required = true}) =>
