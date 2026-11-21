@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -101,6 +102,58 @@ class WooStoreApi {
 
   Future<Map<String, dynamic>> selectShippingRate(int packageId, String rateId) =>
       _send('cart/select-shipping-rate', method: 'POST', body: {'package_id': packageId, 'rate_id': rateId});
+
+  Future<Map<String, dynamic>> getNativePaymentConfig() async {
+    final response = await http.get(
+      Uri.parse(baseUrl).resolve('wp-json/ark-native/v1/payment/config'),
+      headers: const {'Accept': 'application/json'},
+    ).timeout(const Duration(seconds: 20));
+    dynamic decoded;
+    try { decoded = jsonDecode(response.body); } catch (_) {
+      throw Exception('Payment service returned an invalid response.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300 || decoded is! Map) {
+      final message = decoded is Map ? decoded['message'] : null;
+      throw Exception(message?.toString() ?? 'Unable to load store payment methods.');
+    }
+    return Map<String, dynamic>.from(decoded);
+  }
+
+  Future<Map<String, dynamic>> submitUpiPayment({
+    required int orderId,
+    required String orderKey,
+    required String transactionId,
+    Uint8List? screenshotBytes,
+    String screenshotName = 'upi-payment.jpg',
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse(baseUrl).resolve('wp-json/ark-native/v1/payment/upi-submit'),
+    );
+    request.fields.addAll({
+      'order_id': orderId.toString(),
+      'order_key': orderKey,
+      'transaction_id': transactionId,
+    });
+    if (screenshotBytes != null) {
+      request.files.add(http.MultipartFile.fromBytes(
+        'screenshot',
+        screenshotBytes,
+        filename: screenshotName,
+      ));
+    }
+    final streamed = await request.send().timeout(const Duration(seconds: 45));
+    final response = await http.Response.fromStream(streamed);
+    dynamic decoded;
+    try { decoded = jsonDecode(response.body); } catch (_) {
+      throw Exception('UPI submission returned an invalid response.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300 || decoded is! Map) {
+      final message = decoded is Map ? decoded['message'] : null;
+      throw Exception(message?.toString() ?? 'UPI details could not be submitted.');
+    }
+    return Map<String, dynamic>.from(decoded);
+  }
 
   Future<Map<String, dynamic>> getCheckout() => _send('checkout');
 
