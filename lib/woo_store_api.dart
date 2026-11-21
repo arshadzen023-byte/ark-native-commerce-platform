@@ -76,8 +76,8 @@ class WooStoreApi {
       _cartToken = prefs.getString(_tokenKey);
     }
     final cart = await _send('cart', ensureCart: false);
-    if (_cartToken == null) {
-      throw Exception('WooCommerce did not return a Cart-Token. Check Store API/session configuration on pluginstore.shop.');
+    if (_cartToken == null && nonce == null) {
+      throw Exception('WooCommerce returned neither Cart-Token nor Nonce. Check Store API/session configuration on pluginstore.shop.');
     }
     return cart;
   }
