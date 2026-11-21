@@ -59,16 +59,16 @@ jobs:
         run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
-          name: glowhit-checkout-v1-build-82
+          name: glowhit-account-checkout-fix-2026-11-21
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
       - name: Publish installable APK release
-        if: startsWith(github.ref, 'refs/heads/feature/glowhit-account-product-checkout-v1')
+        if: startsWith(github.ref, 'refs/heads/feature/glowhit-account-checkout-fix-2026-11-21')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: glowhit-v1.0.2-build82
-          name: GlowHit v1.0.2 — Checkout and order confirmation
+          tag_name: glowhit-v1.0.3-account-checkout-fix
+          name: GlowHit v1.0.3 — Account and checkout fixes
           prerelease: true
           generate_release_notes: true
           fail_on_unmatched_files: true
