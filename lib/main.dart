@@ -35,6 +35,8 @@ class StoreApi {
   static Future<List<Map<String,dynamic>>> categories()async{final v=await get('products/categories',{'page':'1','per_page':'100','hide_empty':'true','orderby':'name'});if(v is! List)throw Exception('Invalid categories response');return v.whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).toList();}
   static Future<Map<String,dynamic>> cart()async=>Map<String,dynamic>.from(await get('cart') as Map);
   static Future<Map<String,dynamic>> add(int id,int qty,String n)async=>Map<String,dynamic>.from(await post('cart/add-item',{'id':id,'quantity':qty},n) as Map);
+  static Future<Map<String,dynamic>> updateCustomer(Map<String,dynamic> address,String n)async=>Map<String,dynamic>.from(await post('cart/update-customer',{'billing_address':address,'shipping_address':address},n) as Map);
+  static Future<Map<String,dynamic>> selectShipping(int packageId,String rateId,String n)async=>Map<String,dynamic>.from(await post('cart/select-shipping-rate',{'package_id':packageId,'rate_id':rateId},n) as Map);
 }
 
 void main()=>runApp(const GlowHitApp());
@@ -233,25 +235,66 @@ class CheckoutPage extends StatefulWidget{
 class _CheckoutPageState extends State<CheckoutPage>{
   final keyForm=GlobalKey<FormState>();
   final first=TextEditingController(),last=TextEditingController(),email=TextEditingController(),phone=TextEditingController(),address=TextEditingController(),city=TextEditingController(),state=TextEditingController(),pin=TextEditingController();
-  String payment='cod';String? nonce,error;bool busy=false,ready=false;
+  String payment='cod';String? nonce,error,shippingRateId;bool busy=false,ready=false;
+  Map<String,dynamic>? cartData;List<Map<String,dynamic>> paymentMethods=[],shippingRates=[];
   @override void initState(){super.initState();prepare();}
   @override void dispose(){for(final c in [first,last,email,phone,address,city,state,pin]){c.dispose();}super.dispose();}
+  Map<String,dynamic> get addressData=>{'first_name':first.text.trim(),'last_name':last.text.trim(),'email':email.text.trim(),'phone':phone.text.trim(),'address_1':address.text.trim(),'city':city.text.trim(),'state':state.text.trim(),'postcode':pin.text.trim(),'country':'IN'};
+  List<Map<String,dynamic>> extractRates(Map<String,dynamic> cart){
+    final out=<Map<String,dynamic>>[];final packs=cart['shipping_rates'];
+    if(packs is List)for(int i=0;i<packs.length;i++){final p=packs[i];if(p is Map){final rates=p['shipping_rates']??p['rates'];if(rates is List)for(final r in rates)if(r is Map)out.add({...Map<String,dynamic>.from(r),'_package_id':p['package_id']??i});}}
+    return out;
+  }
   Future<void> prepare()async{
-    try{var c=await StoreApi.cart();nonce=(c['nonce']??'').toString();for(final p in widget.items){final id=(p['id'] as num?)?.toInt()??0;if(id>0){c=await StoreApi.add(id,(p['_qty'] as int?)??1,nonce??'');nonce=(c['nonce']??nonce??'').toString();}}if(mounted)setState(()=>ready=true);}
-    catch(e){if(mounted)setState(()=>error='Could not sync cart with store: '+e.toString());}
+    try{
+      var c=await StoreApi.cart();nonce=StoreApi.nonce??'';
+      for(final p in widget.items){final id=(p['id'] as num?)?.toInt()??0;if(id>0){c=await StoreApi.add(id,(p['_qty'] as int?)??1,nonce??'');nonce=StoreApi.nonce??nonce;}}
+      c=await StoreApi.cart();nonce=StoreApi.nonce??nonce;
+      List<Map<String,dynamic>> methods=[];
+      try{final x=await StoreApi.get('checkout');if(x is Map&&x['payment_methods'] is List)methods=(x['payment_methods'] as List).whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).toList();}catch(_){}
+      if(mounted)setState((){
+        cartData=c;paymentMethods=methods;shippingRates=extractRates(c);
+        if(methods.isNotEmpty)payment=methods.any((m)=>m['id']=='cod')?'cod':(methods.first['id']??'').toString();
+        if(shippingRates.isNotEmpty)shippingRateId=(shippingRates.first['rate_id']??shippingRates.first['id']??'').toString();
+        ready=true;
+      });
+    }catch(e){if(mounted)setState(()=>error='Could not prepare WooCommerce cart: '+e.toString());}
   }
   Widget field(TextEditingController c,String label,{TextInputType type=TextInputType.text})=>Padding(padding:const EdgeInsets.only(bottom:10),child:TextFormField(controller:c,keyboardType:type,decoration:InputDecoration(labelText:label,border:const OutlineInputBorder()),validator:(v)=>v==null||v.trim().isEmpty?'Enter '+label:null));
-  Future<void> submit()async{
-    if(!keyForm.currentState!.validate())return;if(nonce==null||nonce!.isEmpty){setState(()=>error='Store cart is not ready. Retry.');return;}
-    setState(() { busy = true; error = null; });
+  Future<void> calculateShipping()async{
+    if(!keyForm.currentState!.validate())return;
+    setState(()=>busy=true);
     try{
-      final billing={'first_name':first.text.trim(),'last_name':last.text.trim(),'email':email.text.trim(),'phone':phone.text.trim(),'address_1':address.text.trim(),'city':city.text.trim(),'state':state.text.trim(),'postcode':pin.text.trim(),'country':'IN'};
-      final body={'billing_address':billing,'shipping_address':billing,'payment_method':payment,'payment_data':<Map<String,dynamic>>[]};
-      final r=await StoreApi.post('checkout',body,nonce!);
+      final updated=await StoreApi.updateCustomer(addressData,nonce??'');nonce=StoreApi.nonce??nonce;
+      final cart=await StoreApi.cart();nonce=StoreApi.nonce??nonce;
+      if(mounted)setState(()=>{cartData=cart,shippingRates=extractRates(cart),shippingRateId=shippingRates.isNotEmpty?(shippingRates.first['rate_id']??shippingRates.first['id']??'').toString():null,error=null});
+    }catch(e){if(mounted)setState(()=>error='Shipping calculation failed: '+e.toString());}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
+  Future<void> chooseShipping(Map<String,dynamic> rate)async{
+    final package=(rate['_package_id'] as num?)?.toInt()??0;final id=(rate['rate_id']??rate['id']??'').toString();if(id.isEmpty)return;
+    setState(()=>busy=true);
+    try{final c=await StoreApi.selectShipping(package,id,nonce??'');nonce=StoreApi.nonce??nonce;if(mounted)setState(()=>cartData=c);}
+    catch(e){if(mounted)setState(()=>error='Shipping selection failed: '+e.toString());}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
+  String get totalLabel{
+    final t=cartData?['totals'];if(t is Map){final raw=int.tryParse((t['total_price']??'').toString())??0;final d=(t['currency_minor_unit'] as num?)?.toInt()??2;final sym=(t['currency_symbol']??'₹').toString();return sym+(raw/(d==0?1:(d==1?10:100))).toStringAsFixed(d);}return '';
+  }
+  Future<void> submit()async{
+    if(!keyForm.currentState!.validate())return;if(!ready){setState(()=>error='Cart is still preparing.');return;}
+    setState((){busy=true;error=null;});
+    try{
+      final r=await StoreApi.post('checkout',{'billing_address':addressData,'shipping_address':addressData,'payment_method':payment,'payment_data':<Map<String,dynamic>>[]},nonce??'');
+      nonce=StoreApi.nonce??nonce;
+      final redirect=(r['payment_result'] is Map?(r['payment_result']['redirect_url']??''):'').toString();
       final id=r['order_id']??r['id']??'';
       if(!mounted)return;
-      await showDialog<void>(context:context,builder:(_)=>AlertDialog(title:const Text('Order response received'),content:Text('Order reference: '+id.toString()),actions:[FilledButton(onPressed:()=>Navigator.pop(context),child:const Text('Done'))]));
-      if(mounted)Navigator.pop(context,true);
+      if(redirect.isNotEmpty){setState(()=>error='Payment gateway returned this secure payment link: '+redirect);}
+      else{
+        await showDialog<void>(context:context,builder:(_)=>AlertDialog(title:const Text('Order submitted'),content:Text('Order reference: '+id.toString()+'\nStatus: '+(r['status']??'received').toString()),actions:[FilledButton(onPressed:()=>Navigator.pop(context),child:const Text('Done'))]));
+        if(mounted)Navigator.pop(context,true);
+      }
     }catch(e){if(mounted)setState(()=>error=e.toString());}
     finally{if(mounted)setState(()=>busy=false);}
   }
@@ -260,16 +303,18 @@ class _CheckoutPageState extends State<CheckoutPage>{
     Row(children:[Expanded(child:field(first,'First name')),const SizedBox(width:8),Expanded(child:field(last,'Last name'))]),
     field(email,'Email',type:TextInputType.emailAddress),field(phone,'Phone',type:TextInputType.phone),field(address,'Address'),
     Row(children:[Expanded(child:field(city,'City')),const SizedBox(width:8),Expanded(child:field(state,'State'))]),field(pin,'PIN code',type:TextInputType.number),
+    OutlinedButton.icon(onPressed:busy?null:calculateShipping,icon:const Icon(Icons.local_shipping_outlined),label:const Text('CALCULATE SHIPPING')),
     const Divider(height:28),const Text('Shipping',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold)),
-    const Text('Shipping options and charges are calculated by WooCommerce during checkout.'),
+    if(shippingRates.isEmpty)const Padding(padding:EdgeInsets.symmetric(vertical:10),child:Text('Enter your address and calculate the shipping options available for your PIN code.'))
+    else ...shippingRates.map((r){final id=(r['rate_id']??r['id']??'').toString();final name=(r['name']??r['method_title']??'Shipping').toString();final cost=(r['price']??r['cost']??'').toString();return RadioListTile<String>(value:id,groupValue:shippingRateId,title:Text(name),subtitle:cost.isEmpty?null:Text(cost),onChanged:(v){setState(()=>shippingRateId=v);chooseShipping(r);});}),
     const Divider(height:28),const Text('Payment',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold)),
-    RadioListTile<String>(value:'cod',groupValue:payment,onChanged:(v)=>setState(()=>payment=v!),title:const Text('Cash on Delivery')),
-    RadioListTile<String>(value:'online',groupValue:payment,onChanged:(v)=>setState(()=>payment=v!),title:const Text('Online payment (requires a compatible store gateway)')),
-    if(error!=null)Text(error!,style:const TextStyle(color:Colors.red)),
-    FilledButton(onPressed:busy||!ready?null:submit,child:Text(!ready?'Preparing cart...':busy?'Please wait...':'PLACE ORDER')),
+    if(paymentMethods.isEmpty)const Padding(padding:EdgeInsets.symmetric(vertical:10),child:Text('WooCommerce did not return any active payment methods. Enable Cash on Delivery or an online gateway in WooCommerce settings.'))
+    else ...paymentMethods.map((m){final id=(m['id']??'').toString();final name=(m['title']??m['method_title']??id).toString();return RadioListTile<String>(value:id,groupValue:payment,title:Text(name),onChanged:(v)=>setState(()=>payment=v??id));}),
+    if(totalLabel.isNotEmpty)Padding(padding:const EdgeInsets.symmetric(vertical:12),child:Text('Order total: '+totalLabel,style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold))),
+    if(error!=null)Padding(padding:const EdgeInsets.only(bottom:10),child:SelectableText(error!,style:const TextStyle(color:Colors.red))),
+    FilledButton(onPressed:busy||!ready||paymentMethods.isEmpty?null:submit,child:Text(!ready?'Preparing cart...':busy?'Please wait...':'PLACE ORDER'))
   ])));
 }
-
 class AccountPage extends StatelessWidget{
   const AccountPage({super.key});
   @override Widget build(BuildContext context)=>const Center(child:Padding(padding:EdgeInsets.all(24),child:Text('Customer account and order history will be added after this shopping checkout stage is verified.',textAlign:TextAlign.center)));
