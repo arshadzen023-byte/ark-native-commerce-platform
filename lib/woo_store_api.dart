@@ -32,6 +32,7 @@ class WooStoreApi {
     Map<String, String>? query,
     Map<String, dynamic>? body,
     bool ensureCart = true,
+    bool retrySession = true,
   }) async {
     if (ensureCart && _cartToken == null) await initialiseCart();
     final uri = _uri(path).replace(queryParameters: query);
@@ -49,6 +50,10 @@ class WooStoreApi {
       final streamed = await client.send(request).timeout(const Duration(seconds: 25));
       final response = await http.Response.fromStream(streamed).timeout(const Duration(seconds: 25));
       await _captureSession(response);
+      if ((response.statusCode == 401 || response.statusCode == 403) && retrySession && method == 'GET' && _cartToken != null) {
+        await initialiseCart(reset: true);
+        return _send(path, method: method, query: query, body: body, ensureCart: ensureCart, retrySession: false);
+      }
       dynamic decoded;
       try {
         decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
