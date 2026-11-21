@@ -52,7 +52,7 @@ class WooStoreApi {
       await _captureSession(response);
       if ((response.statusCode == 401 || response.statusCode == 403) && retrySession && method == 'GET' && _cartToken != null) {
         await initialiseCart(reset: true);
-        return _send(path, method: method, query: query, body: body, ensureCart: ensureCart, retrySession: false);
+        return await _send(path, method: method, query: query, body: body, ensureCart: ensureCart, retrySession: false);
       }
       dynamic decoded;
       try {
