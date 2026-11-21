@@ -84,7 +84,9 @@ class _PaymentPageState extends State<PaymentPage> {
     }
   }
 
-  Map? get totals => widget.cart['totals'] is Map ? widget.cart['totals'] as Map : null;
+  Map? get totals => createdOrder?['totals'] is Map
+      ? createdOrder!['totals'] as Map
+      : (widget.cart['totals'] is Map ? widget.cart['totals'] as Map : null);
   int get totalMinor => int.tryParse('${totals?['total_price'] ?? '0'}') ?? 0;
   int get minorUnit => (totals?['currency_minor_unit'] as num?)?.toInt() ?? 2;
   double get amountValue => totalMinor / (minorUnit == 0 ? 1 : (minorUnit == 1 ? 10 : 100));
