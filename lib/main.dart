@@ -4,6 +4,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
+import 'product_details_page.dart';
 import 'checkout_page.dart';
 import 'woo_store_api.dart';
 
@@ -105,7 +108,12 @@ class _StoreHomeState extends State<StoreHome> {
   bool cartBusy = false;
   final searchController = TextEditingController();
   String? customerToken;
-  @override void initState() { super.initState(); load(); _refreshCart(); }
+  @override void initState() { super.initState(); _restoreCustomerSession(); load(); _refreshCart(); }
+  Future<void> _restoreCustomerSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('glowhit_customer_session');
+    if (mounted && token != null && token.isNotEmpty) setState(() => customerToken = token);
+  }
   @override void dispose() { searchController.dispose(); super.dispose(); }
 
   Future<void> load({String order = 'date', bool sale = false}) async {
@@ -157,18 +165,22 @@ class _StoreHomeState extends State<StoreHome> {
     if (images is List && images.isNotEmpty && images.first is Map) return (images.first['thumbnail'] ?? images.first['src'] ?? '').toString();
     return '';
   }
+  Future<void> _buyNow(Map<String, dynamic> product) async {
+    await _addToCart(product);
+    if (mounted) await _openCheckout();
+  }
   Widget productCard(Map<String, dynamic> p) {
     final id = (p['id'] as num?)?.toInt() ?? 0;
     final liked = wishlist.any((e) => e['id'] == id);
-    return Card(clipBehavior: Clip.antiAlias, elevation: 0.5, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return Card(clipBehavior: Clip.antiAlias, elevation: 0.5, child: InkWell(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(product: p, onAddToCart: () => _addToCart(p), onBuyNow: () => _buyNow(p), isWishlisted: liked, onWishlist: () => setState(() { liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p); })))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Expanded(child: Stack(fit: StackFit.expand, children: [
         Container(color: Colors.white, child: imageUrl(p).isEmpty ? const Icon(Icons.image_outlined, size: 44, color: Colors.black26) : Image.network(imageUrl(p), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined))),
-        Positioned(right: 4, top: 4, child: IconButton.filledTonal(onPressed: () => setState(() { liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p); }), icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : null))),
+        Positioned(right: 4, top: 4, child: Row(mainAxisSize: MainAxisSize.min, children: [IconButton.filledTonal(onPressed: () => setState(() { liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p); }), icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : null)), IconButton.filledTonal(onPressed: () => Share.share('${p['name']}\n${p['permalink'] ?? storeUrl}'), icon: const Icon(Icons.share_outlined))])),
       ])),
       Padding(padding: const EdgeInsets.fromLTRB(9, 7, 9, 2), child: Text((p['name'] ?? 'Product').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 9), child: Text(price(p), style: const TextStyle(fontWeight: FontWeight.w800, color: purple))),
       Padding(padding: const EdgeInsets.fromLTRB(7, 2, 7, 7), child: SizedBox(width: double.infinity, child: FilledButton.tonal(onPressed: () => _addToCart(p), child: const Text('ADD TO CART', style: TextStyle(fontSize: 10))))),
-    ]));
+    ])));
   }
   Widget catalog() => Column(children: [
     Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
@@ -182,7 +194,7 @@ class _StoreHomeState extends State<StoreHome> {
     else if (products.isEmpty) const Expanded(child: Center(child: Text('No products found. Try another search.')))
     else Expanded(child: GridView.builder(padding: const EdgeInsets.fromLTRB(12, 0, 12, 18), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .66, crossAxisSpacing: 10, mainAxisSpacing: 10), itemCount: products.length, itemBuilder: (_, i) => productCard(products[i]))),
   ]);
-  Widget account() => AccountPanel(onLogin: (token) => setState(() => customerToken = token), token: customerToken);
+  Widget account() => AccountPanel(onLogin: (token) => setState(() => customerToken = token), onLogout: () async { final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() => customerToken = null); }, token: customerToken);
   @override Widget build(BuildContext context) {
     final titles = ['Shopping', 'Categories', 'Wishlist', 'Cart', 'Account'];
     Widget page;
@@ -202,8 +214,9 @@ class _StoreHomeState extends State<StoreHome> {
 }
 
 class AccountPanel extends StatefulWidget {
-  const AccountPanel({super.key, required this.onLogin, required this.token});
+  const AccountPanel({super.key, required this.onLogin, required this.onLogout, required this.token});
   final ValueChanged<String> onLogin;
+  final VoidCallback onLogout;
   final String? token;
   @override State<AccountPanel> createState() => _AccountPanelState();
 }
@@ -215,7 +228,7 @@ class _AccountPanelState extends State<AccountPanel> {
   @override void dispose() { user.dispose(); pass.dispose(); super.dispose(); }
   Future<void> submit() async {
     setState(() { busy = true; error = null; });
-    try { final token = await StoreApi.login(user.text, pass.text); widget.onLogin(token); }
+    try { final token = await StoreApi.login(user.text, pass.text); final prefs = await SharedPreferences.getInstance(); await prefs.setString('glowhit_customer_session', token); widget.onLogin(token); }
     catch (e) { setState(() => error = e.toString().replaceFirst('Exception: ', '')); }
     finally { if (mounted) setState(() => busy = false); }
   }
@@ -231,6 +244,13 @@ class _AccountPanelState extends State<AccountPanel> {
       if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
       const SizedBox(height: 16),
       FilledButton(onPressed: busy ? null : submit, child: busy ? const CircularProgressIndicator() : const Text('SIGN IN')),
-    ] else const Padding(padding: EdgeInsets.only(top: 20), child: Icon(Icons.verified_user, size: 56, color: Colors.green)),
+    ] else ...[
+      const Padding(padding: EdgeInsets.only(top: 20), child: Icon(Icons.verified_user, size: 56, color: Colors.green)),
+      const SizedBox(height: 20),
+      for (final item in [(Icons.receipt_long_outlined, 'My Orders'), (Icons.download_outlined, 'Downloads'), (Icons.location_on_outlined, 'Saved Addresses'), (Icons.person_outline, 'Edit Profile')])
+        Card(child: ListTile(leading: Icon(item.$1, color: purple), title: Text(item.$2), trailing: const Icon(Icons.chevron_right), onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${item.$2} needs the authenticated ARK customer API bridge enabled on the store.'))))),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(onPressed: widget.onLogout, icon: const Icon(Icons.logout), label: const Text('LOG OUT')),
+    ],
   ]);
 }
