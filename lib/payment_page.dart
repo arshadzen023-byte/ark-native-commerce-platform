@@ -17,6 +17,7 @@ class PaymentPage extends StatefulWidget {
 class _PaymentPageState extends State<PaymentPage> {
   static const _brand = Color(0xFF51408F);
   final _utrController = TextEditingController();
+  final _payerUpiController = TextEditingController();
   final _picker = ImagePicker();
   List<Map<String, dynamic>> methods = [];
   Map<String, dynamic> upi = {};
@@ -31,7 +32,7 @@ class _PaymentPageState extends State<PaymentPage> {
   void initState() { super.initState(); loadMethods(); }
 
   @override
-  void dispose() { _utrController.dispose(); super.dispose(); }
+  void dispose() { _utrController.dispose(); _payerUpiController.dispose(); super.dispose(); }
 
   Future<void> loadMethods() async {
     try {
@@ -116,10 +117,22 @@ class _PaymentPageState extends State<PaymentPage> {
     }
     setState(() { paying = true; error = null; });
     try {
+      final mode = (upi['upi_address_mode'] ?? 'hide').toString();
+      final payerVpa = _payerUpiController.text.trim();
+      if (selected == 'wc-upi' && upi['require_upi'] == true && mode != 'hide' && payerVpa.isEmpty) {
+        throw Exception('Enter your UPI ID to continue.');
+      }
+      final paymentData = selected == 'wc-upi' && mode != 'hide'
+          ? [
+              {'key': 'customer_upiwc_address', 'value': mode == 'show_handle' ? payerVpa.split('@').first : payerVpa},
+              {'key': 'customer_upiwc_handle', 'value': mode == 'show_handle' && payerVpa.contains('@') ? payerVpa.split('@').last : ''},
+            ]
+          : <Map<String, dynamic>>[];
       final result = await widget.api.placeOrder(
         billing: widget.address,
         shipping: widget.address,
         paymentMethod: selected!,
+        paymentData: paymentData,
       );
       if (selected == 'wc-upi') {
         final id = int.tryParse('${result['order_id'] ?? result['id'] ?? ''}');
@@ -216,7 +229,7 @@ class _PaymentPageState extends State<PaymentPage> {
           if (createdOrder == null) ...[
             if (methods.isEmpty)
               _notice(error ?? 'No active payment methods were returned. Enable COD or UPI in WooCommerce and check the ARK Native API Bridge.', Icons.info_outline),
-            ...methods.map((method) {
+            if (isUpi && (upi['upi_address_mode'] ?? 'hide') != 'hide') ...[\n            TextField(\n              controller: _payerUpiController,\n              keyboardType: TextInputType.emailAddress,\n              decoration: const InputDecoration(labelText: 'Your UPI ID', hintText: 'name@bank', border: OutlineInputBorder(), prefixIcon: Icon(Icons.alternate_email)),\n            ),\n            const SizedBox(height: 12),\n          ],\n          ...methods.map((method) {
               final id = (method['id'] ?? '').toString();
               final active = selected == id;
               final isCod = id == 'cod';
