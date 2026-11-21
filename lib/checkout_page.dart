@@ -53,7 +53,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
       if (_city.text.isEmpty) _city.text = (customer['city'] ?? '').toString();
       if (_state.text.isEmpty) _state.text = (customer['state'] ?? '').toString();
       if (_postcode.text.isEmpty) _postcode.text = (customer['postcode'] ?? '').toString();
-      if (mounted) setState(() { cart = c; paymentMethods = methods; shippingRates = rates; selectedPayment = methods.isEmpty ? null : methods.first['id']?.toString(); selectedRate = rates.where((r) => r['selected'] == true).map((r) => (r['rate_id'] ?? '').toString()).firstOrNull; loading = false; });
+      if (mounted) setState(() { cart = c; paymentMethods = methods; shippingRates = rates; selectedPayment = methods.isEmpty ? null : methods.first['id']?.toString(); final selectedRates = rates.where((r) => r['selected'] == true).map((r) => (r['rate_id'] ?? '').toString()).toList(); selectedRate = selectedRates.isEmpty ? null : selectedRates.first; loading = false; });
     } catch (e) { if (mounted) setState(() { error = e.toString().replaceFirst('Exception: ', ''); loading = false; }); }
   }
   Map<String,dynamic> _addressData() => {
