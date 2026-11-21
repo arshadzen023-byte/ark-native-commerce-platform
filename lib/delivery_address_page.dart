@@ -41,6 +41,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       'postcode': _controller('postcode'),
       'country': _controller('country', fallback: 'IN'),
     };
+    _loadSavedAddresses();
   }
 
   Future<void> _loadSavedAddresses() async {
