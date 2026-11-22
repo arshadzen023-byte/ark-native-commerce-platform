@@ -65,32 +65,52 @@ class StoreApi {
     return value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   }
   static Future<String> login(String username, String password) async {
-    final uri = Uri.parse(storeUrl).resolve('wp-json/ark-native/v1/auth/login');
-    final r = await request(
-      uri,
-      method: 'POST',
-      headers: const {'Accept': 'application/json', 'Content-Type': 'application/json'},
-      body: jsonEncode({'username': username.trim(), 'password': password}),
-    );
+    final cleanUsername = username.trim();
+    final endpoints = <({String path, Map<String, dynamic> payload})>[
+      (path: 'auth/login', payload: {'username': cleanUsername, 'password': password}),
+      (path: 'customer/login', payload: {
+        'username': cleanUsername,
+        'email_or_username': cleanUsername,
+        'password': password,
+      }),
+    ];
 
-    dynamic data;
-    try {
-      data = jsonDecode(r.body);
-    } on FormatException {
-      throw Exception('The store returned an invalid response (HTTP ${r.statusCode}). Please check the WordPress REST API.');
+    for (var index = 0; index < endpoints.length; index++) {
+      final endpoint = endpoints[index];
+      final uri = Uri.parse(storeUrl).resolve('wp-json/ark-native/v1/${endpoint.path}');
+      final response = await request(
+        uri,
+        method: 'POST',
+        headers: const {'Accept': 'application/json', 'Content-Type': 'application/json'},
+        body: jsonEncode(endpoint.payload),
+      );
+
+      dynamic data;
+      try {
+        data = jsonDecode(response.body);
+      } on FormatException {
+        throw Exception('The store returned an invalid login response (HTTP ${response.statusCode}). Check the ARK Native API Bridge on WordPress.');
+      }
+
+      // Older Bridge builds may expose customer/login but not auth/login.
+      if (response.statusCode == 404 && index == 0) continue;
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final message = data is Map
+            ? (data['message'] ?? data['error'] ?? data['code'] ?? response.body).toString()
+            : response.body;
+        throw Exception('Login failed (HTTP ${response.statusCode}): $message');
+      }
+
+      final session = data is Map && data['session'] is Map ? data['session'] as Map : const {};
+      final token = data is Map ? (data['token'] ?? session['token'] ?? '').toString() : '';
+      if (data is! Map || data['success'] != true || token.isEmpty) {
+        throw Exception('The store did not return a valid customer token. Update/activate ARK Native API Bridge.');
+      }
+      return token;
     }
 
-    if (r.statusCode < 200 || r.statusCode >= 300) {
-      final message = data is Map
-          ? (data['message'] ?? data['error'] ?? data['code'] ?? r.body).toString()
-          : r.body;
-      throw Exception('Login failed (HTTP ${r.statusCode}): $message');
-    }
-
-    if (data is! Map || data['success'] != true || (data['token'] ?? '').toString().isEmpty) {
-      throw Exception('The store did not return a valid customer token.');
-    }
-    return data['token'].toString();
+    throw Exception('Login API route is missing on pluginstore.shop. Update and activate ARK Native API Bridge 1.0.4 or newer, then retry.');
   }
 }
 

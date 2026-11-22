@@ -49,6 +49,26 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
   void initState() { super.initState(); api = ArkCustomerApi(widget.token); load(); }
   @override
   void dispose() { for (final c in fields.values) { c.dispose(); } super.dispose(); }
+  List<Map<String, dynamic>> _asMapList(dynamic value, String key) {
+    dynamic list = value;
+    if (value is Map) {
+      list = value[key] ?? value['data'] ?? value['items'];
+      if (list is Map && list[key] is List) list = list[key];
+      if (list is Map && key == 'addresses') {
+        final shipping = list['shipping'];
+        final billing = list['billing'];
+        final candidate = shipping is Map && (shipping['address_1'] ?? '').toString().isNotEmpty
+            ? shipping
+            : billing;
+        list = candidate is Map && (candidate['address_1'] ?? '').toString().isNotEmpty
+            ? [candidate]
+            : [];
+      }
+    }
+    if (list is! List) return [];
+    return list.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
   String get path => switch (widget.section) {
     'My Orders' => 'customer/orders',
     'Downloads' => 'customer/downloads',
@@ -105,11 +125,27 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
         FilledButton(onPressed: saving ? null : saveProfile, child: saving ? const CircularProgressIndicator() : const Text('SAVE PROFILE')),
       ]);
     }
-    final items = data is List ? data as List : const [];
-    if (items.isEmpty) return Center(child: Text(widget.section == 'My Orders' ? 'No orders found yet.' : widget.section == 'Downloads' ? 'No downloadable products found.' : 'No saved addresses found.'));
+    final responseKey = widget.section == 'My Orders' ? 'orders' : widget.section == 'Downloads' ? 'downloads' : 'addresses';
+    final items = _asMapList(data, responseKey);
+    if (items.isEmpty) {
+      if (widget.section == 'My Orders') {
+        return Center(child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.receipt_long_outlined, size: 52, color: _accountPurple),
+            const SizedBox(height: 12),
+            const Text('No orders linked to this account yet.', textAlign: TextAlign.center, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text('Guest orders appear here when their checkout billing email matches your signed-in account email.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade700)),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(onPressed: load, icon: const Icon(Icons.refresh), label: const Text('REFRESH ORDERS')),
+          ]),
+        ));
+      }
+      return Center(child: Text(widget.section == 'Downloads' ? 'No downloadable products found.' : 'No saved addresses found.'));
+    }
     return ListView.builder(padding: const EdgeInsets.all(12), itemCount: items.length, itemBuilder: (context, index) {
       final item = items[index];
-      if (item is! Map) return const SizedBox.shrink();
       if (widget.section == 'My Orders') {
         final lines = (item['items'] as List? ?? []).whereType<Map>().map((e) => '${e['name']} × ${e['quantity']}').join(', ');
         final orderItems = (item['items'] as List? ?? []).whereType<Map>().toList();

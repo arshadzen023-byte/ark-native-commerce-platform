@@ -44,16 +44,53 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     _loadSavedAddresses();
   }
 
+  List<Map<String, dynamic>> _normaliseAddressList(dynamic response) {
+    dynamic list = response;
+    if (response is Map) {
+      list = response['addresses'] ?? response['items'] ?? response['data'];
+      if (list is Map && list['addresses'] is List) list = list['addresses'];
+      if (list is Map) {
+        final shipping = list['shipping'];
+        final billing = list['billing'];
+        final candidate = shipping is Map && (shipping['address_1'] ?? '').toString().isNotEmpty
+            ? shipping
+            : billing;
+        list = candidate is Map && (candidate['address_1'] ?? '').toString().isNotEmpty
+            ? [candidate]
+            : [];
+      }
+      if (list == null && response['address'] is Map) list = [response['address']];
+    }
+    if (list is! List) return [];
+    return list.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
   Future<void> _loadSavedAddresses() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_savedAddressKey);
     if (raw != null) {
-      try { final list = jsonDecode(raw) as List; if (mounted) setState(() => savedAddresses = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList());
-        _applyFirstSavedAddressIfEmpty(); } catch (_) { /* Ignore malformed local cache. */ }
+      try {
+        final cached = _normaliseAddressList(jsonDecode(raw));
+        if (mounted) setState(() => savedAddresses = cached);
+        _applyFirstSavedAddressIfEmpty();
+      } catch (_) {
+        // Ignore malformed local cache; the remote account remains authoritative.
+      }
     }
+
     final token = widget.customerToken;
-    if (token != null) {
-      try { final remote = await ArkCustomerApi(token).request('customer/addresses'); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses)); if (mounted) setState(() {}); _applyFirstSavedAddressIfEmpty(); } } catch (_) { /* Keep locally saved addresses available while offline. */ }
+    if (token == null || token.isEmpty) return;
+    try {
+      final remote = await ArkCustomerApi(token).request('customer/addresses');
+      final addresses = _normaliseAddressList(remote);
+      savedAddresses = addresses;
+      await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses));
+      if (mounted) setState(() {});
+      _applyFirstSavedAddressIfEmpty();
+    } catch (e) {
+      if (mounted) setState(() {
+        error = 'Saved addresses could not be synced: ${e.toString().replaceFirst('Exception: ', '')}';
+      });
     }
   }
 
@@ -66,28 +103,34 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   Future<void> _saveCurrentAddress() async {
     final token = widget.customerToken;
     if (token == null || token.isEmpty) {
-      throw Exception('Please sign in before saving a delivery address. Your address will be stored securely in your customer account.');
+      throw Exception('Please sign in before saving a delivery address.');
     }
+
     final value = address..['label'] = addressLabel;
-    final remote = await ArkCustomerApi(token).request(
+    final api = ArkCustomerApi(token);
+    dynamic response = await api.request(
       'customer/addresses',
       method: 'POST',
       body: value,
     );
-    if (remote is! List) {
-      throw Exception('The store did not confirm that your address was saved. Please retry.');
+    var saved = _normaliseAddressList(response);
+
+    bool containsAddress(List<Map<String, dynamic>> list) => list.any((item) =>
+        (item['address_1'] ?? '').toString().trim() == value['address_1'] &&
+        (item['postcode'] ?? '').toString().trim() == value['postcode'] &&
+        (item['first_name'] ?? '').toString().trim() == value['first_name']);
+
+    // Some deployed bridge builds return {success:true} or {addresses:[...]}.
+    // Confirm persistence by reading the account address list after the write.
+    if (!containsAddress(saved)) {
+      response = await api.request('customer/addresses');
+      saved = _normaliseAddressList(response);
     }
-    final saved = remote
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-    final confirmed = saved.any((e) =>
-        (e['address_1'] ?? '').toString() == value['address_1'] &&
-        (e['postcode'] ?? '').toString() == value['postcode'] &&
-        (e['first_name'] ?? '').toString() == value['first_name']);
-    if (!confirmed) {
-      throw Exception('The store did not return the saved address. Please retry.');
+    if (!containsAddress(saved)) {
+      final shape = response is Map ? response.keys.join(', ') : response.runtimeType.toString();
+      throw Exception('Address was not confirmed by the store (response: $shape). Update the ARK Native API Bridge and retry.');
     }
+
     final prefs = await SharedPreferences.getInstance();
     savedAddresses = saved;
     await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses));
@@ -230,12 +273,20 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         SizedBox(height: 54, child: FilledButton(
           onPressed: busy ? null : () async {
             if (!formKey.currentState!.validate()) return;
-            await _saveCurrentAddress();
             if (rates.isNotEmpty && selectedRate == null) {
               setState(() => error = 'Please select a shipping method.');
               return;
             }
-            Navigator.pop(context, {'address': address, 'cart': updatedCart, 'shipping_selected': selectedRate != null || rates.isEmpty});
+            setState(() { busy = true; error = null; });
+            try {
+              await _saveCurrentAddress();
+              if (!mounted) return;
+              Navigator.pop(context, {'address': address, 'cart': updatedCart, 'shipping_selected': selectedRate != null || rates.isEmpty});
+            } catch (e) {
+              if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
+            } finally {
+              if (mounted) setState(() => busy = false);
+            }
           },
           child: const Text('CONTINUE TO PAYMENT', style: TextStyle(fontWeight: FontWeight.bold)),
         )),
