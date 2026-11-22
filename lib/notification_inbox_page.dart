@@ -38,20 +38,39 @@ class _NotificationInboxPageState extends State<NotificationInboxPage> with Sing
         final isOrder = type.startsWith('order_');
         final image = (item['image_url'] ?? '').toString();
         final link = (item['click_url'] ?? '').toString();
+        final title = (item['title'] ?? '').toString().trim();
+        final body = (item['body'] ?? '').toString().trim();
+        if (title.isEmpty || body.isEmpty) return const SizedBox.shrink();
         return AnimatedBuilder(animation: _pulse, builder: (_, child) => Transform.translate(offset: Offset(0, index == 0 ? -_pulse.value * 1.5 : 0), child: child), child: Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: InkWell(borderRadius: BorderRadius.circular(16), onTap: () => Navigator.pop(context, link),
-            child: Padding(padding: const EdgeInsets.all(13), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              ClipRRect(borderRadius: BorderRadius.circular(11), child: SizedBox(width: 62, height: 62, child: image.isEmpty ? Container(color: _purple.withValues(alpha: .10), child: Icon(isOrder ? Icons.local_shipping_outlined : Icons.campaign_outlined, color: _purple, size: 30)) : Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.notifications)))),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text((item['title'] ?? 'GlowHit update').toString(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                const SizedBox(height: 4),
-                Text((item['body'] ?? '').toString(), maxLines: 3, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 6),
-                Text((item['sent_at'] ?? '').toString(), style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              ])),
-              IconButton(tooltip: 'Delete', onPressed: () => remove(item), icon: const Icon(Icons.delete_outline, color: Colors.red)),
+          margin: const EdgeInsets.only(bottom: 12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: link.trim().isEmpty ? null : () => Navigator.pop(context, link),
+            child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (image.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(minHeight: 90, maxHeight: 210),
+                  decoration: BoxDecoration(color: _purple.withValues(alpha: .06), borderRadius: BorderRadius.circular(12)),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.network(image, width: double.infinity, fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const SizedBox(height: 90, child: Center(child: Icon(Icons.broken_image_outlined, size: 34)))),
+                )
+              else
+                Container(height: 76, decoration: BoxDecoration(color: _purple.withValues(alpha: .08), borderRadius: BorderRadius.circular(12)),
+                  child: Icon(isOrder ? Icons.local_shipping_outlined : Icons.campaign_outlined, color: _purple, size: 34)),
+              const SizedBox(height: 10),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                  const SizedBox(height: 5),
+                  Text(body, maxLines: 4, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 7),
+                  Text((item['sent_at'] ?? '').toString(), style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ])),
+                IconButton(tooltip: 'Delete', onPressed: () => remove(item), icon: const Icon(Icons.delete_outline, color: Colors.red)),
+              ]),
             ])),
           ),
         ));
