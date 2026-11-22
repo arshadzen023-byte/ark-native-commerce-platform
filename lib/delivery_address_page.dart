@@ -48,12 +48,19 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_savedAddressKey);
     if (raw != null) {
-      try { final list = jsonDecode(raw) as List; if (mounted) setState(() => savedAddresses = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()); } catch (_) { /* Ignore malformed local cache. */ }
+      try { final list = jsonDecode(raw) as List; if (mounted) setState(() => savedAddresses = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList());
+        _applyFirstSavedAddressIfEmpty(); } catch (_) { /* Ignore malformed local cache. */ }
     }
     final token = widget.customerToken;
     if (token != null) {
-      try { final remote = await ArkCustomerApi(token).request('customer/addresses'); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses)); if (mounted) setState(() {}); } } catch (_) { /* Keep locally saved addresses available while offline. */ }
+      try { final remote = await ArkCustomerApi(token).request('customer/addresses'); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses)); if (mounted) setState(() {}); _applyFirstSavedAddressIfEmpty(); } } catch (_) { /* Keep locally saved addresses available while offline. */ }
     }
+  }
+
+  void _applyFirstSavedAddressIfEmpty() {
+    if (savedAddresses.isEmpty) return;
+    final hasAddress = ['address_1', 'city', 'postcode'].any((key) => (fields[key]?.text ?? '').trim().isNotEmpty);
+    if (!hasAddress && mounted) _applySavedAddress(savedAddresses.first);
   }
 
   Future<void> _saveCurrentAddress() async {
