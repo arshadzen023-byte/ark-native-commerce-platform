@@ -59,10 +59,6 @@ class WooStoreApi {
       try {
         decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
       } catch (_) {
-        final contentType = _header(response, 'content-type') ?? 'unknown content-type';
-        final preview = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
-        final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
-        final looksHtml = preview.toLowerCase().startsWith('<!doctype') || preview.toLowerCase().startsWith('<html');
         final legacyWarning = response.body.contains('Trying to access array offset on value of type bool');
         throw Exception(legacyWarning
             ? 'The store payment service has a PHP configuration error. Please ask the store administrator to update or disable the old Build App Online plugin and check the ARK payment bridge.'
@@ -117,9 +113,6 @@ class WooStoreApi {
     ).timeout(const Duration(seconds: 20));
     dynamic decoded;
     try { decoded = jsonDecode(response.body); } catch (_) {
-      final contentType = _header(response, 'content-type') ?? 'unknown content-type';
-      final preview = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
-      final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
       final legacyWarning = response.body.contains('Trying to access array offset on value of type bool');
       throw Exception(legacyWarning
           ? 'The store payment settings have a PHP configuration error. The store administrator must repair the old plugin settings.'
@@ -159,9 +152,6 @@ class WooStoreApi {
     final response = await http.Response.fromStream(streamed);
     dynamic decoded;
     try { decoded = jsonDecode(response.body); } catch (_) {
-      final contentType = response.headers['content-type'] ?? 'unknown content-type';
-      final preview = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
-      final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
       final legacyWarning = response.body.contains('Trying to access array offset on value of type bool');
       throw Exception(legacyWarning
           ? 'The store could not save your UPI proof because an old plugin has a PHP configuration error. Your order is not confirmed as paid. Please contact the store.'
