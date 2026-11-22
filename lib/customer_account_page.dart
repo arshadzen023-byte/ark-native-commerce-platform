@@ -213,17 +213,27 @@ class _CustomerOrderDetailPageState extends State<_CustomerOrderDetailPage> {
     }
   }
   Future<void> cancel() async {
-    final ok = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+    final reasonController = TextEditingController();
+    final reason = await showDialog<String>(context: context, builder: (context) => AlertDialog(
       title: const Text('Cancel this order?'),
-      content: const Text('The store will be notified. If payment was already captured, any refund must be reviewed and processed by the store.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('KEEP ORDER')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('CANCEL ORDER'))],
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('The store will be notified. If payment was captured, the store must review and process the refund.'),
+        const SizedBox(height: 12),
+        TextField(controller: reasonController, minLines: 2, maxLines: 3, decoration: const InputDecoration(labelText: 'Cancellation reason (optional)', border: OutlineInputBorder())),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('KEEP ORDER')),
+        FilledButton(onPressed: () => Navigator.pop(context, reasonController.text.trim()), child: const Text('CANCEL ORDER')),
+      ],
     ));
-    if (ok != true) return;
+    reasonController.dispose();
+    if (reason == null) return;
     setState(() => cancelling = true);
     try {
-      await widget.api.request('customer/orders/${widget.orderId}/cancel', method: 'POST', body: {});
+      final response = await widget.api.request('customer/orders/${widget.orderId}/cancel', method: 'POST', body: {'reason': reason});
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order cancellation submitted.')));
+      final message = response is Map ? (response['message'] ?? 'Order cancellation submitted.').toString() : 'Order cancellation submitted.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       await load();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
@@ -276,8 +286,25 @@ class _CustomerOrderDetailPageState extends State<_CustomerOrderDetailPage> {
         const SizedBox(height: 4), Text('Placed on ${o['date_created'] ?? '—'}', style: TextStyle(color: Colors.grey.shade600)),
         const SizedBox(height: 12),
         for (final step in timeline) Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(children: [
-          Icon(step['done'] == true ? Icons.check_circle : Icons.radio_button_unchecked, color: step['done'] == true ? Colors.green : Colors.grey),
-          const SizedBox(width: 10), Expanded(child: Text((step['label'] ?? '').toString())),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+            width: 28, height: 28,
+            decoration: BoxDecoration(
+              color: step['done'] == true ? Colors.green.withValues(alpha: .12) : (step['active'] == true ? _accountPurple.withValues(alpha: .10) : Colors.grey.withValues(alpha: .08)),
+              shape: BoxShape.circle,
+            ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              child: Icon(
+                step['done'] == true ? Icons.check_circle : (step['active'] == true ? Icons.more_horiz : Icons.radio_button_unchecked),
+                key: ValueKey('${step['key']}-${step['done']}-${step['active']}'),
+                color: step['done'] == true ? Colors.green : (step['active'] == true ? _accountPurple : Colors.grey),
+                size: 20,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10), Expanded(child: Text((step['label'] ?? '').toString(), style: TextStyle(fontWeight: step['active'] == true ? FontWeight.w700 : FontWeight.normal))),
         ])),
       ]))),
       Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
