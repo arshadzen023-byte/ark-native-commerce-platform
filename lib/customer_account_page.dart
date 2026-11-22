@@ -35,16 +35,14 @@ class ArkCustomerApi {
           queryParameters: {'rest_route': '/ark-native/v1/$path', ...?query},
         ))
       : primary;
-    try {
-      dynamic data;
-      try { data = result.body.isEmpty ? null : jsonDecode(result.body); }
-      catch (_) { throw Exception('The store returned an invalid response (${result.statusCode}).'); }
-      if (result.statusCode < 200 || result.statusCode >= 300) {
-        final message = data is Map ? (data['message'] ?? data['code']) : data;
-        throw Exception(message?.toString() ?? 'Request failed (${result.statusCode}).');
-      }
-      return data;
+    dynamic data;
+    try { data = result.body.isEmpty ? null : jsonDecode(result.body); }
+    catch (_) { throw Exception('The store returned an invalid response (${result.statusCode}).'); }
+    if (result.statusCode < 200 || result.statusCode >= 300) {
+      final message = data is Map ? (data['message'] ?? data['code']) : data;
+      throw Exception(message?.toString() ?? 'Request failed (${result.statusCode}).');
     }
+    return data;
   }
 }
 
