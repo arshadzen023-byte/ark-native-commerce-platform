@@ -27,6 +27,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   String addressLabel = 'Home';
   int selectedSavedAddress = -1;
   static const _savedAddressKey = 'glowhit_saved_delivery_addresses';
+  String get _accountAddressKey => widget.customerToken == null
+      ? _savedAddressKey
+      : '${_savedAddressKey}_${widget.customerToken}';
 
   @override
   void initState() {
@@ -48,7 +51,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   Future<void> _loadSavedAddresses() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_savedAddressKey);
+    final raw = prefs.getString(_accountAddressKey);
     if (raw != null) {
       try { final list = jsonDecode(raw) as List; if (mounted) setState(() => savedAddresses = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()); } catch (_) { /* Ignore malformed local cache. */ }
     }
@@ -61,7 +64,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   Future<void> _saveCurrentAddress() async {
     final value = address;
     value['label'] = addressLabel;
-    final key = _savedAddressKey;
+    final key = _accountAddressKey;
     final prefs = await SharedPreferences.getInstance();
     final index = savedAddresses.indexWhere((e) => e['address_1'] == value['address_1'] && e['postcode'] == value['postcode'] && e['first_name'] == value['first_name']);
     if (index >= 0) { savedAddresses[index] = value; } else { savedAddresses.add(value); }
