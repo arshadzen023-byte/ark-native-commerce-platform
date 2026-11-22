@@ -60,7 +60,7 @@ class WooStoreApi {
         decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
       } catch (_) {
         final contentType = _header(response, 'content-type') ?? 'unknown content-type';
-        final preview = response.body.replaceAll(RegExp(r'\\s+'), ' ').trim();
+        final preview = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
         final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
         final looksHtml = preview.toLowerCase().startsWith('<!doctype') || preview.toLowerCase().startsWith('<html');
         throw Exception('WooCommerce returned non-JSON data (HTTP ${response.statusCode}, $contentType). ${looksHtml ? 'The server returned an HTML page instead of Store API JSON (often a cache, firewall, security plugin or PHP error page).' : 'Response preview: $safePreview'}');
@@ -115,7 +115,7 @@ class WooStoreApi {
     dynamic decoded;
     try { decoded = jsonDecode(response.body); } catch (_) {
       final contentType = _header(response, 'content-type') ?? 'unknown content-type';
-      final preview = response.body.replaceAll(RegExp(r'\\s+'), ' ').trim();
+      final preview = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
       final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
       throw Exception('Payment configuration returned non-JSON data (HTTP ${response.statusCode}, $contentType). $safePreview');
     }
@@ -154,7 +154,7 @@ class WooStoreApi {
     dynamic decoded;
     try { decoded = jsonDecode(response.body); } catch (_) {
       final contentType = response.headers['content-type'] ?? 'unknown content-type';
-      final preview = response.body.replaceAll(RegExp(r'\\s+'), ' ').trim();
+      final preview = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
       final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
       throw Exception('UPI submission returned non-JSON data (HTTP ${response.statusCode}, $contentType). $safePreview');
     }
