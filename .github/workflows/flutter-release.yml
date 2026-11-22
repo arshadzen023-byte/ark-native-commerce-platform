@@ -33,25 +33,38 @@ jobs:
           cp firebase/google-services.json android/app/google-services.json
           python3 - <<'PY'
           from pathlib import Path
-          settings = Path('android/settings.gradle')
-          text = settings.read_text()
-          if 'com.google.gms.google-services' not in text:
-              text = text.replace('plugins {', 'plugins {\n    id "com.google.gms.google-services" version "4.4.2" apply false', 1)
-              settings.write_text(text)
-          app = Path('android/app/build.gradle')
-          text = app.read_text()
-          if 'id "com.google.gms.google-services"' not in text:
-              text = text.replace('plugins {', 'plugins {\n    id "com.google.gms.google-services"', 1)
-              app.write_text(text)
-          manifest = Path('android/app/src/main/AndroidManifest.xml')
-          text = manifest.read_text()
-          if 'android.permission.POST_NOTIFICATIONS' not in text:
-              end = text.find('>', text.find('<manifest'))
-              text = text[:end+1] + '\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' + text[end+1:]
-              manifest.write_text(text)
-          if 'com.ark.glowhit' not in Path('android/app/google-services.json').read_text():
-              raise SystemExit('Firebase package name mismatch')
-          print('Firebase configuration verified for com.ark.glowhit')
+          settings = Path("android/settings.gradle.kts")
+          app = Path("android/app/build.gradle.kts")
+          kotlin_dsl = settings.exists() and app.exists()
+          if not kotlin_dsl:
+              settings = Path("android/settings.gradle")
+              app = Path("android/app/build.gradle")
+          if not settings.is_file() or not app.is_file():
+              raise SystemExit("Generated Android Gradle files were not found")
+          settings_text = settings.read_text(encoding="utf-8")
+          app_text = app.read_text(encoding="utf-8")
+          if kotlin_dsl:
+              settings_plugin = '    id("com.google.gms.google-services") version "4.4.2" apply false'
+              app_plugin = '    id("com.google.gms.google-services")'
+          else:
+              settings_plugin = '    id "com.google.gms.google-services" version "4.4.2" apply false'
+              app_plugin = '    id "com.google.gms.google-services"'
+          if "com.google.gms.google-services" not in settings_text:
+              settings_text = settings_text.replace("plugins {", "plugins {\\n" + settings_plugin, 1)
+              settings.write_text(settings_text, encoding="utf-8")
+          if app_plugin not in app_text:
+              app_text = app_text.replace("plugins {", "plugins {\\n" + app_plugin, 1)
+              app.write_text(app_text, encoding="utf-8")
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text(encoding="utf-8")
+          if "android.permission.POST_NOTIFICATIONS" not in text:
+              end = text.find(">", text.find("<manifest"))
+              text = text[:end+1] + '\\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' + text[end+1:]
+              manifest.write_text(text, encoding="utf-8")
+          config = Path("android/app/google-services.json").read_text(encoding="utf-8")
+          if "com.ark.glowhit" not in config:
+              raise SystemExit("Firebase package name mismatch")
+          print("Firebase configuration verified for com.ark.glowhit")
           PY
       - name: Ensure Android internet permission
         run: |
