@@ -5,10 +5,12 @@ import 'customer_account_page.dart';
 import 'woo_store_api.dart';
 
 class DeliveryAddressPage extends StatefulWidget {
-  const DeliveryAddressPage({super.key, required this.api, this.initialAddress = const {}, this.customerToken});
+  const DeliveryAddressPage({super.key, required this.api, this.initialAddress = const {}, this.customerToken, this.embedded = false, this.onAddressSaved});
   final WooStoreApi api;
   final String? customerToken;
   final Map<String, dynamic> initialAddress;
+  final bool embedded;
+  final void Function(Map<String, dynamic> address, Map<String, dynamic> cart)? onAddressSaved;
   @override
   State<DeliveryAddressPage> createState() => _DeliveryAddressPageState();
 }
@@ -66,7 +68,16 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     await prefs.setString(key, jsonEncode(savedAddresses));
     final token = widget.customerToken;
     if (token != null) {
-      try { final remote = await ArkCustomerApi(token).request('customer/addresses', method: 'POST', body: value); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(key, jsonEncode(savedAddresses)); } } catch (_) { /* Local copy is retained if the API is temporarily unavailable. */ }
+      try {
+        final remote = await ArkCustomerApi(token).request('customer/addresses', method: 'POST', body: value);
+        final normalized = remote is List ? remote : (remote is Map && remote['addresses'] is List ? remote['addresses'] as List : const []);
+        if (normalized.isNotEmpty) {
+          savedAddresses = normalized.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+        await prefs.setString(key, jsonEncode(savedAddresses));
+      } catch (e) {
+        throw Exception('Address was kept on this device but could not be synced to your account: ${e.toString().replaceFirst('Exception: ', '')}');
+      }
     }
     if (mounted) setState(() {});
   }
@@ -212,7 +223,14 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
               setState(() => error = 'Please select a shipping method.');
               return;
             }
-            Navigator.pop(context, {'address': address, 'cart': updatedCart, 'shipping_selected': selectedRate != null || rates.isEmpty});
+            final chosen = address;
+            final chosenCart = updatedCart.isNotEmpty ? updatedCart : await widget.api.getCart();
+            if (!mounted) return;
+            if (widget.embedded && widget.onAddressSaved != null) {
+              widget.onAddressSaved!(chosen, chosenCart);
+            } else {
+              Navigator.pop(context, {'address': chosen, 'cart': chosenCart, 'shipping_selected': selectedRate != null || rates.isEmpty});
+            }
           },
           child: const Text('CONTINUE TO PAYMENT', style: TextStyle(fontWeight: FontWeight.bold)),
         )),
