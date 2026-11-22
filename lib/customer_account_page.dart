@@ -95,14 +95,6 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
     return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
-  Color _statusColor(String status) {
-    final value = status.toLowerCase();
-    if (value.contains('deliver') || value.contains('complete')) return Colors.green;
-    if (value.contains('cancel') || value.contains('fail') || value.contains('refund')) return Colors.red;
-    if (value.contains('hold') || value.contains('pending')) return Colors.orange;
-    return _accountPurple;
-  }
-
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(widget.section), actions: [IconButton(onPressed: loading ? null : load, icon: const Icon(Icons.refresh))]),
