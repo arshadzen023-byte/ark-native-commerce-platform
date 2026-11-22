@@ -55,6 +55,7 @@ class OrderSummaryPage extends StatelessWidget {
         }),
         const SizedBox(height: 10),
         _row('Subtotal', money({'total_price': totals['total_items'], 'currency_symbol': totals['currency_symbol'], 'currency_minor_unit': totals['currency_minor_unit']})),
+        _row('Tax', money({'total_price': totals['total_tax'], 'currency_symbol': totals['currency_symbol'], 'currency_minor_unit': totals['currency_minor_unit']})),
         _row('Shipping', money({'total_price': totals['total_shipping'], 'currency_symbol': totals['currency_symbol'], 'currency_minor_unit': totals['currency_minor_unit']})),
         _row('Discount', money({'total_price': totals['total_discount'], 'currency_symbol': totals['currency_symbol'], 'currency_minor_unit': totals['currency_minor_unit']})),
         const Divider(height: 26),
