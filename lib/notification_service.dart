@@ -98,8 +98,11 @@ class GlowHitPushService {
   Future<void> deleteMessage(int id) async {
     final token = _token ?? await FirebaseMessaging.instance.getToken();
     if (token == null) throw Exception('Device is not registered.');
-    final response = await http.delete(Uri.parse(_pushBase + '/messages/' + id.toString()), headers: {'Accept': 'application/json', 'x-ark-push-token': token}).timeout(const Duration(seconds: 20));
-    if (response.statusCode < 200 || response.statusCode >= 300) throw Exception('Delete notification failed (' + response.statusCode.toString() + '). The WordPress plugin must expose DELETE /messages/{id}.');
+    final response = await http.post(Uri.parse(_pushBase + '/messages/delete'),
+      headers: {'Accept': 'application/json', 'Content-Type': 'application/json', 'x-ark-push-token': token},
+      body: jsonEncode({'message_id': id}),
+    ).timeout(const Duration(seconds: 20));
+    if (response.statusCode < 200 || response.statusCode >= 300) throw Exception('Delete notification failed (' + response.statusCode.toString() + '). Update the ARK Notifications plugin.');
   }
 
   bool get isReady => _ready;
