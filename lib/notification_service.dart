@@ -146,5 +146,12 @@ class GlowHitPushService {
     if (response.statusCode < 200 || response.statusCode >= 300) throw Exception('Delete notification failed (' + response.statusCode.toString() + '). Update the ARK Notifications plugin.');
   }
 
+  Future<void> unlinkAccount() async {
+    // Re-register this installation as a guest on logout so the previous
+    // customer's private order alerts are no longer routed to this device.
+    _customerJwt = null;
+    await register();
+  }
+
   bool get isReady => _ready;
 }
