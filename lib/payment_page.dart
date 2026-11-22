@@ -22,6 +22,7 @@ class _PaymentPageState extends State<PaymentPage> {
   final _picker = ImagePicker();
   List<Map<String, dynamic>> methods = [];
   Map<String, dynamic> upi = {};
+  Map<String, dynamic> liveCart = {};
   String? selected;
   bool loading = true, paying = false, submittingUpi = false;
   String? error;
@@ -30,14 +31,25 @@ class _PaymentPageState extends State<PaymentPage> {
   String screenshotName = 'upi-payment.jpg';
 
   @override
-  void initState() { super.initState(); loadMethods(); }
+  void initState() { super.initState(); liveCart = Map<String, dynamic>.from(widget.cart); loadMethods(); }
 
   @override
   void dispose() { _utrController.dispose(); _payerUpiController.dispose(); super.dispose(); }
 
   Future<void> loadMethods() async {
     try {
-      final checkout = await widget.api.getCheckout();
+      // Refresh the authoritative cart totals before showing the amount.
+      // A stale/empty checkout snapshot must never be treated as ₹0.00.
+      try {
+        final refreshed = await widget.api.getCart();
+        if (refreshed['totals'] is Map) liveCart = refreshed;
+      } catch (_) {
+        // Continue loading gateway configuration; the order action is guarded below.
+      }
+      Map<String, dynamic> checkout = {};
+      try { checkout = await widget.api.getCheckout(); } catch (e) {
+        error = 'Checkout details could not be loaded. ${e.toString().replaceFirst('Exception: ', '')}';
+      }
       // The bridge adds UPI-specific settings. Its temporary failure must not
       // hide a working WooCommerce COD method returned by Store API.
       Map<String, dynamic> config = {};
@@ -86,7 +98,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
   Map? get totals => createdOrder?['totals'] is Map
       ? createdOrder!['totals'] as Map
-      : (widget.cart['totals'] is Map ? widget.cart['totals'] as Map : null);
+      : (liveCart['totals'] is Map ? liveCart['totals'] as Map : null);
   int get totalMinor => int.tryParse('${totals?['total_price'] ?? '0'}') ?? 0;
   int get minorUnit => (totals?['currency_minor_unit'] as num?)?.toInt() ?? 2;
   double get amountValue => totalMinor / (minorUnit == 0 ? 1 : (minorUnit == 1 ? 10 : 100));
@@ -119,6 +131,10 @@ class _PaymentPageState extends State<PaymentPage> {
   Future<void> placeOrder() async {
     if (selected == null) {
       setState(() => error = 'No active payment method is available. Check WooCommerce → Settings → Payments and the ARK Native API Bridge.');
+      return;
+    }
+    if (totalMinor <= 0) {
+      setState(() => error = 'Order total is unavailable. Refresh your cart and confirm the payable amount before placing the order.');
       return;
     }
     setState(() { paying = true; error = null; });
@@ -281,7 +297,7 @@ class _PaymentPageState extends State<PaymentPage> {
               padding: const EdgeInsets.all(17),
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 const Text('Payable amount', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                Text(money(totals), style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: _brand)),
+                Text(totals == null ? 'Amount unavailable' : money(totals), style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: _brand)),
               ]),
             ),
           ),
@@ -290,7 +306,7 @@ class _PaymentPageState extends State<PaymentPage> {
           SizedBox(
             height: 54,
             child: FilledButton(
-              onPressed: paying || submittingUpi || (methods.isEmpty && createdOrder == null)
+              onPressed: paying || submittingUpi || (methods.isEmpty && createdOrder == null) || (createdOrder == null && totalMinor <= 0)
                   ? null
                   : (createdOrder == null ? placeOrder : submitUpi),
               style: FilledButton.styleFrom(backgroundColor: _brand, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
