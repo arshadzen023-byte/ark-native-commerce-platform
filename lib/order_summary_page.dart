@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 class OrderSummaryPage extends StatelessWidget {
-  const OrderSummaryPage({super.key, required this.cart, required this.onContinue});
+  const OrderSummaryPage({super.key, required this.cart, required this.onContinue, this.onQuantityChanged, this.onRemove});
   final Map<String, dynamic> cart;
   final VoidCallback onContinue;
+  final Future<void> Function(String key, int quantity)? onQuantityChanged;
+  final Future<void> Function(String key)? onRemove;
 
   String money(dynamic data) {
     if (data is! Map) return '';
@@ -38,7 +40,15 @@ class OrderSummaryPage extends StatelessWidget {
                   ? const Icon(Icons.shopping_bag_outlined)
                   : Image.network(image, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined))),
               title: Text((item['name'] ?? 'Product').toString(), maxLines: 2, overflow: TextOverflow.ellipsis),
-              subtitle: Text('Quantity: ${item['quantity'] ?? 1}'),
+              subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Unit price: ${money(item['prices'] is Map ? item['prices'] : lineTotals)}'),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  IconButton(visualDensity: VisualDensity.compact, onPressed: onQuantityChanged == null ? null : () => onQuantityChanged!((item['key'] ?? '').toString(), ((item['quantity'] as num?)?.toInt() ?? 1) - 1), icon: const Icon(Icons.remove_circle_outline)),
+                  Text('${item['quantity'] ?? 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  IconButton(visualDensity: VisualDensity.compact, onPressed: onQuantityChanged == null ? null : () => onQuantityChanged!((item['key'] ?? '').toString(), ((item['quantity'] as num?)?.toInt() ?? 1) + 1), icon: const Icon(Icons.add_circle_outline)),
+                  TextButton(onPressed: onRemove == null ? null : () => onRemove!((item['key'] ?? '').toString()), child: const Text('Remove')),
+                ]),
+              ]),
               trailing: Text(money(lineTotals), style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
           );
