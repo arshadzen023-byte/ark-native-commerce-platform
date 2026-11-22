@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'product_details_page.dart';
 import 'customer_account_page.dart';
 import 'checkout_page.dart';
@@ -218,7 +219,7 @@ class _StoreHomeState extends State<StoreHome> {
       await _openNotifications();
       return;
     }
-    if (uri.scheme == 'ark' && uri.host == 'orders') {
+    if (uri.scheme == 'ark' && (uri.host == 'orders' || uri.host == 'order')) {
       if (customerToken == null) { setState(() => tab = 4); return; }
       if (uri.pathSegments.isNotEmpty) {
         final id = uri.pathSegments.first;
@@ -249,6 +250,31 @@ class _StoreHomeState extends State<StoreHome> {
     }
     if (uri.scheme == 'ark' && uri.host == 'category') {
       if (mounted) setState(() => tab = 1);
+      return;
+    }
+    if (uri.scheme == 'ark' && uri.host == 'page' && uri.pathSegments.isNotEmpty) {
+      final pageId = int.tryParse(uri.pathSegments.first);
+      if (pageId == null || pageId < 1) return;
+      try {
+        final response = await request(Uri.parse(storeUrl).resolve('wp-json/wp/v2/pages/$pageId?_fields=link,status'));
+        if (response.statusCode == 200) {
+          final page = jsonDecode(response.body);
+          final link = page is Map && page['status'] == 'publish' ? (page['link'] ?? '').toString() : '';
+          final target = Uri.tryParse(link);
+          if (target != null && (target.scheme == 'https' || target.scheme == 'http')) {
+            await launchUrl(target, mode: LaunchMode.externalApplication);
+          }
+        }
+      } catch (_) {}
+      return;
+    }
+    if (uri.scheme == 'https' || uri.scheme == 'http') {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    // Handle supported external app schemes selected in the WordPress composer.
+    if (uri.scheme.isNotEmpty && uri.scheme != 'ark') {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
   @override void dispose() { searchController.dispose(); super.dispose(); }
