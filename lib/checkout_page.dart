@@ -18,6 +18,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
   Map<String, dynamic> address = {};
   bool loading = true;
   int step = 0;
+  Map<String, dynamic> completedOrder = {};
   String? error;
 
   @override
@@ -50,13 +51,8 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
       builder: (_) => PaymentPage(api: widget.api, address: address, cart: cart),
     ));
     if (result == null || !mounted) return;
-    await Navigator.push(context, MaterialPageRoute(
-      builder: (_) => OrderConfirmationPage(
-        order: result,
-        cart: cart,
-        onContinue: () => Navigator.of(context).popUntil((route) => route.isFirst),
-      ),
-    ));
+    if (!mounted) return;
+    setState(() { completedOrder = Map<String, dynamic>.from(result); step = 3; });
   }
 
   @override
@@ -74,7 +70,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
         ]))),
       );
     }
-    final steps = ['Summary', 'Address', 'Payment'];
+    final steps = ['Summary', 'Address', 'Payment', 'Received'];
     return Scaffold(
       appBar: AppBar(
         title: const Text('Checkout'),
@@ -83,9 +79,9 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
       ),
       body: Column(children: [
         Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 14), child: Column(children: [
-          Row(children: List.generate(3, (i) => Expanded(child: Container(margin: EdgeInsets.only(right: i == 2 ? 0 : 6), height: 5, decoration: BoxDecoration(color: step >= i ? const Color(0xFF51408F) : Colors.grey.shade300, borderRadius: BorderRadius.circular(8)))))),
+          Row(children: List.generate(4, (i) => Expanded(child: Container(margin: EdgeInsets.only(right: i == 3 ? 0 : 6), height: 5, decoration: BoxDecoration(color: step >= i ? const Color(0xFF51408F) : Colors.grey.shade300, borderRadius: BorderRadius.circular(8)))))), 
           const SizedBox(height: 8),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(3, (i) => Text(steps[i], style: TextStyle(fontSize: 12, color: step >= i ? const Color(0xFF51408F) : Colors.grey, fontWeight: step == i ? FontWeight.bold : FontWeight.normal)))),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(4, (i) => Text(steps[i], style: TextStyle(fontSize: 12, color: step >= i ? const Color(0xFF51408F) : Colors.grey, fontWeight: step == i ? FontWeight.bold : FontWeight.normal)))), 
         ])),
         Expanded(child: step == 0
           ? OrderSummaryPage(cart: cart, onContinue: () => setState(() => step = 1), onQuantityChanged: (key, quantity) async {
@@ -103,7 +99,12 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
             ? DeliveryAddressPage(api: widget.api, initialAddress: address, customerToken: widget.customerToken, embedded: true, onAddressSaved: (value, updated) {
                 setState(() { address = value; cart = updated; step = 2; error = null; });
               })
-            : _paymentReview()),
+            : step == 2 ? _paymentReview()
+            : OrderConfirmationPage(
+                order: completedOrder,
+                cart: cart,
+                onContinue: () => Navigator.of(context).popUntil((route) => route.isFirst),
+              )), 
       ]),
     );
   }
