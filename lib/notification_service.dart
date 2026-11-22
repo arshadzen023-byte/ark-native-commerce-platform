@@ -146,6 +146,20 @@ class GlowHitPushService {
     return clean.take(6).toList();
   }
 
+  Future<void> recordClick(int id) async {
+    final token = _token ?? await FirebaseMessaging.instance.getToken();
+    if (token == null || token.isEmpty || id < 1) return;
+    final response = await _requestWithRestFallback(
+      path: 'click',
+      method: 'POST',
+      headers: {'Accept': 'application/json', 'Content-Type': 'application/json', 'x-ark-push-token': token},
+      body: jsonEncode({'message_id': id}),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Could not record notification click (' + response.statusCode.toString() + ').');
+    }
+  }
+
   Future<void> deleteMessage(int id) async {
     final token = _token ?? await FirebaseMessaging.instance.getToken();
     if (token == null) throw Exception('Device is not registered.');
