@@ -25,6 +25,32 @@ jobs:
           cache: true
       - name: Generate Android project
         run: flutter create --project-name glowhit_shopping --org shop.pluginstore --platforms android .
+      - name: Use official Gradle distribution mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          wrapper = Path("android/gradle/wrapper/gradle-wrapper.properties")
+          if not wrapper.is_file():
+              raise SystemExit(f"Gradle wrapper properties missing: {wrapper}")
+
+          text = wrapper.read_text(encoding="utf-8")
+          updated, count = re.subn(
+              r"(?m)^distributionUrl=.*$",
+              r"distributionUrl=https\\://downloads.gradle.org/distributions/gradle-9.5.0-bin.zip",
+              text,
+          )
+          if count != 1:
+              raise SystemExit(f"Expected exactly one distributionUrl, found {count}")
+          wrapper.write_text(updated, encoding="utf-8")
+          check = wrapper.read_text(encoding="utf-8")
+          if "downloads.gradle.org/distributions/gradle-9.5.0-bin.zip" not in check:
+              raise SystemExit("Gradle distribution URL patch verification failed")
+          print("Gradle wrapper now uses the official downloads.gradle.org binary distribution")
+          PY
       - name: Ensure Android internet permission
         shell: bash
         run: |
