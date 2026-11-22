@@ -65,9 +65,23 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     if (index >= 0) { savedAddresses[index] = value; } else { savedAddresses.add(value); }
     await prefs.setString(key, jsonEncode(savedAddresses));
     final token = widget.customerToken;
-    if (token != null) {
-      try { final remote = await ArkCustomerApi(token).request('customer/addresses', method: 'POST', body: value); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(key, jsonEncode(savedAddresses)); } } catch (_) { /* Local copy is retained if the API is temporarily unavailable. */ }
+    if (token == null || token.isEmpty) {
+      throw Exception('Please sign in before saving a delivery address. Your address will be stored securely in your customer account.');
     }
+    final remote = await ArkCustomerApi(token).request('customer/addresses', method: 'POST', body: value);
+    if (remote is! List) {
+      throw Exception('The store did not confirm that your address was saved. Please retry.');
+    }
+    final saved = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    final confirmed = saved.any((e) =>
+      (e['address_1'] ?? '').toString() == value['address_1'] &&
+      (e['postcode'] ?? '').toString() == value['postcode'] &&
+      (e['first_name'] ?? '').toString() == value['first_name']);
+    if (!confirmed) {
+      throw Exception('The store did not return the saved address. Please retry.');
+    }
+    savedAddresses = saved;
+    await prefs.setString(key, jsonEncode(savedAddresses));
     if (mounted) setState(() {});
   }
 
@@ -202,7 +216,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
           }),
         ],
         const SizedBox(height: 16),
-        OutlinedButton.icon(onPressed: busy ? null : () async { if (!formKey.currentState!.validate()) return; await _saveCurrentAddress(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address saved'))); }, icon: const Icon(Icons.bookmark_add_outlined), label: const Text('SAVE THIS ADDRESS')),
+        OutlinedButton.icon(onPressed: busy ? null : () async { if (!formKey.currentState!.validate()) return; setState(() { busy = true; error = null; }); try { await _saveCurrentAddress(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address saved to your customer account'))); } catch (e) { if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', '')); } finally { if (mounted) setState(() => busy = false); } }, icon: const Icon(Icons.bookmark_add_outlined), label: const Text('SAVE THIS ADDRESS')),
         const SizedBox(height: 8),
         SizedBox(height: 54, child: FilledButton(
           onPressed: busy ? null : () async {
