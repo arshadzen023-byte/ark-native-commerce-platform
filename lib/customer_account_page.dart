@@ -14,12 +14,28 @@ class ArkCustomerApi {
     final uri = Uri.parse(baseUrl).resolve('wp-json/ark-native/v1/$path').replace(queryParameters: query);
     final headers = <String, String>{'Accept': 'application/json', 'Authorization': 'Bearer $token'};
     if (body != null) headers['Content-Type'] = 'application/json';
-    final req = http.Request(method, uri)..headers.addAll(headers);
-    if (body != null) req.body = jsonEncode(body);
-    final client = http.Client();
+
+    Future<http.Response> send(Uri target) async {
+      final req = http.Request(method, target)..headers.addAll(headers);
+      if (body != null) req.body = jsonEncode(body);
+      final client = http.Client();
+      try {
+        final response = await client.send(req).timeout(const Duration(seconds: 20));
+        return await http.Response.fromStream(response).timeout(const Duration(seconds: 20));
+      } finally { client.close(); }
+    }
+
+    final primary = await send(uri);
+    // Retry WordPress' canonical REST query form only for rewrite-related
+    // 404/405 responses. Do not retry 401/403: authentication and WAF blocks
+    // must remain visible and must never be bypassed by a fallback.
+    final result = (primary.statusCode == 404 || primary.statusCode == 405)
+      ? await send(Uri.parse(baseUrl).replace(
+          path: '/',
+          queryParameters: {'rest_route': '/ark-native/v1/$path', ...?query},
+        ))
+      : primary;
     try {
-      final response = await client.send(req).timeout(const Duration(seconds: 20));
-      final result = await http.Response.fromStream(response);
       dynamic data;
       try { data = result.body.isEmpty ? null : jsonDecode(result.body); }
       catch (_) { throw Exception('The store returned an invalid response (${result.statusCode}).'); }
