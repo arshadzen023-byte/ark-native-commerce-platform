@@ -127,7 +127,23 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
     }
     final responseKey = widget.section == 'My Orders' ? 'orders' : widget.section == 'Downloads' ? 'downloads' : 'addresses';
     final items = _asMapList(data, responseKey);
-    if (items.isEmpty) return Center(child: Text(widget.section == 'My Orders' ? 'No orders found yet.' : widget.section == 'Downloads' ? 'No downloadable products found.' : 'No saved addresses found.'));
+    if (items.isEmpty) {
+      if (widget.section == 'My Orders') {
+        return Center(child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.receipt_long_outlined, size: 52, color: _accountPurple),
+            const SizedBox(height: 12),
+            const Text('No orders linked to this account yet.', textAlign: TextAlign.center, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text('Guest orders appear here when their checkout billing email matches your signed-in account email.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade700)),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(onPressed: load, icon: const Icon(Icons.refresh), label: const Text('REFRESH ORDERS')),
+          ]),
+        ));
+      }
+      return Center(child: Text(widget.section == 'Downloads' ? 'No downloadable products found.' : 'No saved addresses found.'));
+    }
     return ListView.builder(padding: const EdgeInsets.all(12), itemCount: items.length, itemBuilder: (context, index) {
       final item = items[index];
       if (item is! Map) return const SizedBox.shrink();
