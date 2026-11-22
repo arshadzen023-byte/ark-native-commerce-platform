@@ -232,7 +232,6 @@ class _PaymentPageState extends State<PaymentPage> {
   @override
   Widget build(BuildContext context) {
     if (loading) return Scaffold(appBar: AppBar(title: const Text('Payment')), body: const Center(child: CircularProgressIndicator()));
-    final isUpi = selected == 'wc-upi';
     return Scaffold(
       appBar: AppBar(title: const Text('Payment')),
       body: ListView(
