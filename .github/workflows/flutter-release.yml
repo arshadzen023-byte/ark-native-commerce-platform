@@ -87,7 +87,7 @@ jobs:
         run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
-          name: glowhit-v1.0.4-build-84
+          name: glowhit-v1.0.5-build-85
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
@@ -95,8 +95,8 @@ jobs:
         if: startsWith(github.ref, 'refs/heads/feature/glowhit-saved-customer-address-2026-11-22')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: glowhit-v1.0.4-saved-customer-address-2026-11-22
-          name: GlowHit v1.0.4 — Saved customer addresses and native payments
+          tag_name: glowhit-v1.0.5-native-orders-api-2026-11-22
+          name: GlowHit v1.0.5 — Native orders, API and payment fixes
           prerelease: true
           generate_release_notes: true
           fail_on_unmatched_files: true
