@@ -174,6 +174,14 @@ class OrderDetailPage extends StatefulWidget {
 }
 
 class _OrderDetailPageState extends State<OrderDetailPage> {
+  Color _statusColor(String status) {
+    final value = status.toLowerCase();
+    if (value.contains('deliver') || value.contains('complete')) return Colors.green;
+    if (value.contains('cancel') || value.contains('fail') || value.contains('refund')) return Colors.red;
+    if (value.contains('hold') || value.contains('pending')) return Colors.orange;
+    return _accountPurple;
+  }
+
   late Map<String, dynamic> order;
   bool loading = false;
   String? error;
