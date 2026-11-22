@@ -3,7 +3,7 @@ on:
   push:
     branches: [main, 'feature/**', 'fix/**']
   pull_request:
-    branches: [main]
+    branches: [main, feature/glowhit-my-orders-redesign-2026-11-22]
   workflow_dispatch:
 permissions:
   contents: write
