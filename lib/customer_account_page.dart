@@ -119,10 +119,58 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
   );
   Widget _body() {
     if (widget.section == 'Edit Profile') {
-      return ListView(padding: const EdgeInsets.all(16), children: [
-        for (final key in ['display_name', 'email', 'first_name', 'last_name', 'billing_phone'])
-          Padding(padding: const EdgeInsets.only(bottom: 12), child: TextField(controller: fields[key], keyboardType: key == 'email' ? TextInputType.emailAddress : TextInputType.text, decoration: InputDecoration(labelText: switch (key) { 'display_name' => 'Display name', 'billing_phone' => 'Mobile number', _ => key.replaceAll('_', ' ').toUpperCase() }, border: const OutlineInputBorder()))),
-        FilledButton(onPressed: saving ? null : saveProfile, child: saving ? const CircularProgressIndicator() : const Text('SAVE PROFILE')),
+      return ListView(padding: const EdgeInsets.fromLTRB(16, 18, 16, 28), children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF33205F), Color(0xFF7655A8)]),
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(Icons.manage_accounts_rounded, color: Colors.white, size: 34),
+            SizedBox(height: 12),
+            Text('Your profile, your details', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800)),
+            SizedBox(height: 4),
+            Text('Keep your contact information up to date for smooth deliveries.', style: TextStyle(color: Colors.white70)),
+          ]),
+        ),
+        const SizedBox(height: 18),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: .45))),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(children: [
+              for (final entry in [
+                ('display_name', 'Display name', Icons.badge_outlined),
+                ('first_name', 'First name', Icons.person_outline),
+                ('last_name', 'Last name', Icons.person_outline),
+                ('email', 'Email address', Icons.email_outlined),
+                ('billing_phone', 'Mobile number', Icons.phone_outlined),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 13),
+                  child: TextField(
+                    controller: fields[entry.$1],
+                    keyboardType: entry.$1 == 'email' ? TextInputType.emailAddress : entry.$1 == 'billing_phone' ? TextInputType.phone : TextInputType.text,
+                    decoration: InputDecoration(
+                      labelText: entry.$2,
+                      prefixIcon: Icon(entry.$3, color: _accountPurple),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .35),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                    ),
+                  ),
+                ),
+              SizedBox(width: double.infinity, child: FilledButton.icon(
+                onPressed: saving ? null : saveProfile,
+                icon: saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save_rounded),
+                label: const Text('SAVE CHANGES'),
+                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15)),
+              )),
+            ]),
+          ),
+        ),
       ]);
     }
     final items = _asItems(data, widget.section == 'My Orders' ? 'orders' : widget.section == 'Downloads' ? 'downloads' : 'addresses');
@@ -131,7 +179,49 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
     return ListView.builder(padding: const EdgeInsets.all(12), itemCount: items.length, itemBuilder: (context, index) {
       final item = items[index];
       if (widget.section == 'Downloads') {
-        return Card(child: ListTile(leading: const Icon(Icons.download, color: _accountPurple), title: Text((item['download_name'] ?? item['product_name'] ?? 'Download').toString()), subtitle: Text('Remaining: ${item['downloads_remaining'] ?? '—'}'), trailing: IconButton(icon: const Icon(Icons.open_in_new), onPressed: () { final uri = Uri.tryParse((item['download_url'] ?? '').toString()); if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication); })));
+        final name = (item['product_name'] ?? item['name'] ?? item['download_name'] ?? 'Download').toString();
+        final fileName = (item['file_name'] ?? '').toString();
+        final url = (item['download_url'] ?? '').toString();
+        final remaining = (item['downloads_remaining'] ?? '—').toString();
+        final expiry = (item['access_expires'] ?? '').toString();
+        return Card(
+          margin: const EdgeInsets.only(bottom: 13),
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(19), side: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: .45))),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(15),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(width: 52, height: 52, decoration: BoxDecoration(color: _accountPurple.withValues(alpha: .10), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.file_download_outlined, color: _accountPurple, size: 29)),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                  if (fileName.isNotEmpty) Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
+                ])),
+              ]),
+              const SizedBox(height: 13),
+              Wrap(spacing: 8, runSpacing: 7, children: [
+                Chip(avatar: const Icon(Icons.download_done, size: 16), label: Text('Remaining: $remaining')),
+                if (item['order_id'] != null) Chip(avatar: const Icon(Icons.receipt_long, size: 16), label: Text('Order #${item['order_id']}')),
+              ]),
+              if (expiry.isNotEmpty && expiry != '0') Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Access expires: $expiry', style: Theme.of(context).textTheme.bodySmall)),
+              SizedBox(width: double.infinity, child: FilledButton.icon(
+                onPressed: url.isEmpty ? null : () async {
+                  final uri = Uri.tryParse(url);
+                  if (uri == null || (uri.scheme != 'https' && uri.scheme != 'http')) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download link is invalid.')));
+                    return;
+                  }
+                  final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  if (!opened && context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open the download link.')));
+                },
+                icon: const Icon(Icons.download_rounded),
+                label: const Text('DOWNLOAD FILE'),
+              )),
+            ]),
+          ),
+        );
       }
       return Card(child: ListTile(leading: const Icon(Icons.location_on_outlined, color: _accountPurple), title: Text((item['label'] ?? 'Address').toString()), subtitle: Text(['address_1','address_2','city','state','postcode','country'].map((k) => item[k]).where((v) => v != null && v.toString().isNotEmpty).join(', '))));
     });
