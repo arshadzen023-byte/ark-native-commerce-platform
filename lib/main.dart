@@ -187,13 +187,25 @@ class _StoreHomeState extends State<StoreHome> {
     load();
     _refreshCart();
   }
-  Future<void> _refreshNotificationCount() async {
+  Future<void> _refreshNotificationCount({bool markSeen = false}) async {
     try {
       final items = await push.loadInbox();
-      if (mounted) setState(() => notificationCount = items.length);
+      final prefs = await SharedPreferences.getInstance();
+      final latestId = items.fold<int>(0, (latest, item) {
+        final id = int.tryParse((item['id'] ?? '').toString()) ?? 0;
+        return id > latest ? id : latest;
+      });
+      const seenKey = 'glowhit_notifications_seen_through_id';
+      final seenId = prefs.getInt(seenKey) ?? 0;
+      if (markSeen && latestId > seenId) await prefs.setInt(seenKey, latestId);
+      if (mounted) setState(() => notificationCount = markSeen ? 0 : items.where((item) {
+        final id = int.tryParse((item['id'] ?? '').toString()) ?? 0;
+        return id > seenId;
+      }).length);
     } catch (_) {}
   }
   Future<void> _openNotifications() async {
+    await _refreshNotificationCount(markSeen: true);
     final link = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NotificationInboxPage(service: push)));
     await _refreshNotificationCount();
     if (link != null && link.isNotEmpty) await _handleNotificationLink(link);
@@ -319,7 +331,7 @@ class _StoreHomeState extends State<StoreHome> {
     else if (products.isEmpty) const Expanded(child: Center(child: Text('No products found. Try another search.')))
     else Expanded(child: GridView.builder(padding: const EdgeInsets.fromLTRB(12, 0, 12, 18), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .66, crossAxisSpacing: 10, mainAxisSpacing: 10), itemCount: products.length, itemBuilder: (_, i) => productCard(products[i]))),
   ]);
-  Widget account() => AccountPanel(onLogin: (token) { setState(() => customerToken = token); push.register(customerJwt: token); }, onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() => customerToken = null); }, token: customerToken);
+  Widget account() => AccountPanel(onLogin: (token) { setState(() => customerToken = token); push.register(customerJwt: token); }, onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } try { await push.unlinkAccount(); } catch (_) {} final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() { customerToken = null; notificationCount = 0; }); }, token: customerToken);
   @override Widget build(BuildContext context) {
     final titles = ['Shopping', 'Categories', 'Wishlist', 'Cart', 'Account'];
     Widget page;
