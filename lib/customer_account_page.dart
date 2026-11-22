@@ -146,7 +146,6 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
     }
     return ListView.builder(padding: const EdgeInsets.all(12), itemCount: items.length, itemBuilder: (context, index) {
       final item = items[index];
-      if (item is! Map) return const SizedBox.shrink();
       if (widget.section == 'My Orders') {
         final lines = (item['items'] as List? ?? []).whereType<Map>().map((e) => '${e['name']} × ${e['quantity']}').join(', ');
         final orderItems = (item['items'] as List? ?? []).whereType<Map>().toList();
