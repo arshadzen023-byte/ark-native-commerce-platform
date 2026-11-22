@@ -57,31 +57,33 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   }
 
   Future<void> _saveCurrentAddress() async {
-    final value = address;
-    value['label'] = addressLabel;
-    final key = _savedAddressKey;
-    final prefs = await SharedPreferences.getInstance();
-    final index = savedAddresses.indexWhere((e) => e['address_1'] == value['address_1'] && e['postcode'] == value['postcode'] && e['first_name'] == value['first_name']);
-    if (index >= 0) { savedAddresses[index] = value; } else { savedAddresses.add(value); }
-    await prefs.setString(key, jsonEncode(savedAddresses));
     final token = widget.customerToken;
     if (token == null || token.isEmpty) {
       throw Exception('Please sign in before saving a delivery address. Your address will be stored securely in your customer account.');
     }
-    final remote = await ArkCustomerApi(token).request('customer/addresses', method: 'POST', body: value);
+    final value = address..['label'] = addressLabel;
+    final remote = await ArkCustomerApi(token).request(
+      'customer/addresses',
+      method: 'POST',
+      body: value,
+    );
     if (remote is! List) {
       throw Exception('The store did not confirm that your address was saved. Please retry.');
     }
-    final saved = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    final saved = remote
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
     final confirmed = saved.any((e) =>
-      (e['address_1'] ?? '').toString() == value['address_1'] &&
-      (e['postcode'] ?? '').toString() == value['postcode'] &&
-      (e['first_name'] ?? '').toString() == value['first_name']);
+        (e['address_1'] ?? '').toString() == value['address_1'] &&
+        (e['postcode'] ?? '').toString() == value['postcode'] &&
+        (e['first_name'] ?? '').toString() == value['first_name']);
     if (!confirmed) {
       throw Exception('The store did not return the saved address. Please retry.');
     }
+    final prefs = await SharedPreferences.getInstance();
     savedAddresses = saved;
-    await prefs.setString(key, jsonEncode(savedAddresses));
+    await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses));
     if (mounted) setState(() {});
   }
 
