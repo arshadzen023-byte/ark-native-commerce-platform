@@ -124,11 +124,11 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
   }
 
   String _normalStatus(dynamic raw) {
-    final s = (raw ?? 'pending').toString().toLowerCase().replaceAll('_', '-').replaceAll(' ', '-');
+    final s = (raw ?? 'pending').toString().toLowerCase().replaceAll('_', '-').replaceAll(' ', '-').replaceFirst(RegExp(r'^wc-'), '');
     if (s == 'on-hold' || s == 'hold') return 'hold';
-    if (s == 'pending' || s == 'pending-payment' || s == 'payment-pending') return 'payment-pending';
-    if (s == 'outfordelivery' || s == 'out-for-delivery') return 'out-for-delivery';
-    if (s == 'complete' || s == 'completed' || s == 'delivered') return 'delivered';
+    if (['pending','pending-payment','payment-pending','awaiting-verification'].contains(s)) return 'payment-pending';
+    if (['outfordelivery','out-of-delivery','out-for-delivery'].contains(s)) return 'out-for-delivery';
+    if (['complete','completed','delivered'].contains(s)) return 'delivered';
     if (s == 'draft') return 'draft';
     if (s == 'cancelled' || s == 'canceled') return 'cancelled';
     if (s == 'failed' || s == 'refunded') return s;
@@ -158,7 +158,7 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
 
   bool _matchesFilter(Map<String, dynamic> item) {
     if (orderFilter == 'All') return true;
-    final status = _normalStatus(item['status']);
+    final status = _normalStatus(item['status_key'] ?? item['status']);
     switch (orderFilter) {
       case 'Draft': return status == 'draft';
       case 'Hold': return status == 'hold';
@@ -253,6 +253,13 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
                           const SizedBox(width: 4),
                           const Icon(Icons.chevron_right),
                         ]),
+                        const SizedBox(height: 8),
+                        Align(alignment: Alignment.centerLeft, child: Builder(builder: (context) {
+                          final state = _normalStatus(item['status_key'] ?? item['status']);
+                          final color = state == 'delivered' ? Colors.green : ['cancelled','failed','refunded'].contains(state) ? Colors.red : ['hold','payment-pending'].contains(state) ? Colors.deepOrange : state == 'out-for-delivery' ? Colors.teal : state == 'shipped' ? Colors.indigo : _accountPurple;
+                          final label = state.replaceAll('-', ' ').toUpperCase();
+                          return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: color.withValues(alpha: .10), borderRadius: BorderRadius.circular(30)), child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 11)));
+                        })),
                         const SizedBox(height: 14),
                         Row(children: [
                           ClipRRect(
