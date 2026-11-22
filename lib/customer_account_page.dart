@@ -49,6 +49,26 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
   void initState() { super.initState(); api = ArkCustomerApi(widget.token); load(); }
   @override
   void dispose() { for (final c in fields.values) { c.dispose(); } super.dispose(); }
+  List<Map<String, dynamic>> _asMapList(dynamic value, String key) {
+    dynamic list = value;
+    if (value is Map) {
+      list = value[key] ?? value['data'] ?? value['items'];
+      if (list is Map && list[key] is List) list = list[key];
+      if (list is Map && key == 'addresses') {
+        final shipping = list['shipping'];
+        final billing = list['billing'];
+        final candidate = shipping is Map && (shipping['address_1'] ?? '').toString().isNotEmpty
+            ? shipping
+            : billing;
+        list = candidate is Map && (candidate['address_1'] ?? '').toString().isNotEmpty
+            ? [candidate]
+            : [];
+      }
+    }
+    if (list is! List) return [];
+    return list.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
   String get path => switch (widget.section) {
     'My Orders' => 'customer/orders',
     'Downloads' => 'customer/downloads',
@@ -105,7 +125,8 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
         FilledButton(onPressed: saving ? null : saveProfile, child: saving ? const CircularProgressIndicator() : const Text('SAVE PROFILE')),
       ]);
     }
-    final items = data is List ? data as List : const [];
+    final responseKey = widget.section == 'My Orders' ? 'orders' : widget.section == 'Downloads' ? 'downloads' : 'addresses';
+    final items = _asMapList(data, responseKey);
     if (items.isEmpty) return Center(child: Text(widget.section == 'My Orders' ? 'No orders found yet.' : widget.section == 'Downloads' ? 'No downloadable products found.' : 'No saved addresses found.'));
     return ListView.builder(padding: const EdgeInsets.all(12), itemCount: items.length, itemBuilder: (context, index) {
       final item = items[index];
