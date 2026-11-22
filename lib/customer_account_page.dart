@@ -82,8 +82,12 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
     finally { if (mounted) setState(() => saving = false); }
   }
   String _money(dynamic value, dynamic currency) {
-    final amount = double.tryParse(value?.toString() ?? '') ?? 0;
-    return '${currency ?? '₹'}${amount.toStringAsFixed(2)}';
+    if (value == null || value.toString().trim().isEmpty) return '—';
+    final amount = double.tryParse(value.toString().replaceAll(',', ''));
+    if (amount == null) return value.toString();
+    final code = (currency ?? '₹').toString();
+    final symbol = code.toUpperCase() == 'INR' ? '₹' : code;
+    return '$symbol${amount.toStringAsFixed(2)}';
   }
 
   List<Map<String, dynamic>> _asItems(dynamic value, [String? key]) {
@@ -139,14 +143,22 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
   }
 
   String _orderTotal(Map<String, dynamic> item) {
-    final value = item['total'] ?? item['total_amount'] ?? item['order_total'] ?? item['amount'] ?? item['formatted_total'];
-    if (value == null || value.toString().trim().isEmpty) return '—';
+    final candidates = [item['total'], item['total_amount'], item['order_total'], item['total_price'], item['amount_total'], item['grand_total'], item['amount']];
+    dynamic value;
+    for (final candidate in candidates) {
+      if (candidate == null || candidate.toString().trim().isEmpty) continue;
+      final parsed = double.tryParse(candidate.toString().replaceAll(',', ''));
+      if (parsed != null && parsed != 0) { value = candidate; break; }
+      value ??= candidate;
+    }
+    value ??= item['formatted_total'];
+    if (value == null) return '—';
     if (value is String && value.contains(RegExp(r'[^0-9., -]'))) return value;
     return _money(value, item['currency_symbol'] ?? item['currency']);
   }
 
   String _shortTitle(String value) {
-    final clean = value.replaceAll(RegExp(r'\\s+'), ' ').trim();
+    final clean = value.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (clean.length <= 44) return clean;
     return '${clean.substring(0, 41).trimRight()}…';
   }
@@ -459,7 +471,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
         const Padding(padding: EdgeInsets.only(left: 3, bottom: 4), child: Text('ITEMS', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800))),
         ...lineItems.map((item) {
           final image = item['image'] is Map ? (item['image'] as Map)['src']?.toString() ?? '' : (item['image'] ?? item['image_url'] ?? '').toString();
-          final rawTitle = (item['name'] ?? item['product_name'] ?? 'Product').toString().replaceAll(RegExp(r'\\s+'), ' ').trim();
+          final rawTitle = (item['name'] ?? item['product_name'] ?? 'Product').toString().replaceAll(RegExp(r'\s+'), ' ').trim();
           final title = rawTitle.length > 48 ? '${rawTitle.substring(0, 45).trimRight()}…' : rawTitle;
           return Card(child: Padding(padding: const EdgeInsets.all(11), child: Row(children: [
             ClipRRect(borderRadius: BorderRadius.circular(8), child: SizedBox(width: 76, height: 76, child: image.isEmpty ? const Icon(Icons.shopping_bag_outlined, size: 35) : Image.network(image, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined)))),
