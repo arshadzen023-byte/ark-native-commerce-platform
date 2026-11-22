@@ -18,7 +18,6 @@ class PaymentPage extends StatefulWidget {
 class _PaymentPageState extends State<PaymentPage> {
   static const _brand = Color(0xFF51408F);
   final _utrController = TextEditingController();
-  final _payerUpiController = TextEditingController();
   final _picker = ImagePicker();
   List<Map<String, dynamic>> methods = [];
   Map<String, dynamic> upi = {};
@@ -34,7 +33,7 @@ class _PaymentPageState extends State<PaymentPage> {
   void initState() { super.initState(); liveCart = Map<String, dynamic>.from(widget.cart); loadMethods(); }
 
   @override
-  void dispose() { _utrController.dispose(); _payerUpiController.dispose(); super.dispose(); }
+  void dispose() { _utrController.dispose(); super.dispose(); }
 
   Future<void> loadMethods() async {
     try {
@@ -139,20 +138,12 @@ class _PaymentPageState extends State<PaymentPage> {
     }
     setState(() { paying = true; error = null; });
     try {
-      final mode = (upi['upi_address_mode'] ?? 'hide').toString();
-      final payerVpa = _payerUpiController.text.trim();
       if (selected == 'wc-upi' && (upi['merchant_vpa'] ?? '').toString().trim().isEmpty) {
         throw Exception('The store has not configured its UPI merchant address. Please contact the store.');
       }
-      if (selected == 'wc-upi' && upi['require_upi'] == true && mode != 'hide' && payerVpa.isEmpty) {
-        throw Exception('Enter your UPI ID to continue.');
-      }
-      final paymentData = selected == 'wc-upi' && mode != 'hide'
-          ? [
-              {'key': 'customer_upiwc_address', 'value': mode == 'show_handle' ? payerVpa.split('@').first : payerVpa},
-              {'key': 'customer_upiwc_handle', 'value': mode == 'show_handle' && payerVpa.contains('@') ? payerVpa.split('@').last : ''},
-            ]
-          : <Map<String, dynamic>>[];
+      // Customer UPI ID is intentionally not collected. UTR and screenshot
+      // are submitted after the order is created and linked by order key.
+      const paymentData = <Map<String, dynamic>>[];
       final result = await widget.api.placeOrder(
         billing: widget.address,
         shipping: widget.address,
@@ -254,15 +245,7 @@ class _PaymentPageState extends State<PaymentPage> {
           if (createdOrder == null) ...[
             if (methods.isEmpty)
               _notice(error ?? 'No active payment methods were returned. Enable COD or UPI in WooCommerce and check the ARK Native API Bridge.', Icons.info_outline),
-            if (isUpi && (upi['upi_address_mode'] ?? 'hide') != 'hide') ...[
-            TextField(
-              controller: _payerUpiController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Your UPI ID', hintText: 'name@bank', border: OutlineInputBorder(), prefixIcon: Icon(Icons.alternate_email)),
-            ),
-            const SizedBox(height: 12),
-          ],
-          ...methods.map((method) {
+              ...methods.map((method) {
               final id = (method['id'] ?? '').toString();
               final active = selected == id;
               final isCod = id == 'cod';
