@@ -59,7 +59,11 @@ class WooStoreApi {
       try {
         decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
       } catch (_) {
-        throw Exception('WooCommerce returned an invalid response (HTTP ${response.statusCode}).');
+        final contentType = _header(response, 'content-type') ?? 'unknown content-type';
+        final preview = response.body.replaceAll(RegExp(r'\\s+'), ' ').trim();
+        final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
+        final looksHtml = preview.toLowerCase().startsWith('<!doctype') || preview.toLowerCase().startsWith('<html');
+        throw Exception('WooCommerce returned non-JSON data (HTTP ${response.statusCode}, $contentType). ${looksHtml ? 'The server returned an HTML page instead of Store API JSON (often a cache, firewall, security plugin or PHP error page).' : 'Response preview: $safePreview'}');
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final message = decoded is Map ? (decoded['message'] ?? decoded['code'] ?? response.body) : response.body;
@@ -110,7 +114,10 @@ class WooStoreApi {
     ).timeout(const Duration(seconds: 20));
     dynamic decoded;
     try { decoded = jsonDecode(response.body); } catch (_) {
-      throw Exception('Payment service returned an invalid response.');
+      final contentType = _header(response, 'content-type') ?? 'unknown content-type';
+      final preview = response.body.replaceAll(RegExp(r'\\s+'), ' ').trim();
+      final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
+      throw Exception('Payment configuration returned non-JSON data (HTTP ${response.statusCode}, $contentType). $safePreview');
     }
     if (response.statusCode < 200 || response.statusCode >= 300 || decoded is! Map) {
       final message = decoded is Map ? decoded['message'] : null;
@@ -146,7 +153,10 @@ class WooStoreApi {
     final response = await http.Response.fromStream(streamed);
     dynamic decoded;
     try { decoded = jsonDecode(response.body); } catch (_) {
-      throw Exception('UPI submission returned an invalid response.');
+      final contentType = response.headers['content-type'] ?? 'unknown content-type';
+      final preview = response.body.replaceAll(RegExp(r'\\s+'), ' ').trim();
+      final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
+      throw Exception('UPI submission returned non-JSON data (HTTP ${response.statusCode}, $contentType). $safePreview');
     }
     if (response.statusCode < 200 || response.statusCode >= 300 || decoded is! Map) {
       final message = decoded is Map ? decoded['message'] : null;
