@@ -17,6 +17,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
   Map<String, dynamic> cart = {};
   Map<String, dynamic> address = {};
   bool loading = true;
+  int step = 0;
   String? error;
 
   @override
