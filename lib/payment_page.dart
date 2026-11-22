@@ -5,12 +5,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'woo_store_api.dart';
+import 'customer_account_page.dart';
 
 class PaymentPage extends StatefulWidget {
-  const PaymentPage({super.key, required this.api, required this.address, required this.cart});
+  const PaymentPage({super.key, required this.api, required this.address, required this.cart, this.customerToken});
   final WooStoreApi api;
   final Map<String, dynamic> address;
   final Map<String, dynamic> cart;
+  final String? customerToken;
   @override
   State<PaymentPage> createState() => _PaymentPageState();
 }
@@ -150,12 +152,21 @@ class _PaymentPageState extends State<PaymentPage> {
         paymentMethod: selected!,
         paymentData: paymentData,
       );
+      final id = int.tryParse('${result['order_id'] ?? result['id'] ?? ''}');
+      final key = (result['order_key'] ?? result['key'] ?? '').toString();
+      if (id == null || key.isEmpty) {
+        throw Exception('The store created no verifiable order reference. Please contact store support before retrying checkout.');
+      }
+      final token = widget.customerToken;
+      if (token == null || token.isEmpty) {
+        throw Exception('Please sign in again. Your order cannot be linked to your customer account without an active session.');
+      }
+      await ArkCustomerApi(token).request(
+        'customer/orders/attach',
+        method: 'POST',
+        body: {'order_id': id, 'order_key': key},
+      );
       if (selected == 'wc-upi') {
-        final id = int.tryParse('${result['order_id'] ?? result['id'] ?? ''}');
-        final key = (result['order_key'] ?? result['key'] ?? '').toString();
-        if (id == null || key.isEmpty) {
-          throw Exception('WooCommerce created no usable UPI order reference. The order response did not include order ID and order key.');
-        }
         if (mounted) setState(() { createdOrder = result; paying = false; });
       } else {
         if (mounted) Navigator.pop(context, result);
