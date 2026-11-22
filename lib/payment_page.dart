@@ -159,15 +159,23 @@ class _PaymentPageState extends State<PaymentPage> {
         paymentMethod: selected!,
         paymentData: paymentData,
       );
+      // WooCommerce Store API checkout responses may contain the order ID/key
+      // but omit cart totals. Preserve the last authoritative cart totals so
+      // the confirmation page can always display the actual payable amount.
+      final resultWithTotals = <String, dynamic>{
+        ...result,
+        if (result['totals'] is! Map && liveCart['totals'] is Map)
+          'totals': Map<String, dynamic>.from(liveCart['totals'] as Map),
+      };
       if (selected == 'wc-upi') {
-        final id = int.tryParse('${result['order_id'] ?? result['id'] ?? ''}');
-        final key = (result['order_key'] ?? result['key'] ?? '').toString();
+        final id = int.tryParse('${resultWithTotals['order_id'] ?? resultWithTotals['id'] ?? ''}');
+        final key = (resultWithTotals['order_key'] ?? resultWithTotals['key'] ?? '').toString();
         if (id == null || key.isEmpty) {
           throw Exception('WooCommerce created no usable UPI order reference. The order response did not include order ID and order key.');
         }
-        if (mounted) setState(() { createdOrder = result; paying = false; });
+        if (mounted) setState(() { createdOrder = resultWithTotals; paying = false; });
       } else {
-        if (mounted) Navigator.pop(context, result);
+        if (mounted) Navigator.pop(context, resultWithTotals);
       }
     } catch (e) {
       if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
