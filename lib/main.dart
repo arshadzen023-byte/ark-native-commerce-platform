@@ -332,10 +332,64 @@ class _StoreHomeState extends State<StoreHome> {
     await _addToCart(product);
     if (mounted) await _openCheckout();
   }
+  Future<void> _rememberRecentlyViewed(Map<String, dynamic> product) async {
+    final id = (product['id'] ?? '').toString();
+    if (id.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList('glowhit_recent_viewed') ?? [];
+    final saved = <Map<String, dynamic>>[];
+    for (final entry in raw) {
+      try {
+        final value = jsonDecode(entry);
+        if (value is Map && (value['id'] ?? '').toString() != id) saved.add(Map<String, dynamic>.from(value));
+      } catch (_) {}
+    }
+    final images = product['images'] is List ? (product['images'] as List).take(3).toList() : [];
+    final compact = <String, dynamic>{
+      'id': product['id'], 'name': product['name'], 'permalink': product['permalink'],
+      'images': images, 'prices': product['prices'], 'short_description': product['short_description'],
+      'description': product['description'], 'average_rating': product['average_rating'],
+      'stock_status': product['stock_status'],
+    };
+    saved.insert(0, compact);
+    await prefs.setStringList('glowhit_recent_viewed', saved.take(12).map(jsonEncode).toList());
+  }
+
+  Future<void> _openRecentlyViewed() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rows = <Map<String, dynamic>>[];
+    for (final entry in prefs.getStringList('glowhit_recent_viewed') ?? []) {
+      try {
+        final value = jsonDecode(entry);
+        if (value is Map && value['id'] != null && (value['name'] ?? '').toString().trim().isNotEmpty) {
+          rows.add(Map<String, dynamic>.from(value));
+        }
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => RecentlyViewedPage(
+      products: rows,
+      onOpen: (product) {
+        Navigator.pop(context);
+        Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(
+          product: product,
+          onAddToCart: () => _addToCart(product),
+          onBuyNow: () => _buyNow(product),
+          isWishlisted: wishlist.any((e) => e['id'] == product['id']),
+          onWishlist: () => setState(() {
+            wishlist.any((e) => e['id'] == product['id'])
+              ? wishlist.removeWhere((e) => e['id'] == product['id'])
+              : wishlist.add(product);
+          }),
+        )));
+      },
+    )));
+  }
+
   Widget productCard(Map<String, dynamic> p) {
     final id = (p['id'] as num?)?.toInt() ?? 0;
     final liked = wishlist.any((e) => e['id'] == id);
-    return Card(clipBehavior: Clip.antiAlias, elevation: 0.5, child: InkWell(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(product: p, onAddToCart: () => _addToCart(p), onBuyNow: () => _buyNow(p), isWishlisted: liked, onWishlist: () => setState(() { liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p); })))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return Card(clipBehavior: Clip.antiAlias, elevation: 0.5, child: InkWell(onTap: () { _rememberRecentlyViewed(p); Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(product: p, onAddToCart: () => _addToCart(p), onBuyNow: () => _buyNow(p), isWishlisted: liked, onWishlist: () => setState(() { liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p); }))); }, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Expanded(child: Stack(fit: StackFit.expand, children: [
         Container(color: Colors.white, child: imageUrl(p).isEmpty ? const Icon(Icons.image_outlined, size: 44, color: Colors.black26) : Image.network(imageUrl(p), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined))),
         Positioned(right: 4, top: 4, child: Row(mainAxisSize: MainAxisSize.min, children: [IconButton.filledTonal(onPressed: () => setState(() { liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p); }), icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : null)), IconButton.filledTonal(onPressed: () => Share.share('${p['name']}\n${p['permalink'] ?? storeUrl}'), icon: const Icon(Icons.share_outlined))])),
@@ -357,7 +411,7 @@ class _StoreHomeState extends State<StoreHome> {
     else if (products.isEmpty) const Expanded(child: Center(child: Text('No products found. Try another search.')))
     else Expanded(child: GridView.builder(padding: const EdgeInsets.fromLTRB(12, 0, 12, 18), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .66, crossAxisSpacing: 10, mainAxisSpacing: 10), itemCount: products.length, itemBuilder: (_, i) => productCard(products[i]))),
   ]);
-  Widget account() => AccountPanel(onLogin: (token) { setState(() => customerToken = token); push.register(customerJwt: token); }, onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } try { await push.unlinkAccount(); } catch (_) {} final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() { customerToken = null; notificationCount = 0; }); }, token: customerToken);
+  Widget account() => AccountPanel(onLogin: (token) { setState(() => customerToken = token); push.register(customerJwt: token); }, onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } try { await push.unlinkAccount(); } catch (_) {} final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() { customerToken = null; notificationCount = 0; }); }, token: customerToken, onRecentViewed: _openRecentlyViewed);
   @override Widget build(BuildContext context) {
     final titles = ['Shopping', 'Categories', 'Wishlist', 'Cart', 'Account'];
     Widget page;
@@ -387,43 +441,176 @@ class _StoreHomeState extends State<StoreHome> {
 }
 
 class AccountPanel extends StatefulWidget {
-  const AccountPanel({super.key, required this.onLogin, required this.onLogout, required this.token});
+  const AccountPanel({super.key, required this.onLogin, required this.onLogout, required this.token, required this.onRecentViewed});
   final ValueChanged<String> onLogin;
   final VoidCallback onLogout;
+  final VoidCallback onRecentViewed;
   final String? token;
   @override State<AccountPanel> createState() => _AccountPanelState();
 }
-class _AccountPanelState extends State<AccountPanel> {
+
+class _AccountPanelState extends State<AccountPanel> with SingleTickerProviderStateMixin {
   final user = TextEditingController();
   final pass = TextEditingController();
-  bool busy = false;
+  bool busy = false, profileLoading = false;
   String? error;
-  @override void dispose() { user.dispose(); pass.dispose(); super.dispose(); }
+  String displayName = 'Customer';
+  String email = '';
+  late final AnimationController _helloPulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1900))..repeat(reverse: true);
+
+  @override void initState() { super.initState(); if (widget.token != null) loadProfile(); }
+  @override void didUpdateWidget(covariant AccountPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.token != widget.token && widget.token != null) loadProfile();
+    if (widget.token == null) { displayName = 'Customer'; email = ''; }
+  }
+  @override void dispose() { user.dispose(); pass.dispose(); _helloPulse.dispose(); super.dispose(); }
+
+  Future<void> loadProfile() async {
+    final token = widget.token;
+    if (token == null) return;
+    setState(() => profileLoading = true);
+    try {
+      final value = await ArkCustomerApi(token).request('customer/me');
+      if (!mounted || widget.token != token) return;
+      if (value is Map) {
+        final first = (value['first_name'] ?? '').toString().trim();
+        final last = (value['last_name'] ?? '').toString().trim();
+        final full = [first, last].where((v) => v.isNotEmpty).join(' ');
+        final candidate = (value['display_name'] ?? '').toString().trim();
+        setState(() {
+          displayName = candidate.isNotEmpty ? candidate : (full.isNotEmpty ? full : 'Customer');
+          email = (value['email'] ?? '').toString();
+          profileLoading = false;
+        });
+      } else if (mounted) setState(() => profileLoading = false);
+    } catch (_) {
+      if (mounted) setState(() => profileLoading = false);
+    }
+  }
+
   Future<void> submit() async {
     setState(() { busy = true; error = null; });
-    try { final token = await StoreApi.login(user.text, pass.text); final prefs = await SharedPreferences.getInstance(); await prefs.setString('glowhit_customer_session', token); widget.onLogin(token); }
-    catch (e) { setState(() => error = e.toString().replaceFirst('Exception: ', '')); }
-    finally { if (mounted) setState(() => busy = false); }
+    try {
+      final token = await StoreApi.login(user.text, pass.text);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('glowhit_customer_session', token);
+      widget.onLogin(token);
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
-  @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [
-    const Text('Welcome back', style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
-    const SizedBox(height: 8),
-    Text(widget.token == null ? 'Sign in to see your orders and shopping activity.' : 'You are signed in to your customer account.'),
-    if (widget.token == null) ...[
-      const SizedBox(height: 22),
-      TextField(controller: user, decoration: const InputDecoration(labelText: 'Email or username', border: OutlineInputBorder())),
-      const SizedBox(height: 12),
-      TextField(controller: pass, obscureText: true, decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder())),
-      if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
-      const SizedBox(height: 16),
-      FilledButton(onPressed: busy ? null : submit, child: busy ? const CircularProgressIndicator() : const Text('SIGN IN')),
-    ] else ...[
-      const Padding(padding: EdgeInsets.only(top: 20), child: Icon(Icons.verified_user, size: 56, color: Colors.green)),
-      const SizedBox(height: 20),
-      for (final item in [(Icons.receipt_long_outlined, 'My Orders'), (Icons.download_outlined, 'Downloads'), (Icons.location_on_outlined, 'Saved Addresses'), (Icons.person_outline, 'Edit Profile')])
-        Card(child: ListTile(leading: Icon(item.$1, color: purple), title: Text(item.$2), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: item.$2))))),
-      const SizedBox(height: 8),
-      OutlinedButton.icon(onPressed: widget.onLogout, icon: const Icon(Icons.logout), label: const Text('LOG OUT')),
+
+  Widget _menuTile(BuildContext context, IconData icon, String title, String subtitle, VoidCallback onTap) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17), side: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: .4))),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+        leading: Container(width: 45, height: 45, decoration: BoxDecoration(color: purple.withValues(alpha: .09), borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: purple)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  @override Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+    children: [
+      if (widget.token == null) ...[
+        const Text('Welcome back', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 7),
+        const Text('Sign in to see your orders and shopping activity.'),
+        const SizedBox(height: 22),
+        TextField(controller: user, decoration: const InputDecoration(labelText: 'Email or username', prefixIcon: Icon(Icons.person_outline), border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        TextField(controller: pass, obscureText: true, decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder())),
+        if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
+        const SizedBox(height: 16),
+        FilledButton(onPressed: busy ? null : submit, child: busy ? const CircularProgressIndicator() : const Text('SIGN IN')),
+      ] else ...[
+        AnimatedBuilder(
+          animation: _helloPulse,
+          builder: (context, child) => Transform.scale(scale: 0.985 + (_helloPulse.value * .015), child: child),
+          child: Container(
+            padding: const EdgeInsets.all(19),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF302052), Color(0xFF7356A6), Color(0xFF9B72B7)]),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [BoxShadow(color: purple.withValues(alpha: .20), blurRadius: 20, offset: const Offset(0, 9))],
+            ),
+            child: Row(children: [
+              Container(width: 60, height: 60, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .17), shape: BoxShape.circle, border: Border.all(color: Colors.white54)),
+                child: Center(child: Text(displayName.trim().isEmpty ? 'G' : displayName.trim().substring(0, 1).toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w800)))),
+              const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Hii,', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                Text(displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800)),
+                if (email.isNotEmpty) Text(email, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                if (profileLoading) const Padding(padding: EdgeInsets.only(top: 4), child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))),
+              ])),
+              IconButton(
+                tooltip: 'Edit profile',
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Edit Profile'))),
+                icon: const Icon(Icons.edit_rounded, color: Colors.white),
+                style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: .16)),
+              ),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 22),
+        const Padding(padding: EdgeInsets.only(left: 3, bottom: 10), child: Text('MY ACCOUNT', style: TextStyle(fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.w800, color: purple))),
+        _menuTile(context, Icons.receipt_long_rounded, 'My Orders', 'Track, cancel and review your purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'My Orders')))),
+        _menuTile(context, Icons.download_for_offline_rounded, 'Downloads', 'Your available digital purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Downloads')))),
+        _menuTile(context, Icons.location_on_rounded, 'Saved Addresses', 'Manage delivery addresses', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Saved Addresses')))),
+        _menuTile(context, Icons.person_rounded, 'Edit Profile', 'Update your name and contact details', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Edit Profile')))),
+        _menuTile(context, Icons.history_rounded, 'Recently Viewed', 'Continue browsing products you opened', widget.onRecentViewed),
+        const SizedBox(height: 5),
+        OutlinedButton.icon(
+          onPressed: widget.onLogout,
+          icon: const Icon(Icons.logout_rounded),
+          label: const Text('LOG OUT'),
+          style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.redAccent), padding: const EdgeInsets.symmetric(vertical: 15)),
+        ),
+      ],
     ],
-  ]);
+  );
+}
+
+class RecentlyViewedPage extends StatelessWidget {
+  const RecentlyViewedPage({super.key, required this.products, required this.onOpen});
+  final List<Map<String, dynamic>> products;
+  final ValueChanged<Map<String, dynamic>> onOpen;
+  @override Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Recently Viewed')),
+    body: products.isEmpty
+      ? const Center(child: Text('Products you view will appear here.'))
+      : GridView.builder(
+          padding: const EdgeInsets.all(12),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .68, crossAxisSpacing: 11, mainAxisSpacing: 11),
+          itemCount: products.length,
+          itemBuilder: (context, index) {
+            final item = products[index];
+            final images = item['images'] is List ? item['images'] as List : const [];
+            final image = images.isNotEmpty && images.first is Map ? (images.first['src'] ?? images.first['thumbnail'] ?? '').toString() : '';
+            final prices = item['prices'] is Map ? item['prices'] as Map : const {};
+            final raw = int.tryParse((prices['price'] ?? '').toString()) ?? 0;
+            final digits = (prices['currency_minor_unit'] as num?)?.toInt() ?? 2;
+            final amount = prices.isEmpty ? '' : '${prices['currency_symbol'] ?? '₹'}${(raw / (digits == 0 ? 1 : (digits == 1 ? 10 : 100))).toStringAsFixed(digits)}';
+            return Card(clipBehavior: Clip.antiAlias, child: InkWell(
+              onTap: () => onOpen(item),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(child: SizedBox(width: double.infinity, child: image.isEmpty ? const Icon(Icons.shopping_bag_outlined, size: 42) : Image.network(image, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)))),
+                Padding(padding: const EdgeInsets.fromLTRB(10, 6, 10, 2), child: Text((item['name'] ?? 'Product').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700))),
+                Padding(padding: const EdgeInsets.fromLTRB(10, 2, 10, 10), child: Text(amount, style: const TextStyle(color: purple, fontWeight: FontWeight.w800))),
+              ]),
+            ));
+          },
+        ),
+  );
 }
