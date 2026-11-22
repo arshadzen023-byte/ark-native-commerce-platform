@@ -59,17 +59,32 @@ class StoreApi {
     return value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   }
   static Future<String> login(String username, String password) async {
-    final uri = Uri.parse(storeUrl).resolve('wp-json/ark-native/v1/customer/login');
-    final r = await request(uri, method: 'POST', body: jsonEncode({'email_or_username': username.trim(), 'password': password}));
-    final data = jsonDecode(r.body);
+    final uri = Uri.parse(storeUrl).resolve('wp-json/ark-native/v1/auth/login');
+    final r = await request(
+      uri,
+      method: 'POST',
+      headers: const {'Accept': 'application/json', 'Content-Type': 'application/json'},
+      body: jsonEncode({'username': username.trim(), 'password': password}),
+    );
+
+    dynamic data;
+    try {
+      data = jsonDecode(r.body);
+    } on FormatException {
+      throw Exception('The store returned an invalid response (HTTP ${r.statusCode}). Please check the WordPress REST API.');
+    }
+
     if (r.statusCode < 200 || r.statusCode >= 300) {
-      final message = data is Map ? (data['message'] ?? data['error'] ?? r.body) : r.body;
-      throw Exception('Login failed (${r.statusCode}): $message');
+      final message = data is Map
+          ? (data['message'] ?? data['error'] ?? data['code'] ?? r.body).toString()
+          : r.body;
+      throw Exception('Login failed (HTTP ${r.statusCode}): $message');
     }
-    if (data is! Map || data['session'] is! Map || (data['session']['token'] ?? '').toString().isEmpty) {
-      throw Exception('The store did not return a valid customer session.');
+
+    if (data is! Map || data['success'] != true || (data['token'] ?? '').toString().isEmpty) {
+      throw Exception('The store did not return a valid customer token.');
     }
-    return data['session']['token'].toString();
+    return data['token'].toString();
   }
 }
 
