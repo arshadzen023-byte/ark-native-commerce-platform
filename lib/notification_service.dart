@@ -131,7 +131,19 @@ class GlowHitPushService {
     final decoded = jsonDecode(response.body);
     final rows = decoded is Map ? decoded['messages'] : null;
     if (rows is! List) return [];
-    return rows.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).take(6).toList();
+    final clean = <Map<String, dynamic>>[];
+    for (final raw in rows) {
+      if (raw is! Map) continue;
+      final row = Map<String, dynamic>.from(raw);
+      final id = int.tryParse((row['id'] ?? '').toString()) ?? 0;
+      final title = (row['title'] ?? '').toString().trim();
+      final message = (row['body'] ?? '').toString().trim();
+      if (id < 1 || title.isEmpty || message.isEmpty) continue;
+      row['title'] = title;
+      row['body'] = message;
+      clean.add(row);
+    }
+    return clean.take(6).toList();
   }
 
   Future<void> deleteMessage(int id) async {
