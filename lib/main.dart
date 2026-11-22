@@ -76,10 +76,18 @@ class StoreApi {
       final message = data is Map ? (data['message'] ?? data['error'] ?? r.body) : r.body;
       throw Exception('Login failed (${r.statusCode}): $message');
     }
-    if (data is! Map || data['session'] is! Map || (data['session']['token'] ?? '').toString().isEmpty) {
+    if (data is! Map) {
       throw Exception('The store did not return a valid customer session.');
     }
-    return data['session']['token'].toString();
+    // The unified ARK Native Commerce Bridge /auth/login response returns
+    // {success, token, user}; the compatibility /customer/login response
+    // returns {success, session: {token}, customer}. Accept both contracts.
+    final session = data['session'];
+    final token = (data['token'] ?? (session is Map ? session['token'] : null) ?? '').toString();
+    if (token.isEmpty) {
+      throw Exception('The store did not return a valid customer token.');
+    }
+    return token;
   }
 }
 
