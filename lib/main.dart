@@ -65,9 +65,13 @@ class StoreApi {
     return value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   }
   static Future<String> login(String username, String password) async {
-    final uri = Uri.parse(storeUrl).resolve('wp-json/ark-native/v1/customer/login');
-    final r = await request(uri, method: 'POST', body: jsonEncode({'email_or_username': username.trim(), 'password': password}));
-    final data = jsonDecode(r.body);
+    final base = Uri.parse(storeUrl);
+    var r = await request(base.resolve('wp-json/ark-native/v1/auth/login'), method: 'POST', body: jsonEncode({'username': username.trim(), 'email': username.trim(), 'password': password}));
+    if (r.statusCode == 404 || r.statusCode == 405) {
+      r = await request(base.resolve('wp-json/ark-native/v1/customer/login'), method: 'POST', body: jsonEncode({'email_or_username': username.trim(), 'username': username.trim(), 'password': password}));
+    }
+    dynamic data;
+    try { data = jsonDecode(r.body); } catch (_) { throw Exception('Login returned an invalid server response (HTTP ${r.statusCode}).'); }
     if (r.statusCode < 200 || r.statusCode >= 300) {
       final message = data is Map ? (data['message'] ?? data['error'] ?? r.body) : r.body;
       throw Exception('Login failed (${r.statusCode}): $message');
@@ -113,7 +117,14 @@ class _StoreHomeState extends State<StoreHome> {
   Future<void> _restoreCustomerSession() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('glowhit_customer_session');
-    if (mounted && token != null && token.isNotEmpty) setState(() => customerToken = token);
+    if (mounted && token != null && token.isNotEmpty) {
+      setState(() => customerToken = token);
+      try { await ArkCustomerApi(token).request('customer/me'); }
+      catch (_) {
+        await prefs.remove('glowhit_customer_session');
+        if (mounted) setState(() => customerToken = null);
+      }
+    }
   }
   @override void dispose() { searchController.dispose(); super.dispose(); }
 
