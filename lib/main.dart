@@ -10,6 +10,8 @@ import 'product_details_page.dart';
 import 'customer_account_page.dart';
 import 'checkout_page.dart';
 import 'woo_store_api.dart';
+import 'notification_service.dart';
+import 'notification_inbox_page.dart';
 
 const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
@@ -175,7 +177,68 @@ class _StoreHomeState extends State<StoreHome> {
   bool cartBusy = false;
   final searchController = TextEditingController();
   String? customerToken;
-  @override void initState() { super.initState(); customerToken = widget.initialToken; load(); _refreshCart(); }
+  late final GlowHitPushService push;
+  int notificationCount = 0;
+  @override void initState() {
+    super.initState();
+    customerToken = widget.initialToken;
+    push = GlowHitPushService(onTap: _handleNotificationLink, onForeground: _refreshNotificationCount);
+    push.initialize(customerJwt: customerToken).then((_) => _refreshNotificationCount());
+    load();
+    _refreshCart();
+  }
+  Future<void> _refreshNotificationCount() async {
+    try {
+      final items = await push.loadInbox();
+      if (mounted) setState(() => notificationCount = items.length);
+    } catch (_) {}
+  }
+  Future<void> _openNotifications() async {
+    final link = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NotificationInboxPage(service: push)));
+    await _refreshNotificationCount();
+    if (link != null && link.isNotEmpty) await _handleNotificationLink(link);
+  }
+  Future<void> _handleNotificationLink(String? link) async {
+    if (!mounted || link == null || link.isEmpty) return;
+    final uri = Uri.tryParse(link);
+    if (uri == null) return;
+    if (uri.scheme == 'ark' && uri.host == 'notifications') {
+      await _openNotifications();
+      return;
+    }
+    if (uri.scheme == 'ark' && uri.host == 'orders') {
+      if (customerToken == null) { setState(() => tab = 4); return; }
+      if (uri.pathSegments.isNotEmpty) {
+        final id = uri.pathSegments.first;
+        try {
+          final data = await ArkCustomerApi(customerToken!).request('customer/orders/' + id);
+          final order = data is Map && data['order'] is Map ? data['order'] : data;
+          if (order is Map && mounted) {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => OrderDetailPage(token: customerToken!, order: Map<String, dynamic>.from(order))));
+          }
+        } catch (_) { if (mounted) setState(() => tab = 4); }
+      } else {
+        if (mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders')));
+      }
+      return;
+    }
+    if (uri.scheme == 'ark' && uri.host == 'product' && uri.pathSegments.isNotEmpty) {
+      try {
+        final response = await request(Uri.parse(storeUrl).resolve('wp-json/wc/store/v1/products/' + uri.pathSegments.first));
+        if (response.statusCode == 200) {
+          final product = jsonDecode(response.body);
+          if (product is Map && mounted) {
+            final p = Map<String, dynamic>.from(product);
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(product: p, onAddToCart: () => _addToCart(p), onBuyNow: () => _buyNow(p), isWishlisted: wishlist.any((e) => e['id'] == p['id']), onWishlist: () => setState(() { wishlist.any((e) => e['id'] == p['id']) ? wishlist.removeWhere((e) => e['id'] == p['id']) : wishlist.add(p); }))));
+          }
+        }
+      } catch (_) {}
+      return;
+    }
+    if (uri.scheme == 'ark' && uri.host == 'category') {
+      if (mounted) setState(() => tab = 1);
+    }
+  }
   @override void dispose() { searchController.dispose(); super.dispose(); }
 
   Future<void> load({String order = 'date', bool sale = false}) async {
@@ -256,7 +319,7 @@ class _StoreHomeState extends State<StoreHome> {
     else if (products.isEmpty) const Expanded(child: Center(child: Text('No products found. Try another search.')))
     else Expanded(child: GridView.builder(padding: const EdgeInsets.fromLTRB(12, 0, 12, 18), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .66, crossAxisSpacing: 10, mainAxisSpacing: 10), itemCount: products.length, itemBuilder: (_, i) => productCard(products[i]))),
   ]);
-  Widget account() => AccountPanel(onLogin: (token) => setState(() => customerToken = token), onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() => customerToken = null); }, token: customerToken);
+  Widget account() => AccountPanel(onLogin: (token) { setState(() => customerToken = token); push.register(customerJwt: token); }, onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() => customerToken = null); }, token: customerToken);
   @override Widget build(BuildContext context) {
     final titles = ['Shopping', 'Categories', 'Wishlist', 'Cart', 'Account'];
     Widget page;
@@ -265,7 +328,17 @@ class _StoreHomeState extends State<StoreHome> {
     else if (tab == 2) page = wishlist.isEmpty ? const Center(child: Text('Your wishlist is empty')) : GridView.count(crossAxisCount: 2, childAspectRatio: .66, children: wishlist.map(productCard).toList());
     else if (tab == 3) page = _cartPage();
     else page = account();
-    return Scaffold(appBar: AppBar(title: Text(titles[tab]), actions: [if (tab == 0) IconButton(onPressed: load, icon: const Icon(Icons.refresh))]), body: SafeArea(child: page), bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v), destinations: [
+    return Scaffold(appBar: AppBar(title: Text(titles[tab]), actions: [
+      if (tab == 0) IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
+      IconButton(
+        tooltip: 'Notifications',
+        onPressed: _openNotifications,
+        icon: Stack(clipBehavior: Clip.none, children: [
+          const Icon(Icons.notifications_none_rounded),
+          if (notificationCount > 0) Positioned(right: -2, top: -2, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5))))),
+        ]),
+      ),
+    ]), body: SafeArea(child: page), bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v), destinations: [
       const NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
       const NavigationDestination(icon: Icon(Icons.grid_view), label: 'Categories'),
       const NavigationDestination(icon: Icon(Icons.favorite_border), label: 'Wishlist'),
