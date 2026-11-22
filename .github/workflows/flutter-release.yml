@@ -61,16 +61,16 @@ jobs:
         run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
-          name: glowhit-v1.0.6-checkout
+          name: glowhit-v1.0.7-account-login-fix
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
       - name: Publish installable APK release
-        if: github.ref == 'refs/heads/feature/glowhit-custom-four-step-checkout-2026-11-22'
+        if: github.ref == 'refs/heads/fix/glowhit-account-login-layout-2026-11-22'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: glowhit-v1.0.6-custom-checkout-2026-11-22
-          name: GlowHit v1.0.6 — Four-step custom checkout
+          tag_name: glowhit-v1.0.7-account-login-fix-2026-11-22
+          name: GlowHit v1.0.7 — Account login layout fix
           prerelease: true
           generate_release_notes: true
           fail_on_unmatched_files: true
