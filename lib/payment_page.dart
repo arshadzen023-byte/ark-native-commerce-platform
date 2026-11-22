@@ -326,7 +326,7 @@ class _PaymentPageState extends State<PaymentPage> {
               TextButton.icon(
                 onPressed: () => Clipboard.setData(ClipboardData(text: vpa)),
                 icon: const Icon(Icons.copy),
-                label: const Text('COPY UPI ID'),
+                label: const Text('COPY STORE UPI ADDRESS'),
               ),
               OutlinedButton.icon(
                 onPressed: () async {
