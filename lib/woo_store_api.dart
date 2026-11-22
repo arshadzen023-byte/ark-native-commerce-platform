@@ -63,7 +63,10 @@ class WooStoreApi {
         final preview = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
         final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
         final looksHtml = preview.toLowerCase().startsWith('<!doctype') || preview.toLowerCase().startsWith('<html');
-        throw Exception('WooCommerce returned non-JSON data (HTTP ${response.statusCode}, $contentType). ${looksHtml ? 'The server returned an HTML page instead of Store API JSON (often a cache, firewall, security plugin or PHP error page).' : 'Response preview: $safePreview'}');
+        final legacyWarning = response.body.contains('Trying to access array offset on value of type bool');
+        throw Exception(legacyWarning
+            ? 'The store payment service has a PHP configuration error. Please ask the store administrator to update or disable the old Build App Online plugin and check the ARK payment bridge.'
+            : 'The store returned an unreadable checkout response. Please refresh and try again; if it continues, contact store support.');
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final message = decoded is Map ? (decoded['message'] ?? decoded['code'] ?? response.body) : response.body;
@@ -117,7 +120,10 @@ class WooStoreApi {
       final contentType = _header(response, 'content-type') ?? 'unknown content-type';
       final preview = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
       final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
-      throw Exception('Payment configuration returned non-JSON data (HTTP ${response.statusCode}, $contentType). $safePreview');
+      final legacyWarning = response.body.contains('Trying to access array offset on value of type bool');
+      throw Exception(legacyWarning
+          ? 'The store payment settings have a PHP configuration error. The store administrator must repair the old plugin settings.'
+          : 'The store payment settings could not be read. Please try again or contact store support.');
     }
     if (response.statusCode < 200 || response.statusCode >= 300 || decoded is! Map) {
       final message = decoded is Map ? decoded['message'] : null;
@@ -156,7 +162,10 @@ class WooStoreApi {
       final contentType = response.headers['content-type'] ?? 'unknown content-type';
       final preview = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
       final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
-      throw Exception('UPI submission returned non-JSON data (HTTP ${response.statusCode}, $contentType). $safePreview');
+      final legacyWarning = response.body.contains('Trying to access array offset on value of type bool');
+      throw Exception(legacyWarning
+          ? 'The store could not save your UPI proof because an old plugin has a PHP configuration error. Your order is not confirmed as paid. Please contact the store.'
+          : 'Your payment details could not be submitted. Please try again or contact store support.');
     }
     if (response.statusCode < 200 || response.statusCode >= 300 || decoded is! Map) {
       final message = decoded is Map ? decoded['message'] : null;
