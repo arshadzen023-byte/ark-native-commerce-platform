@@ -85,6 +85,54 @@ class StoreApi {
 
 void main() => runApp(const GlowHitApp());
 
+class SessionGate extends StatefulWidget {
+  const SessionGate({super.key});
+  @override State<SessionGate> createState() => _SessionGateState();
+}
+
+class _SessionGateState extends State<SessionGate> {
+  bool checking = true;
+  String? token;
+  @override void initState() { super.initState(); _check(); }
+  Future<void> _check() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('glowhit_customer_session');
+    if (saved != null && saved.isNotEmpty) {
+      try { await ArkCustomerApi(saved).request('customer/me'); token = saved; }
+      catch (_) { await prefs.remove('glowhit_customer_session'); token = null; }
+    }
+    if (mounted) setState(() => checking = false);
+  }
+  @override Widget build(BuildContext context) {
+    if (checking) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (token == null) return LoginLandingPage(onLogin: (value) => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => StoreHome(initialToken: value))));
+    return StoreHome(initialToken: token);
+  }
+}
+
+class LoginLandingPage extends StatelessWidget {
+  const LoginLandingPage({super.key, required this.onLogin});
+  final ValueChanged<String> onLogin;
+  @override Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('GlowHit Account')),
+    body: Center(child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 480),
+      child: Padding(padding: const EdgeInsets.all(20), child: Card(
+        child: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Icon(Icons.shopping_bag_rounded, size: 54, color: purple),
+          const SizedBox(height: 14),
+          const Text('Welcome to GlowHit', textAlign: TextAlign.center, style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          const Text('Sign in to continue shopping', textAlign: TextAlign.center),
+          const SizedBox(height: 18),
+          AccountPanel(token: null, onLogin: onLogin, onLogout: () {}),
+        ])),
+      )),
+    )),
+  );
+}
+
+
 class GlowHitApp extends StatelessWidget {
   const GlowHitApp({super.key});
   @override
@@ -92,12 +140,13 @@ class GlowHitApp extends StatelessWidget {
     title: 'GlowHit Shopping',
     debugShowCheckedModeBanner: false,
     theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: purple), scaffoldBackgroundColor: const Color(0xFFF7F6FA)),
-    home: const StoreHome(),
+    home: const SessionGate(),
   );
 }
 
 class StoreHome extends StatefulWidget {
-  const StoreHome({super.key});
+  const StoreHome({super.key, this.initialToken});
+  final String? initialToken;
   @override State<StoreHome> createState() => _StoreHomeState();
 }
 
@@ -113,19 +162,7 @@ class _StoreHomeState extends State<StoreHome> {
   bool cartBusy = false;
   final searchController = TextEditingController();
   String? customerToken;
-  @override void initState() { super.initState(); _restoreCustomerSession(); load(); _refreshCart(); }
-  Future<void> _restoreCustomerSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('glowhit_customer_session');
-    if (mounted && token != null && token.isNotEmpty) {
-      setState(() => customerToken = token);
-      try { await ArkCustomerApi(token).request('customer/me'); }
-      catch (_) {
-        await prefs.remove('glowhit_customer_session');
-        if (mounted) setState(() => customerToken = null);
-      }
-    }
-  }
+  @override void initState() { super.initState(); customerToken = widget.initialToken; load(); _refreshCart(); }
   @override void dispose() { searchController.dispose(); super.dispose(); }
 
   Future<void> load({String order = 'date', bool sale = false}) async {
