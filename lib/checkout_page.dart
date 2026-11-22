@@ -61,7 +61,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
   @override
   Widget build(BuildContext context) {
     if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (error != null) {
+    if (error != null && cart.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Checkout')),
         body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -73,6 +73,65 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
         ]))),
       );
     }
-    return OrderSummaryPage(cart: cart, onContinue: openAddress);
+    final steps = ['Summary', 'Address', 'Payment'];
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Checkout'),
+        leading: step > 0 ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => setState(() => step--)) : null,
+        actions: [IconButton(onPressed: loading ? null : loadCart, icon: const Icon(Icons.refresh))],
+      ),
+      body: Column(children: [
+        Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 14), child: Column(children: [
+          Row(children: List.generate(3, (i) => Expanded(child: Container(margin: EdgeInsets.only(right: i == 2 ? 0 : 6), height: 5, decoration: BoxDecoration(color: step >= i ? const Color(0xFF51408F) : Colors.grey.shade300, borderRadius: BorderRadius.circular(8)))))),
+          const SizedBox(height: 8),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(3, (i) => Text(steps[i], style: TextStyle(fontSize: 12, color: step >= i ? const Color(0xFF51408F) : Colors.grey, fontWeight: step == i ? FontWeight.bold : FontWeight.normal)))),
+        ])),
+        Expanded(child: step == 0
+          ? OrderSummaryPage(cart: cart, onContinue: () => setState(() => step = 1), onQuantityChanged: (key, quantity) async {
+              if (key.isEmpty) return;
+              setState(() => loading = true);
+              try { final updated = quantity <= 0 ? await widget.api.removeItem(key) : await widget.api.updateItem(key, quantity); if (mounted) setState(() { cart = updated; loading = false; error = null; }); }
+              catch (e) { if (mounted) setState(() { error = e.toString().replaceFirst('Exception: ', ''); loading = false; }); }
+            }, onRemove: (key) async {
+              if (key.isEmpty) return;
+              setState(() => loading = true);
+              try { final updated = await widget.api.removeItem(key); if (mounted) setState(() { cart = updated; loading = false; error = null; }); }
+              catch (e) { if (mounted) setState(() { error = e.toString().replaceFirst('Exception: ', ''); loading = false; }); }
+            })
+          : step == 1
+            ? DeliveryAddressPage(api: widget.api, initialAddress: address, customerToken: widget.customerToken, embedded: true, onAddressSaved: (value, updated) {
+                setState(() { address = value; cart = updated; step = 2; error = null; });
+              })
+            : _paymentReview()),
+      ]),
+    );
+  }
+
+  Widget _paymentReview() {
+    final totals = cart['totals'] is Map ? cart['totals'] as Map : const {};
+    final lines = (cart['items'] as List? ?? []).whereType<Map>().toList();
+    final currency = (totals['currency_symbol'] ?? '₹').toString();
+    final raw = int.tryParse('${totals['total_price'] ?? '0'}') ?? 0;
+    final digits = (totals['currency_minor_unit'] as num?)?.toInt() ?? 2;
+    final amount = '$currency${(raw / (digits == 0 ? 1 : digits == 1 ? 10 : 100)).toStringAsFixed(digits)}';
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      const Text('Review order and delivery', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 12),
+      Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Delivery address', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 6),
+        Text([address['first_name'], address['last_name'], address['address_1'], address['address_2'], address['city'], address['state'], address['postcode'], address['phone']].where((v) => v != null && v.toString().isNotEmpty).join(', ')),
+        Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => setState(() => step = 1), child: const Text('CHANGE ADDRESS'))),
+      ]))),
+      const SizedBox(height: 8),
+      Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Products', style: TextStyle(fontWeight: FontWeight.bold)),
+        for (final item in lines) ListTile(contentPadding: EdgeInsets.zero, title: Text((item['name'] ?? 'Product').toString()), subtitle: Text('Quantity: ${item['quantity'] ?? 1}'), trailing: Text((item['totals'] is Map ? (item['totals'] as Map)['line_total'] : '')?.toString() ?? '')),
+      ]))),
+      const SizedBox(height: 10),
+      Card(child: Padding(padding: const EdgeInsets.all(16), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Total payable', style: TextStyle(fontWeight: FontWeight.bold)), Text(amount, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF51408F)))]))),
+      const SizedBox(height: 12),
+      SizedBox(height: 54, child: FilledButton(onPressed: address['address_1'] == null || address['address_1'].toString().trim().isEmpty ? null : openPayment, child: const Text('CONTINUE TO PAYMENT'))),
+    ]);
   }
 }
