@@ -492,7 +492,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
               const SizedBox(width: 9),
               Expanded(child: Padding(padding: const EdgeInsets.only(top: 2, bottom: 10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(steps[i].$2, style: TextStyle(fontWeight: !terminal && current == i ? FontWeight.w800 : FontWeight.w600, color: !terminal && current >= i ? null : Theme.of(context).colorScheme.onSurfaceVariant)),
-                if (_stepDate(steps[i].$1, i).isNotEmpty) Padding(padding: const EdgeInsets.only(top: 3), child: Text(_stepDate(steps[i].$1, i), style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant))),
+                if (_stepDate(steps[i].$1, i).isNotEmpty) Padding(padding: const EdgeInsets.only(top: 3), child: Text(_stepDate(steps[i].$1, i), style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)))
                 else if (!terminal && current >= i) Padding(padding: const EdgeInsets.only(top: 3), child: Text('Time not provided by store', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant))),
               ]))),
             ]),
