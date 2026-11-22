@@ -133,7 +133,12 @@ class LoginLandingPage extends StatelessWidget {
           const SizedBox(height: 6),
           const Text('Sign in to continue shopping', textAlign: TextAlign.center),
           const SizedBox(height: 18),
-          AccountPanel(token: null, onLogin: onLogin, onLogout: () {}),
+          // AccountPanel contains a scrollable form; constrain it inside this
+          // landing card so its ListView receives a finite height and paints.
+          SizedBox(
+            height: 340,
+            child: AccountPanel(token: null, onLogin: onLogin, onLogout: () {}),
+          ),
         ])),
       )),
     )),
