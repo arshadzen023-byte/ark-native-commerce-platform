@@ -105,7 +105,8 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
       if (item is! Map) return const SizedBox.shrink();
       if (widget.section == 'My Orders') {
         final lines = (item['items'] as List? ?? []).whereType<Map>().map((e) => '${e['name']} × ${e['quantity']}').join(', ');
-        final firstItem = (item['items'] as List? ?? []).whereType<Map>().firstOrNull;
+        final orderItems = (item['items'] as List? ?? []).whereType<Map>().toList();
+        final firstItem = orderItems.isEmpty ? null : orderItems.first;
         final image = firstItem?['image']?.toString() ?? '';
         final status = (item['status_label'] ?? item['status'] ?? 'Order received').toString();
         final statusColor = switch ((item['status'] ?? '').toString().toLowerCase()) {
