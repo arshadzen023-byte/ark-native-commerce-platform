@@ -54,7 +54,53 @@ jobs:
               settings.write_text(settings_text, encoding="utf-8")
           if app_plugin not in app_text:
               app_text = app_text.replace("plugins {", "plugins {\n" + app_plugin, 1)
-              app.write_text(app_text, encoding="utf-8")
+
+          # flutter_local_notifications needs Java 8+ core library desugaring.
+          if kotlin_dsl:
+              compile_block = """
+          android {
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+                  isCoreLibraryDesugaringEnabled = true
+              }
+          }
+          """
+              dependency_block = """
+          dependencies {
+              coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+          }
+          """
+              if "isCoreLibraryDesugaringEnabled = true" not in app_text:
+                  marker = "android {"
+                  if marker not in app_text:
+                      raise SystemExit("Android block missing in app/build.gradle.kts")
+                  # Add compile options inside the existing android block.
+                  app_text = app_text.replace(marker, marker + """
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+                  isCoreLibraryDesugaringEnabled = true
+              }
+          """, 1)
+              if 'coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:' not in app_text:
+                  app_text += dependency_block
+          else:
+              if "coreLibraryDesugaringEnabled true" not in app_text:
+                  app_text = app_text.replace("android {", """android {
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+                  coreLibraryDesugaringEnabled true
+              }
+          """, 1)
+              if "coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:" not in app_text and 'coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:' not in app_text:
+                  app_text += """
+          dependencies {
+              coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+          }
+          """
+          app.write_text(app_text, encoding="utf-8")
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           text = manifest.read_text(encoding="utf-8")
           if "android.permission.POST_NOTIFICATIONS" not in text:
