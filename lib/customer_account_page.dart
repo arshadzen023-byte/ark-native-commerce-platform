@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'woo_store_api.dart';
 
 const _accountPurple = Color(0xFF51408F);
 
@@ -80,7 +81,12 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
     finally { if (mounted) setState(() => saving = false); }
   }
   String _money(dynamic value, dynamic currency) {
-    final amount = double.tryParse(value?.toString() ?? '') ?? 0;
+    final raw = (value ?? '').toString().trim();
+    if (raw.isEmpty) return '${currency ?? '₹'}0.00';
+    // The ARK bridge already formats WooCommerce totals (for example ₹1,122.00).
+    // Preserve those strings instead of parsing them as zero.
+    if (RegExp(r'[^0-9.,-]').hasMatch(raw)) return raw;
+    final amount = double.tryParse(raw.replaceAll(',', '')) ?? 0;
     return '${currency ?? '₹'}${amount.toStringAsFixed(2)}';
   }
   @override
@@ -109,7 +115,7 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
         final firstItem = orderItems.isEmpty ? null : orderItems.first;
         final image = firstItem?['image']?.toString() ?? '';
         final status = (item['status_label'] ?? item['status'] ?? 'Order received').toString();
-        final statusColor = switch ((item['status'] ?? '').toString().toLowerCase()) {
+        final statusColor = switch ((item['status_key'] ?? item['status'] ?? '').toString().toLowerCase()) {
           'completed' => Colors.green,
           'cancelled' || 'failed' || 'refunded' => Colors.red,
           'on-hold' || 'pending' => Colors.orange,
@@ -139,7 +145,7 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(status, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    Text(item['date_created']?.toString() ?? '', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                    Text((item['date_created'] ?? item['date'] ?? '').toString(), style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
                     const SizedBox(height: 4),
                     Text(lines, maxLines: 2, overflow: TextOverflow.ellipsis),
                   ])),
@@ -222,7 +228,33 @@ class _CustomerOrderDetailPageState extends State<_CustomerOrderDetailPage> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
     } finally { if (mounted) setState(() => cancelling = false); }
   }
-  String money(dynamic v, dynamic currency) => '${currency ?? '₹'}${(double.tryParse(v?.toString() ?? '') ?? 0).toStringAsFixed(2)}';
+  String money(dynamic v, dynamic currency) {
+    final raw = (v ?? '').toString().trim();
+    if (raw.isEmpty) return '${currency ?? '₹'}0.00';
+    if (RegExp(r'[^0-9.,-]').hasMatch(raw)) return raw;
+    return '${currency ?? '₹'}${(double.tryParse(raw.replaceAll(',', '')) ?? 0).toStringAsFixed(2)}';
+  }
+
+  Future<void> buyAgain() async {
+    final items = (order?['items'] as List? ?? []).whereType<Map>().toList();
+    if (items.isEmpty) return;
+    final woo = WooStoreApi();
+    var added = 0;
+    try {
+      for (final item in items) {
+        final id = int.tryParse('${item['product_id'] ?? ''}') ?? 0;
+        final quantity = int.tryParse('${item['quantity'] ?? 1}') ?? 1;
+        if (id > 0) {
+          await woo.addItem(id, quantity: quantity.clamp(1, 99));
+          added++;
+        }
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(added > 0 ? '$added product(s) added to your cart.' : 'These products are no longer available.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+    }
+  }
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text('Order #${widget.orderId}'), actions: [IconButton(onPressed: loading ? null : load, icon: const Icon(Icons.refresh))]),
     body: loading ? const Center(child: CircularProgressIndicator()) : error != null
@@ -234,7 +266,8 @@ class _CustomerOrderDetailPageState extends State<_CustomerOrderDetailPage> {
     final items = (o['items'] as List? ?? []).whereType<Map>().toList();
     final timeline = (o['timeline'] as List? ?? []).whereType<Map>().toList();
     final shipping = o['shipping'] is Map ? o['shipping'] as Map : const {};
-    final address = ['first_name','last_name','address_1','address_2','city','state','postcode','country'].map((k) => shipping[k]?.toString() ?? '').where((v) => v.isNotEmpty).join(', ');
+    final addressParts = ['first_name','last_name','address_1','address_2','city','state','postcode','country'].map((k) => shipping[k]?.toString() ?? '').where((v) => v.isNotEmpty).toList();
+    final address = addressParts.isNotEmpty ? addressParts.join(', ') : (shipping['address']?.toString() ?? '');
     return ListView(padding: const EdgeInsets.all(16), children: [
       Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text((o['status_label'] ?? o['status'] ?? 'Order received').toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _accountPurple)),
@@ -264,8 +297,9 @@ class _CustomerOrderDetailPageState extends State<_CustomerOrderDetailPage> {
         const SizedBox(height: 8), Text(address.isEmpty ? 'Address not available' : address),
         if ((shipping['phone'] ?? '').toString().isNotEmpty) Text('Phone: ${shipping['phone']}'),
       ]))),
+      if (items.isNotEmpty) SizedBox(height: 52, child: FilledButton.icon(onPressed: buyAgain, icon: const Icon(Icons.shopping_bag_outlined), label: const Text('BUY AGAIN'))),
       if (o['can_cancel'] == true) SizedBox(height: 52, child: OutlinedButton.icon(onPressed: cancelling ? null : cancel, icon: cancelling ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.cancel_outlined), label: const Text('CANCEL ORDER'), style: OutlinedButton.styleFrom(foregroundColor: Colors.red))),
-      if ((o['status'] ?? '').toString() == 'completed' && (o['return_request_status'] ?? '').toString() != 'pending')
+      if ((o['status_key'] ?? o['status'] ?? '').toString() == 'completed' && (o['return_request_status'] ?? '').toString() != 'pending')
         SizedBox(height: 52, child: OutlinedButton.icon(onPressed: requestReturn, icon: const Icon(Icons.assignment_return_outlined), label: const Text('REQUEST RETURN'))),
       if ((o['return_request_status'] ?? '').toString() == 'pending')
         const ListTile(leading: Icon(Icons.hourglass_top, color: Colors.orange), title: Text('Return request awaiting store review')),
