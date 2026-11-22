@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -292,54 +293,94 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
   late Map<String, dynamic> order;
   bool loading = false;
   String? error;
+  Timer? _statusTimer;
   late final AnimationController pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
 
-  @override void initState() { super.initState(); order = Map<String, dynamic>.from(widget.order); refresh(); }
-  @override void dispose() { pulse.dispose(); super.dispose(); }
+  @override void initState() {
+    super.initState();
+    order = Map<String, dynamic>.from(widget.order);
+    refresh();
+    // Keep the order status and its colour/timeline in sync with WooCommerce.
+    _statusTimer = Timer.periodic(const Duration(seconds: 30), (_) { if (mounted && !loading) refresh(); });
+  }
+  @override void dispose() { _statusTimer?.cancel(); pulse.dispose(); super.dispose(); }
 
-  String get status => (order['status'] ?? 'pending').toString().toLowerCase().replaceAll('_', '-');
+  String get status => (order['status_key'] ?? order['status'] ?? 'pending').toString().toLowerCase().replaceAll('_', '-').replaceFirst(RegExp(r'^wc-'), '');
   String get normalizedStatus {
     if (status == 'on-hold' || status == 'hold') return 'hold';
-    if (status == 'pending' || status == 'pending-payment' || status == 'payment-pending') return 'payment-pending';
-    if (status == 'outfordelivery') return 'out-for-delivery';
-    if (status == 'completed' || status == 'complete' || status == 'delivered') return 'delivered';
+    if (['pending','pending-payment','payment-pending','awaiting-payment','awaiting-verification'].contains(status)) return 'payment-pending';
+    if (['outfordelivery','out-of-delivery','out-for-delivery','out-for-delivery-status'].contains(status)) return 'out-for-delivery';
+    if (['completed','complete','delivered'].contains(status)) return 'delivered';
+    if (status == 'canceled') return 'cancelled';
     return status;
   }
 
   int get activeStep {
     switch (normalizedStatus) {
+      case 'confirmed': return 1;
       case 'processing': return 2;
       case 'shipped': return 3;
       case 'out-for-delivery': return 4;
-      case 'completed':
-      case 'complete':
       case 'delivered': return 5;
-      case 'on-hold':
       case 'hold':
-      case 'pending':
       case 'payment-pending': return 0;
       default: return -1;
     }
   }
 
   Color get statusColor {
-    if (['delivered','completed','complete'].contains(normalizedStatus)) return Colors.green;
-    if (['cancelled','canceled','failed','refunded'].contains(normalizedStatus)) return Colors.red;
-    if (['hold','on-hold','payment-pending','pending'].contains(normalizedStatus)) return Colors.orange;
-    return _accountPurple;
+    switch (normalizedStatus) {
+      case 'delivered': return Colors.green;
+      case 'cancelled': case 'failed': case 'refunded': return Colors.red;
+      case 'hold': case 'payment-pending': return Colors.deepOrange;
+      case 'draft': return Colors.blueGrey;
+      case 'out-for-delivery': return Colors.teal;
+      case 'shipped': return Colors.indigo;
+      case 'processing': case 'confirmed': return _accountPurple;
+      default: return Colors.blueGrey;
+    }
   }
 
   String get statusLabel => switch (normalizedStatus) {
-    'hold' || 'on-hold' => 'ON HOLD',
-    'payment-pending' || 'pending' => 'PAYMENT PENDING',
+    'hold' => 'ON HOLD',
+    'payment-pending' => 'PAYMENT PENDING',
     'out-for-delivery' => 'OUT FOR DELIVERY',
-    'delivered' || 'completed' || 'complete' => 'DELIVERED',
-    'cancelled' || 'canceled' => 'CANCELLED',
+    'delivered' => 'DELIVERED',
+    'cancelled' => 'CANCELLED',
     'failed' => 'FAILED',
     'refunded' => 'REFUNDED',
     'draft' => 'DRAFT',
+    'confirmed' => 'CONFIRMED',
     _ => normalizedStatus.replaceAll('-', ' ').toUpperCase(),
   };
+
+  String _dateTime(dynamic raw) {
+    if (raw == null || raw.toString().trim().isEmpty) return '';
+    final parsed = DateTime.tryParse(raw.toString());
+    if (parsed == null) return '';
+    final d = parsed.toLocal();
+    final hour = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final minute = d.minute.toString().padLeft(2, '0');
+    final suffix = d.hour >= 12 ? 'PM' : 'AM';
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year} • $hour:$minute $suffix';
+  }
+
+  String _stepDate(String key, int index) {
+    final history = order['timeline'];
+    if (history is List) {
+      for (final raw in history.whereType<Map>()) {
+        final eventKey = (raw['key'] ?? '').toString().toLowerCase().replaceAll('_', '-');
+        final mapped = eventKey == 'completed' ? 'delivered' : eventKey == 'out-of-delivery' ? 'out-for-delivery' : eventKey;
+        if (mapped == key) {
+          final date = _dateTime(raw['date'] ?? raw['date_created'] ?? raw['timestamp'] ?? raw['time']);
+          if (date.isNotEmpty) return date;
+        }
+      }
+    }
+    if (key == 'placed') return _dateTime(order['date_created'] ?? order['date']);
+    if (index == activeStep) return _dateTime(order['date_modified'] ?? order['date_updated']);
+    return '';
+  }
 
   Future<void> refresh() async {
     final id = (order['id'] ?? order['order_id'] ?? '').toString();
@@ -396,8 +437,15 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
   );
 
   Widget timeline() {
-    const steps = ['Order placed','Confirmed','Processing','Shipped','Out for delivery','Delivered'];
-    final terminal = ['cancelled','canceled','failed','refunded','draft'].contains(normalizedStatus);
+    const steps = [
+      ('placed', 'Order placed'),
+      ('confirmed', 'Confirmed'),
+      ('processing', 'Processing'),
+      ('shipped', 'Shipped'),
+      ('out-for-delivery', 'Out for delivery'),
+      ('delivered', 'Delivered'),
+    ];
+    final terminal = ['cancelled','failed','refunded','draft'].contains(normalizedStatus);
     final current = activeStep;
     return Card(
       child: Padding(
@@ -407,13 +455,13 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
             const Expanded(child: Text('ORDER STATUS', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: .5))),
             Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7), decoration: BoxDecoration(color: statusColor.withValues(alpha: .13), borderRadius: BorderRadius.circular(30)), child: Text(statusLabel, style: TextStyle(color: statusColor, fontWeight: FontWeight.w800, fontSize: 12))),
           ]),
-          if (normalizedStatus == 'hold' || normalizedStatus == 'on-hold' || normalizedStatus == 'payment-pending' || normalizedStatus == 'pending' || normalizedStatus == 'draft') ...[
+          if (['hold','payment-pending','draft'].contains(normalizedStatus)) ...[
             const SizedBox(height: 12),
-            Text(normalizedStatus == 'hold' || normalizedStatus == 'on-hold' ? 'Your order is on hold while the store reviews it.' : normalizedStatus == 'draft' ? 'This order is still a draft.' : 'Payment is pending store confirmation.', style: TextStyle(color: statusColor)),
+            Container(width: double.infinity, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: statusColor.withValues(alpha: .09), borderRadius: BorderRadius.circular(12), border: Border.all(color: statusColor.withValues(alpha: .22))), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(normalizedStatus == 'hold' ? Icons.pause_circle_outline : normalizedStatus == 'draft' ? Icons.edit_note : Icons.payments_outlined, color: statusColor), const SizedBox(width: 9), Expanded(child: Text(normalizedStatus == 'hold' ? 'Your order is on hold while the store reviews it.' : normalizedStatus == 'draft' ? 'This order is still a draft and has not entered fulfilment.' : 'Payment is pending. The order will move forward after the store verifies payment.', style: TextStyle(color: statusColor, fontWeight: FontWeight.w600)))])),
           ],
-          if (terminal && normalizedStatus != 'draft') ...[
+          if (terminal) ...[
             const SizedBox(height: 14),
-            Row(children: [Icon(Icons.info_outline, color: statusColor), const SizedBox(width: 8), Text(statusLabel, style: TextStyle(color: statusColor, fontWeight: FontWeight.w700))]),
+            Container(width: double.infinity, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: statusColor.withValues(alpha: .09), borderRadius: BorderRadius.circular(12)), child: Row(children: [Icon(normalizedStatus == 'cancelled' ? Icons.cancel_outlined : Icons.info_outline, color: statusColor), const SizedBox(width: 8), Expanded(child: Text(normalizedStatus == 'draft' ? 'Draft order — fulfilment has not started.' : statusLabel, style: TextStyle(color: statusColor, fontWeight: FontWeight.w700)))])),
           ],
           const SizedBox(height: 17),
           for (var i = 0; i < steps.length; i++) ...[
@@ -424,22 +472,22 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
                   builder: (_, __) {
                     final done = !terminal && current >= i;
                     final active = !terminal && current == i;
+                    final stepColor = active ? statusColor : _accountPurple;
                     return Container(
-                      width: active ? 25 : 22, height: active ? 25 : 22,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: done ? _accountPurple : Theme.of(context).colorScheme.surfaceContainerHighest,
-                        border: Border.all(color: active ? _accountPurple : Colors.transparent, width: 2),
-                        boxShadow: active ? [BoxShadow(color: _accountPurple.withValues(alpha: .18 + pulse.value * .24), blurRadius: 5 + pulse.value * 5)] : [],
-                      ),
+                      width: active ? 27 : 23, height: active ? 27 : 23,
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: done ? stepColor : Theme.of(context).colorScheme.surfaceContainerHighest, border: Border.all(color: active ? statusColor : Colors.transparent, width: 2), boxShadow: active ? [BoxShadow(color: statusColor.withValues(alpha: .18 + pulse.value * .24), blurRadius: 5 + pulse.value * 5)] : []),
                       child: Icon(done ? Icons.check : Icons.circle, size: done ? 14 : 7, color: done ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant),
                     );
                   },
                 ),
-                if (i != steps.length - 1) Container(width: 2, height: 26, color: !terminal && current > i ? _accountPurple : Theme.of(context).colorScheme.outlineVariant),
+                if (i != steps.length - 1) Container(width: 2, height: 34, color: !terminal && current > i ? _accountPurple : Theme.of(context).colorScheme.outlineVariant),
               ])),
               const SizedBox(width: 9),
-              Padding(padding: const EdgeInsets.only(top: 2), child: Text(steps[i], style: TextStyle(fontWeight: !terminal && current == i ? FontWeight.w800 : FontWeight.w500, color: !terminal && current >= i ? null : Theme.of(context).colorScheme.onSurfaceVariant))),
+              Expanded(child: Padding(padding: const EdgeInsets.only(top: 2, bottom: 10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(steps[i].$2, style: TextStyle(fontWeight: !terminal && current == i ? FontWeight.w800 : FontWeight.w600, color: !terminal && current >= i ? null : Theme.of(context).colorScheme.onSurfaceVariant)),
+                if (_stepDate(steps[i].$1, i).isNotEmpty) Padding(padding: const EdgeInsets.only(top: 3), child: Text(_stepDate(steps[i].$1, i), style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant))),
+                else if (!terminal && current >= i) Padding(padding: const EdgeInsets.only(top: 3), child: Text('Time not provided by store', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant))),
+              ]))),
             ]),
           ],
         ]),
@@ -450,7 +498,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
   @override Widget build(BuildContext context) {
     final lineItems = (order['items'] as List? ?? order['line_items'] as List? ?? const []).whereType<Map>().toList();
     final shipping = order['shipping'] is Map ? order['shipping'] as Map : const {};
-    final canCancel = ['pending','on-hold','hold','processing','draft'].contains(normalizedStatus);
+    final canCancel = order['can_cancel'] == true || (order['can_cancel'] == null && ['payment-pending','hold','processing','confirmed'].contains(normalizedStatus));
     final subtotal = order['subtotal'] ?? order['cart_subtotal'] ?? order['line_items_subtotal'];
     final shippingTotal = order['shipping_total'] ?? order['shipping_cost'] ?? order['shipping_amount'];
     final tax = order['total_tax'] ?? order['tax_total'] ?? order['tax'];
