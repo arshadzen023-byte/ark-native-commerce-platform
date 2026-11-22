@@ -162,7 +162,7 @@ class _PaymentPageState extends State<PaymentPage> {
         throw Exception('Please sign in again. Your order cannot be linked to your customer account without an active session.');
       }
       await ArkCustomerApi(token).request(
-        'customer/orders/attach',
+        'orders/attach',
         method: 'POST',
         body: {'order_id': id, 'order_key': key},
       );
