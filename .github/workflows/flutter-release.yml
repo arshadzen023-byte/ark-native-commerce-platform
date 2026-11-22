@@ -24,32 +24,42 @@ jobs:
           channel: stable
           cache: true
       - name: Generate Android project
-        run: flutter create --project-name glowhit_shopping --org shop.pluginstore --platforms android .
-      - name: Ensure Android internet permission
+        run: flutter create --project-name glowhit_shopping --org com.ark --platforms android .
+      - name: Configure Firebase Android app
         shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p android/app
+          cp firebase/google-services.json android/app/google-services.json
+          python3 - <<'PY'
+          from pathlib import Path
+          settings = Path('android/settings.gradle')
+          text = settings.read_text()
+          if 'com.google.gms.google-services' not in text:
+              text = text.replace('plugins {', 'plugins {\n    id "com.google.gms.google-services" version "4.4.2" apply false', 1)
+              settings.write_text(text)
+          app = Path('android/app/build.gradle')
+          text = app.read_text()
+          if 'id "com.google.gms.google-services"' not in text:
+              text = text.replace('plugins {', 'plugins {\n    id "com.google.gms.google-services"', 1)
+              app.write_text(text)
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text()
+          if 'android.permission.POST_NOTIFICATIONS' not in text:
+              end = text.find('>', text.find('<manifest'))
+              text = text[:end+1] + '\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' + text[end+1:]
+              manifest.write_text(text)
+          if 'com.ark.glowhit' not in Path('android/app/google-services.json').read_text():
+              raise SystemExit('Firebase package name mismatch')
+          print('Firebase configuration verified for com.ark.glowhit')
+          PY
+      - name: Ensure Android internet permission
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
-          manifest = Path("android/app/src/main/AndroidManifest.xml")
-          if not manifest.is_file():
-              raise SystemExit(f"Android manifest was not generated: {manifest}")
-
-          text = manifest.read_text(encoding="utf-8")
-          permission = '    <uses-permission android:name="android.permission.INTERNET" />'
-
-          if "android.permission.INTERNET" not in text:
-              start = text.find("<manifest")
-              end = text.find(">", start)
-              if start < 0 or end < 0:
-                  raise SystemExit("Could not find the opening <manifest> tag")
-              text = text[:end + 1] + chr(10) + permission + text[end + 1:]
-              manifest.write_text(text, encoding="utf-8")
-
-          verified = manifest.read_text(encoding="utf-8")
-          if "android.permission.INTERNET" not in verified:
-              raise SystemExit("INTERNET permission was not added")
-          print("Verified INTERNET permission in AndroidManifest.xml")
+          p=Path('android/app/src/main/AndroidManifest.xml'); t=p.read_text()
+          if 'android.permission.INTERNET' not in t:
+              i=t.find('>',t.find('<manifest')); t=t[:i+1]+'\n    <uses-permission android:name="android.permission.INTERNET" />'+t[i+1:]; p.write_text(t)
           PY
       - name: Get dependencies
         run: flutter pub get
@@ -61,17 +71,7 @@ jobs:
         run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
-          name: glowhit-v1.0.7-account-login-fix
+          name: glowhit-v1.0.8-fcm-notifications
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
-      - name: Publish installable APK release
-        if: github.ref == 'refs/heads/fix/glowhit-account-login-layout-2026-11-22'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: glowhit-v1.0.7-account-login-fix-2026-11-22
-          name: GlowHit v1.0.7 — Account login layout fix
-          prerelease: true
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          files: build/app/outputs/flutter-apk/app-release.apk
