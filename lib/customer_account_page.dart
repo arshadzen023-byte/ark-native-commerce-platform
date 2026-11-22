@@ -44,7 +44,7 @@ class ArkCustomerApi {
         throw Exception(message?.toString() ?? 'Request failed (${result.statusCode}).');
       }
       return data;
-    } finally { client.close(); }
+    }
   }
 }
 
