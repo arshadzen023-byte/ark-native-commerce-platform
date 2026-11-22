@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -24,6 +25,7 @@ class GlowHitPushService {
     importance: Importance.high,
   );
   String? _token;
+  String? _customerJwt;
   bool _ready = false;
 
   Future<void> initialize({String? customerJwt}) async {
@@ -49,9 +51,10 @@ class GlowHitPushService {
       if (initial != null) onTap(initial.data['click_url']?.toString());
       _token = await FirebaseMessaging.instance.getToken();
       if (_token != null) await register(customerJwt: customerJwt);
+      _customerJwt = customerJwt;
       FirebaseMessaging.instance.onTokenRefresh.listen((value) async {
         _token = value;
-        await register(customerJwt: customerJwt);
+        await register(customerJwt: _customerJwt);
       });
       _ready = true;
     } catch (_) { _ready = false; }
@@ -68,6 +71,7 @@ class GlowHitPushService {
   }
 
   Future<void> register({String? customerJwt}) async {
+    if (customerJwt != null) _customerJwt = customerJwt;
     final token = _token ?? await FirebaseMessaging.instance.getToken();
     if (token == null || token.isEmpty) return;
     _token = token;
