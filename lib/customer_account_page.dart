@@ -87,7 +87,8 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
     // Preserve those strings instead of parsing them as zero.
     if (RegExp(r'[^0-9.,-]').hasMatch(raw)) return raw;
     final amount = double.tryParse(raw.replaceAll(',', '')) ?? 0;
-    return '${currency ?? '₹'}${amount.toStringAsFixed(2)}';
+    final symbol = currency?.toString() == 'INR' ? '₹' : (currency ?? '₹').toString();
+    return '$symbol${amount.toStringAsFixed(2)}';
   }
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -232,7 +233,8 @@ class _CustomerOrderDetailPageState extends State<_CustomerOrderDetailPage> {
     final raw = (v ?? '').toString().trim();
     if (raw.isEmpty) return '${currency ?? '₹'}0.00';
     if (RegExp(r'[^0-9.,-]').hasMatch(raw)) return raw;
-    return '${currency ?? '₹'}${(double.tryParse(raw.replaceAll(',', '')) ?? 0).toStringAsFixed(2)}';
+    final symbol = currency?.toString() == 'INR' ? '₹' : (currency ?? '₹').toString();
+    return '$symbol${(double.tryParse(raw.replaceAll(',', '')) ?? 0).toStringAsFixed(2)}';
   }
 
   Future<void> buyAgain() async {
@@ -245,7 +247,7 @@ class _CustomerOrderDetailPageState extends State<_CustomerOrderDetailPage> {
         final id = int.tryParse('${item['product_id'] ?? ''}') ?? 0;
         final quantity = int.tryParse('${item['quantity'] ?? 1}') ?? 1;
         if (id > 0) {
-          await woo.addItem(id, quantity: quantity.clamp(1, 99));
+          await woo.addItem(id, quantity: quantity.clamp(1, 99).toInt());
           added++;
         }
       }
