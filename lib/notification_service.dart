@@ -70,6 +70,36 @@ class GlowHitPushService {
     return id;
   }
 
+  Future<http.Response> _requestWithRestFallback({
+    required String path,
+    required String method,
+    required Map<String, String> headers,
+    String? body,
+  }) async {
+    Future<http.Response> send(Uri uri) async {
+      final request = http.Request(method, uri)..headers.addAll(headers);
+      if (body != null) request.body = body;
+      final client = http.Client();
+      try {
+        final streamed = await client.send(request).timeout(const Duration(seconds: 20));
+        return await http.Response.fromStream(streamed).timeout(const Duration(seconds: 20));
+      } finally {
+        client.close();
+      }
+    }
+
+    final prettyUri = Uri.parse(_pushBase + '/' + path);
+    final response = await send(prettyUri);
+    if (response.statusCode != 404 && response.statusCode != 405) return response;
+
+    // Some WordPress/hosting configurations do not rewrite pretty REST URLs.
+    // Retry the same authenticated request through WordPress' rest_route query.
+    final fallbackUri = Uri.parse('https://pluginstore.shop/').replace(
+      queryParameters: {'rest_route': '/ark-push/v1/' + path},
+    );
+    return send(fallbackUri);
+  }
+
   Future<void> register({String? customerJwt}) async {
     if (customerJwt != null) _customerJwt = customerJwt;
     final token = _token ?? await FirebaseMessaging.instance.getToken();
@@ -77,9 +107,14 @@ class GlowHitPushService {
     _token = token;
     final headers = <String, String>{'Accept': 'application/json', 'Content-Type': 'application/json'};
     if (customerJwt != null && customerJwt.isNotEmpty) headers['Authorization'] = 'Bearer ' + customerJwt;
-    final response = await http.post(Uri.parse(_pushBase + '/register'), headers: headers, body: jsonEncode({
-      'token': token, 'platform': 'android', 'app_version': '1.0.8+88', 'installation_id': await _installationId(),
-    })).timeout(const Duration(seconds: 20));
+    final response = await _requestWithRestFallback(
+      path: 'register',
+      method: 'POST',
+      headers: headers,
+      body: jsonEncode({
+        'token': token, 'platform': 'android', 'app_version': '1.0.8+88', 'installation_id': await _installationId(),
+      }),
+    );
     if (response.statusCode < 200 || response.statusCode >= 300) throw Exception('FCM registration failed (' + response.statusCode.toString() + ')');
   }
 
@@ -87,7 +122,11 @@ class GlowHitPushService {
     final token = _token ?? await FirebaseMessaging.instance.getToken();
     if (token == null || token.isEmpty) return [];
     _token = token;
-    final response = await http.get(Uri.parse(_pushBase + '/messages'), headers: {'Accept': 'application/json', 'x-ark-push-token': token}).timeout(const Duration(seconds: 20));
+    final response = await _requestWithRestFallback(
+      path: 'messages',
+      method: 'GET',
+      headers: {'Accept': 'application/json', 'x-ark-push-token': token},
+    );
     if (response.statusCode < 200 || response.statusCode >= 300) throw Exception('Notification inbox unavailable (' + response.statusCode.toString() + ')');
     final decoded = jsonDecode(response.body);
     final rows = decoded is Map ? decoded['messages'] : null;
@@ -98,10 +137,12 @@ class GlowHitPushService {
   Future<void> deleteMessage(int id) async {
     final token = _token ?? await FirebaseMessaging.instance.getToken();
     if (token == null) throw Exception('Device is not registered.');
-    final response = await http.post(Uri.parse(_pushBase + '/messages/delete'),
+    final response = await _requestWithRestFallback(
+      path: 'messages/delete',
+      method: 'POST',
       headers: {'Accept': 'application/json', 'Content-Type': 'application/json', 'x-ark-push-token': token},
       body: jsonEncode({'message_id': id}),
-    ).timeout(const Duration(seconds: 20));
+    );
     if (response.statusCode < 200 || response.statusCode >= 300) throw Exception('Delete notification failed (' + response.statusCode.toString() + '). Update the ARK Notifications plugin.');
   }
 
