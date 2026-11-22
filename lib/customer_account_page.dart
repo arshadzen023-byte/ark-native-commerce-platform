@@ -187,6 +187,24 @@ class _CustomerOrderDetailPageState extends State<_CustomerOrderDetailPage> {
       if (mounted) setState(() { error = e.toString().replaceFirst('Exception: ', ''); loading = false; });
     }
   }
+  Future<void> requestReturn() async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Request a return'),
+      content: TextField(controller: controller, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Reason for return', hintText: 'Tell us what went wrong', border: OutlineInputBorder())),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')), FilledButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('SUBMIT REQUEST'))],
+    ));
+    controller.dispose();
+    if (reason == null || reason.trim().length < 5) return;
+    try {
+      await widget.api.request('customer/orders/${widget.orderId}/return', method: 'POST', body: {'reason': reason.trim()});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Return request sent to the store for review.')));
+      await load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+    }
+  }
   Future<void> cancel() async {
     final ok = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Cancel this order?'),
@@ -247,6 +265,10 @@ class _CustomerOrderDetailPageState extends State<_CustomerOrderDetailPage> {
         if ((shipping['phone'] ?? '').toString().isNotEmpty) Text('Phone: ${shipping['phone']}'),
       ]))),
       if (o['can_cancel'] == true) SizedBox(height: 52, child: OutlinedButton.icon(onPressed: cancelling ? null : cancel, icon: cancelling ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.cancel_outlined), label: const Text('CANCEL ORDER'), style: OutlinedButton.styleFrom(foregroundColor: Colors.red))),
+      if ((o['status'] ?? '').toString() == 'completed' && (o['return_request_status'] ?? '').toString() != 'pending')
+        SizedBox(height: 52, child: OutlinedButton.icon(onPressed: requestReturn, icon: const Icon(Icons.assignment_return_outlined), label: const Text('REQUEST RETURN'))),
+      if ((o['return_request_status'] ?? '').toString() == 'pending')
+        const ListTile(leading: Icon(Icons.hourglass_top, color: Colors.orange), title: Text('Return request awaiting store review')),
       const SizedBox(height: 20),
     ]);
   }
