@@ -140,7 +140,7 @@ class LoginLandingPage extends StatelessWidget {
           // landing card so its ListView receives a finite height and paints.
           SizedBox(
             height: 340,
-            child: AccountPanel(token: null, onLogin: onLogin, onLogout: () {}),
+            child: AccountPanel(token: null, onLogin: onLogin, onLogout: () {}, onRecentViewed: () {}),
           ),
         ])),
       )),
@@ -389,15 +389,43 @@ class _StoreHomeState extends State<StoreHome> {
   Widget productCard(Map<String, dynamic> p) {
     final id = (p['id'] as num?)?.toInt() ?? 0;
     final liked = wishlist.any((e) => e['id'] == id);
-    return Card(clipBehavior: Clip.antiAlias, elevation: 0.5, child: InkWell(onTap: () { _rememberRecentlyViewed(p); Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(product: p, onAddToCart: () => _addToCart(p), onBuyNow: () => _buyNow(p), isWishlisted: liked, onWishlist: () => setState(() { liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p); }))); }, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Expanded(child: Stack(fit: StackFit.expand, children: [
-        Container(color: Colors.white, child: imageUrl(p).isEmpty ? const Icon(Icons.image_outlined, size: 44, color: Colors.black26) : Image.network(imageUrl(p), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined))),
-        Positioned(right: 4, top: 4, child: Row(mainAxisSize: MainAxisSize.min, children: [IconButton.filledTonal(onPressed: () => setState(() { liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p); }), icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : null)), IconButton.filledTonal(onPressed: () => Share.share('${p['name']}\n${p['permalink'] ?? storeUrl}'), icon: const Icon(Icons.share_outlined))])),
-      ])),
-      Padding(padding: const EdgeInsets.fromLTRB(9, 7, 9, 2), child: Text((p['name'] ?? 'Product').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 9), child: Text(price(p), style: const TextStyle(fontWeight: FontWeight.w800, color: purple))),
-      Padding(padding: const EdgeInsets.fromLTRB(7, 2, 7, 7), child: SizedBox(width: double.infinity, child: FilledButton.tonal(onPressed: () => _addToCart(p), child: const Text('ADD TO CART', style: TextStyle(fontSize: 10))))),
-    ])));
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 0.5,
+      child: InkWell(
+        onTap: () {
+          _rememberRecentlyViewed(p);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(
+            product: p,
+            onAddToCart: () => _addToCart(p),
+            onBuyNow: () => _buyNow(p),
+            isWishlisted: liked,
+            onWishlist: () => setState(() {
+              liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p);
+            }),
+          )));
+        },
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: Stack(fit: StackFit.expand, children: [
+            Container(
+              color: Colors.white,
+              child: imageUrl(p).isEmpty
+                ? const Icon(Icons.image_outlined, size: 44, color: Colors.black26)
+                : Image.network(imageUrl(p), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+            ),
+            Positioned(right: 4, top: 4, child: Row(mainAxisSize: MainAxisSize.min, children: [
+              IconButton.filledTonal(onPressed: () => setState(() {
+                liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p);
+              }), icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : null)),
+              IconButton.filledTonal(onPressed: () => Share.share('${p['name']}\\n${p['permalink'] ?? storeUrl}'), icon: const Icon(Icons.share_outlined)),
+            ])),
+          ])),
+          Padding(padding: const EdgeInsets.fromLTRB(9, 7, 9, 2), child: Text((p['name'] ?? 'Product').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 9), child: Text(price(p), style: const TextStyle(fontWeight: FontWeight.w800, color: purple))),
+          Padding(padding: const EdgeInsets.fromLTRB(7, 2, 7, 7), child: SizedBox(width: double.infinity, child: FilledButton.tonal(onPressed: () => _addToCart(p), child: const Text('ADD TO CART', style: TextStyle(fontSize: 10))))),
+        ]),
+      ),
+    );
   }
   Widget catalog() => Column(children: [
     Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
