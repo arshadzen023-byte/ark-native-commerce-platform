@@ -140,6 +140,13 @@ class _StoreHomeState extends State<StoreHome> {
     finally { if (mounted) setState(() => cartBusy = false); }
   }
   Future<void> _openCheckout() async {
+    if (customerToken == null || customerToken!.isEmpty) {
+      setState(() => tab = 4);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in first. Your delivery addresses will then be saved to your customer account.')),
+      );
+      return;
+    }
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => WooCheckoutPage(api: woo, customerToken: customerToken)));
     await _refreshCart();
   }
