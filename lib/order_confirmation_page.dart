@@ -11,8 +11,21 @@ class OrderConfirmationPage extends StatelessWidget {
   final VoidCallback onContinue;
 
   String amount() {
-    final totals = order['totals'] is Map ? order['totals'] as Map : (cart['totals'] is Map ? cart['totals'] as Map : const {});
-    final raw = int.tryParse('${totals['total_price'] ?? '0'}') ?? 0;
+    // Store API checkout responses do not always include a populated totals map.
+    // Prefer a valid order total, then fall back to the authoritative cart total
+    // captured immediately before order placement. Never display a false ₹0.00.
+    final orderTotals = order['totals'] is Map ? order['totals'] as Map : const {};
+    final cartTotals = cart['totals'] is Map ? cart['totals'] as Map : const {};
+    final orderRaw = int.tryParse('${orderTotals['total_price'] ?? ''}');
+    final cartRaw = int.tryParse('${cartTotals['total_price'] ?? ''}');
+    final useOrder = orderRaw != null && orderRaw > 0;
+    final totals = useOrder ? orderTotals : cartTotals;
+    final raw = useOrder ? orderRaw : cartRaw;
+    if (raw == null || raw <= 0) {
+      final direct = double.tryParse('${order['total'] ?? order['order_total'] ?? ''}');
+      if (direct != null && direct > 0) return '₹${direct.toStringAsFixed(2)}';
+      return 'Amount unavailable';
+    }
     final digits = (totals['currency_minor_unit'] as num?)?.toInt() ?? 2;
     final divisor = digits == 0 ? 1 : (digits == 1 ? 10 : 100);
     return '${totals['currency_symbol'] ?? '₹'}${(raw / divisor).toStringAsFixed(digits)}';
