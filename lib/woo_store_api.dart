@@ -65,8 +65,12 @@ class WooStoreApi {
             : 'The store returned an unreadable checkout response. Please refresh and try again; if it continues, contact store support.');
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        final code = decoded is Map ? (decoded['code'] ?? '').toString() : '';
         final message = decoded is Map ? (decoded['message'] ?? decoded['code'] ?? response.body) : response.body;
-        throw Exception('Store API ${response.statusCode}: $message');
+        if (response.statusCode == 404 && code == 'rest_no_route') {
+          throw Exception('WooCommerce checkout endpoint is not available ( $method ${uri.path} ). The store must enable/update the WooCommerce Store API. No order was placed.');
+        }
+        throw Exception('Store API ${response.statusCode} ( $method ${uri.path} ): $message');
       }
       if (decoded is Map<String, dynamic>) return decoded;
       throw Exception('Unexpected WooCommerce response format.');
