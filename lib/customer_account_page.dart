@@ -1112,7 +1112,7 @@ class _SavedAddressFormPageState extends State<SavedAddressFormPage> {
           if (text.isEmpty) return 'Required';
           if (key == 'postcode' && text.length < 5) return 'Enter a valid PIN code';
           if (key == 'phone' && text.replaceAll(RegExp(r'\D'), '').length < 10) return 'Enter a valid mobile number';
-          if (key == 'email' && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+
+          if (key == 'email' && !RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(text)) return 'Enter a valid email address';
           return null;
         },
         decoration: InputDecoration(
