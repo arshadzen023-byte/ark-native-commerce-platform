@@ -1112,7 +1112,96 @@ class _SavedAddressFormPageState extends State<SavedAddressFormPage> {
           if (text.isEmpty) return 'Required';
           if (key == 'postcode' && text.length < 5) return 'Enter a valid PIN code';
           if (key == 'phone' && text.replaceAll(RegExp(r'\D'), '').length < 10) return 'Enter a valid mobile number';
-          if (key == 'email' && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+.hasMatch(text)) return 'Enter a valid email';
+          if (key == 'email' && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+
+          return null;
+        },
+        decoration: InputDecoration(
+          labelText: definition.$2,
+          prefixIcon: Icon(definition.$3, color: _accountPurple),
+          filled: true,
+          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .32),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+          errorMaxLines: 2,
+        ),
+      ),
+    );
+  }
+
+  @override Widget build(BuildContext context) {
+    final editing = widget.initialAddress != null;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(editing ? 'Edit Address' : 'New Address'),
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : _save,
+            child: const Text('SAVE', style: TextStyle(fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF33205F), Color(0xFF7655A8)]),
+                borderRadius: BorderRadius.circular(21),
+              ),
+              child: Row(children: [
+                const Icon(Icons.location_on_rounded, color: Colors.white, size: 34),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(editing ? 'UPDATE DELIVERY PLACE' : 'ADD DELIVERY PLACE', style: const TextStyle(color: Colors.white70, fontSize: 10, letterSpacing: 1.1, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 5),
+                  Text(editing ? 'Keep your address up to date.' : 'Where should we deliver?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
+                ])),
+              ]),
+            ),
+            const SizedBox(height: 18),
+            DropdownButtonFormField<String>(
+              value: _label,
+              decoration: InputDecoration(
+                labelText: 'Address type',
+                prefixIcon: const Icon(Icons.bookmark_outline, color: _accountPurple),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .32),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'Home', child: Text('Home')),
+                DropdownMenuItem(value: 'Work', child: Text('Work')),
+                DropdownMenuItem(value: 'Other', child: Text('Other')),
+                DropdownMenuItem(value: 'Default', child: Text('Default')),
+              ],
+              onChanged: _saving ? null : (value) => setState(() => _label = value ?? 'Home'),
+            ),
+            const SizedBox(height: 14),
+            for (final definition in _definitions) _input(definition),
+            if (_error != null) Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.red.withValues(alpha: .08), borderRadius: BorderRadius.circular(12)),
+              child: Text(_error!, style: TextStyle(color: Colors.red.shade700)),
+            ),
+            SizedBox(
+              height: 54,
+              child: FilledButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: _saving ? const SizedBox(width: 19, height: 19, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.cloud_done_rounded),
+                label: Text(_saving ? 'SAVING TO YOUR ACCOUNT…' : editing ? 'UPDATE ADDRESS' : 'SAVE ADDRESS'),
+                style: FilledButton.styleFrom(backgroundColor: _accountPurple, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+).hasMatch(text)) return 'Enter a valid email';
           return null;
         },
         decoration: InputDecoration(
