@@ -37,7 +37,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Banner style'),
       500,
-      scrollable: find.byType(ListView).last,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
     expect(find.text('Banner style'), findsOneWidget);
