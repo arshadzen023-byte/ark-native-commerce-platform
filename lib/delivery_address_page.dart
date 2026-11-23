@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'customer_account_page.dart';
+import 'customer_account_page.dart' show ArkCustomerApi;
 import 'woo_store_api.dart';
 import 'checkout_artwork.dart';
 
