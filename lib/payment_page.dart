@@ -4,11 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'customer_account_page.dart';
 import 'woo_store_api.dart';
 
 class PaymentPage extends StatefulWidget {
-  const PaymentPage({super.key, required this.api, required this.address, required this.cart});
+  const PaymentPage({super.key, required this.api, required this.address, required this.cart, this.customerToken});
   final WooStoreApi api;
+  final String? customerToken;
   final Map<String, dynamic> address;
   final Map<String, dynamic> cart;
   @override
@@ -184,19 +186,58 @@ class _PaymentPageState extends State<PaymentPage> {
         liveCart = Map<String, dynamic>.from(authoritativeCart);
       }
 
+      // Billing email must match the signed-in WooCommerce account. The
+      // selected delivery address remains the shipping address and may differ.
+      final billingAddress = <String, dynamic>{...selectedAddress};
+      final token = widget.customerToken;
+      if (token != null && token.trim().isNotEmpty) {
+        final profile = await ArkCustomerApi(token).request('customer/me');
+        final accountEmail = profile is Map ? (profile['email'] ?? '').toString().trim() : '';
+        if (accountEmail.isEmpty) {
+          throw Exception('Your account email could not be verified. Open Account → Edit Profile, save a valid email, then retry checkout.');
+        }
+        billingAddress['email'] = accountEmail;
+      }
+
       // The app collects payer proof only after the WooCommerce order is
       // created. The payer's own UPI address is intentionally not requested.
       const paymentData = <Map<String, dynamic>>[];
       final result = await widget.api.placeOrder(
-        billing: selectedAddress,
+        billing: billingAddress,
         shipping: selectedAddress,
         paymentMethod: selected!,
         paymentData: paymentData,
       );
       final orderId = WooStoreApi.confirmedOrderId(result);
+
+      // Store API can create a valid guest order; attach it to the signed-in
+      // customer using the Bridge's order-key + account-email ownership check
+      // so it appears in My Orders. Never fabricate an order ID on attach error.
+      var accountLinked = token == null || token.trim().isEmpty;
+      String? accountLinkWarning;
+      if (token != null && token.trim().isNotEmpty) {
+        final orderKey = (result['order_key'] ?? result['key'] ?? '').toString();
+        try {
+          if (orderKey.isEmpty) throw Exception('WooCommerce did not return an order key.');
+          final attached = await ArkCustomerApi(token).request(
+            'orders/attach',
+            method: 'POST',
+            body: {'order_id': orderId, 'order_key': orderKey},
+          );
+          accountLinked = attached is Map &&
+              attached['success'] == true &&
+              int.tryParse('${attached['order_id'] ?? ''}') == orderId;
+          if (!accountLinked) throw Exception('The store did not confirm linking this order to your account.');
+        } catch (e) {
+          accountLinkWarning = e.toString().replaceFirst('Exception: ', '');
+        }
+      }
+
       final resultWithTotals = <String, dynamic>{
         ...result,
         'order_id': orderId,
+        'account_linked': accountLinked,
+        if (accountLinkWarning != null) 'account_link_warning': accountLinkWarning,
         if (result['totals'] is! Map && liveCart['totals'] is Map)
           'totals': Map<String, dynamic>.from(liveCart['totals'] as Map),
       };
