@@ -195,12 +195,21 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       child: ListView(padding: const EdgeInsets.all(16), children: [
         const Text('Where should we deliver?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
         const SizedBox(height: 12),
+        SizedBox(width: double.infinity, child: OutlinedButton.icon(
+          onPressed: busy ? null : () {
+            for (final controller in fields.values) { controller.clear(); }
+            fields['country']!.text = 'IN';
+            setState(() { selectedSavedAddress = -1; addressLabel = 'Home'; });
+          },
+          icon: const Icon(Icons.add_location_alt_outlined),
+          label: const Text('ADD NEW ADDRESS'),
+        )),
         if (savedAddresses.isNotEmpty) ...[
           DropdownButtonFormField<int>(
             value: selectedSavedAddress,
             decoration: const InputDecoration(labelText: 'Choose a saved address', border: OutlineInputBorder()),
             items: [const DropdownMenuItem(value: -1, child: Text('Enter a new address')), ...List.generate(savedAddresses.length, (i) => DropdownMenuItem(value: i, child: Text((savedAddresses[i]['label'] ?? 'Address ${i + 1}').toString())))],
-            onChanged: (index) { if (index == null) return; if (index == -1) { setState(() => selectedSavedAddress = -1); } else { _applySavedAddress(savedAddresses[index]); } },
+            onChanged: (index) { if (index == null) return; if (index == -1) { for (final controller in fields.values) { controller.clear(); } fields['country']!.text = 'IN'; setState(() { selectedSavedAddress = -1; addressLabel = 'Home'; }); } else { _applySavedAddress(savedAddresses[index]); } },
           ),
           Row(children: [
             TextButton.icon(
