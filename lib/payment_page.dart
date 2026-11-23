@@ -464,7 +464,7 @@ class _PaymentPageState extends State<PaymentPage> {
                             child: isCod
                               ? Image.memory(CheckoutArtwork.rupee, fit: BoxFit.contain, gaplessPlayback: true)
                               : isMethodUpi
-                                ? Image.memory(CheckoutArtwork.smartphone, fit: BoxFit.contain, gaplessPlayback: true)
+                                ? Image.memory(CheckoutArtwork.qrScan, fit: BoxFit.contain, gaplessPlayback: true)
                                 : Icon(Icons.account_balance_wallet_rounded, color: _brand, size: 34),
                           ),
                         ),
