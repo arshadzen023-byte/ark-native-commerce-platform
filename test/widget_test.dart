@@ -34,6 +34,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Component Properties'), findsOneWidget);
     expect(find.text('LIVE COMPONENT PREVIEW'), findsOneWidget);
+    await tester.ensureVisible(find.text('Banner style'));
+    await tester.pumpAndSettle();
     expect(find.text('Banner style'), findsOneWidget);
     await tester.tap(find.text('SAVE'));
     await tester.pumpAndSettle();
