@@ -181,17 +181,40 @@ class WooStoreApi {
 
   Future<Map<String, dynamic>> getCheckout() => _send('checkout');
 
+  /// Extracts a real WooCommerce order ID from the Store API response.
+  /// A 200 response without an order ID is not an order and must never open
+  /// the Order Received screen.
+  static int confirmedOrderId(Map<String, dynamic> response) {
+    final raw = response['order_id'] ?? response['id'];
+    final id = int.tryParse((raw ?? '').toString());
+    if (id == null || id <= 0) {
+      throw Exception(
+        'WooCommerce did not confirm this order (no valid order ID was returned). '
+        'Your order has not been placed. Please retry or contact the store.',
+      );
+    }
+    final status = (response['status'] ?? '').toString().toLowerCase();
+    if (status == 'failed' || status == 'cancelled' || status == 'canceled') {
+      throw Exception('WooCommerce returned order status: $status. Please retry payment.');
+    }
+    return id;
+  }
+
   Future<Map<String, dynamic>> placeOrder({
     required Map<String, dynamic> billing,
     required Map<String, dynamic> shipping,
     required String paymentMethod,
     String customerNote = '',
     List<Map<String, dynamic>> paymentData = const [],
-  }) => _send('checkout', method: 'POST', body: {
-    'billing_address': billing,
-    'shipping_address': shipping,
-    'payment_method': paymentMethod,
-    'payment_data': paymentData,
-    'customer_note': customerNote,
-  });
+  }) async {
+    final response = await _send('checkout', method: 'POST', body: {
+      'billing_address': billing,
+      'shipping_address': shipping,
+      'payment_method': paymentMethod,
+      'payment_data': paymentData,
+      'customer_note': customerNote,
+    });
+    confirmedOrderId(response);
+    return response;
+  }
 }
