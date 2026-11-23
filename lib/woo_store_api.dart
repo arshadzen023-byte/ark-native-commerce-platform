@@ -93,6 +93,20 @@ class WooStoreApi {
     return cart;
   }
 
+  Future<List<Map<String, dynamic>>> getRecommendedProducts({int limit = 6}) async {
+    final uri = Uri.parse(baseUrl).resolve('wp-json/wc/store/v1/products').replace(
+      queryParameters: {'per_page': limit.toString(), 'orderby': 'popularity', 'order': 'desc'},
+    );
+    final response = await http.get(uri, headers: const {'Accept': 'application/json'})
+        .timeout(const Duration(seconds: 20));
+    if (response.statusCode != 200) {
+      throw Exception('Recommended products unavailable (HTTP ${response.statusCode}).');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) throw Exception('Unexpected recommended-products response.');
+    return decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
   Future<Map<String, dynamic>> getCart() => _send('cart');
   Future<Map<String, dynamic>> addItem(int productId, {int quantity = 1}) =>
       _send('cart/add-item', method: 'POST', body: {'id': productId, 'quantity': quantity});
