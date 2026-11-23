@@ -27,7 +27,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   List<Map<String, dynamic>> savedAddresses = [];
   String addressLabel = 'Home';
   int selectedSavedAddress = -1;
-  bool formVisible = true;
+  bool formVisible = false;
+  bool addressesLoading = true;
   static const _savedAddressKey = 'glowhit_saved_delivery_addresses';
 
   @override
@@ -50,7 +51,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   Future<void> _loadSavedAddresses() async {
     if (widget.formOnly) {
-      if (mounted) setState(() => formVisible = true);
+      if (mounted) setState(() { formVisible = true; addressesLoading = false; });
       return;
     }
     final prefs = await SharedPreferences.getInstance();
@@ -63,6 +64,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       try { final remote = await ArkCustomerApi(token).request('customer/addresses'); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses)); if (mounted) setState(() {}); } } catch (_) { /* Keep locally saved addresses available while offline. */ }
     }
     if (mounted) setState(() {
+      addressesLoading = false;
       if (savedAddresses.isEmpty && (widget.initialAddress['address_1'] ?? '').toString().trim().isNotEmpty) {
         savedAddresses.add({...widget.initialAddress, 'label': 'Default', 'id': 'default'});
       }
@@ -79,6 +81,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   Future<void> _saveCurrentAddress() async {
     final value = address;
+    final existingId = (widget.initialAddress['id'] ?? '').toString();
+    if (existingId.isNotEmpty) value['id'] = widget.initialAddress['id'];
     value['label'] = addressLabel;
     if ((value['id'] ?? '').toString().isEmpty) {
       value['id'] = 'local-${DateTime.now().microsecondsSinceEpoch}';
@@ -136,7 +140,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       savedAddresses.removeAt(selectedSavedAddress);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses));
-      if (mounted) setState(() { selectedSavedAddress = -1; formVisible = savedAddresses.isEmpty; });
+      if (mounted) setState(() { selectedSavedAddress = -1; formVisible = false; });
     } catch (e) {
       if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -188,6 +192,33 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     } else {
       Navigator.pop(context, {'address': chosen, 'cart': cart, 'shipping_selected': true});
     }
+  }
+
+  Future<void> _openEditAddressPage(Map<String, dynamic> item, int index) async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DeliveryAddressPage(
+          api: widget.api,
+          customerToken: widget.customerToken,
+          initialAddress: Map<String, dynamic>.from(item),
+          formOnly: true,
+        ),
+      ),
+    );
+    if (result == null || !mounted || result['address'] is! Map) return;
+    final updated = Map<String, dynamic>.from(result['address'] as Map);
+    if (index >= 0 && index < savedAddresses.length) savedAddresses[index] = updated;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses));
+    if (!mounted) return;
+    setState(() {
+      if (selectedSavedAddress == index) {
+        for (final entry in fields.entries) { entry.value.text = (updated[entry.key] ?? '').toString(); }
+        addressLabel = (updated['label'] ?? 'Home').toString();
+      }
+      error = null;
+    });
   }
 
   TextEditingController _controller(String key, {String fallback = ''}) =>
@@ -283,8 +314,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: widget.embedded ? null : AppBar(
-      title: Text(widget.formOnly ? 'Add new address' : 'Delivery address'),
+      title: Text(widget.formOnly ? ((widget.initialAddress['id'] ?? '').toString().isEmpty ? 'Add new address' : 'Edit address') : 'Delivery address'),
       centerTitle: false,
+      actions: [if (!widget.formOnly) IconButton(tooltip: 'Add address', onPressed: busy ? null : _openNewAddressPage, icon: const Icon(Icons.add_location_alt_outlined))],
     ),
     body: Form(
       key: formKey,
@@ -304,7 +336,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
               SizedBox(height: 4),
               Text('Choose a saved place or add a new one.', style: TextStyle(color: Colors.white70, fontSize: 12)),
             ])),
-            Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), borderRadius: BorderRadius.circular(18)), child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 36)),
+            Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), borderRadius: BorderRadius.circular(18)), child: widget.embedded && !widget.formOnly
+              ? IconButton(tooltip: 'Add address', onPressed: busy ? null : _openNewAddressPage, icon: const Icon(Icons.add_location_alt_rounded, color: Colors.white, size: 32))
+              : const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 36)),
           ]),
         ),
         const SizedBox(height: 18),
@@ -341,10 +375,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                 Padding(
                   padding: const EdgeInsets.only(right: 8, bottom: 6),
                   child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                    TextButton.icon(onPressed: busy ? null : () {
-                      _applySavedAddress(item);
-                      setState(() { selectedSavedAddress = index; formVisible = true; });
-                    }, icon: const Icon(Icons.edit_outlined, size: 17), label: const Text('EDIT')),
+                    TextButton.icon(onPressed: busy ? null : () => _openEditAddressPage(item, index), icon: const Icon(Icons.edit_outlined, size: 17), label: const Text('EDIT')),
                     TextButton.icon(onPressed: busy ? null : () async {
                       setState(() => selectedSavedAddress = index);
                       await _deleteSelectedAddress();
@@ -355,12 +386,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
             );
           }),
         ],
-        if (!widget.formOnly) SizedBox(width: double.infinity, child: OutlinedButton.icon(
-          onPressed: busy ? null : _openNewAddressPage,
-          icon: const Icon(Icons.add_location_alt_outlined),
-          style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF51408F), side: const BorderSide(color: Color(0xFF51408F)), padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-          label: const Text('ADD NEW ADDRESS', style: TextStyle(fontWeight: FontWeight.w800)),
-        )),
+        if (addressesLoading && !widget.formOnly)
+          const Padding(padding: EdgeInsets.symmetric(vertical: 28), child: Center(child: CircularProgressIndicator()))
+        else if (!widget.formOnly && savedAddresses.isEmpty)
+          const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Text('No saved addresses yet. Use the + icon above to add one.', textAlign: TextAlign.center)),
         if (formVisible) ...[
         DropdownButtonFormField<String>(
           value: addressLabel,
@@ -384,7 +413,12 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
             if (!formKey.currentState!.validate()) return;
             try {
               await _saveCurrentAddress();
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address saved')));
+              if (!mounted) return;
+              if (widget.formOnly) {
+                Navigator.pop(context, {'address': <String, dynamic>{...address, if ((widget.initialAddress['id'] ?? '').toString().isNotEmpty) 'id': widget.initialAddress['id'], 'label': addressLabel}, 'saved': true});
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address saved')));
+              }
             } catch (e) {
               if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
             }
@@ -394,7 +428,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         ),
         ],
         const SizedBox(height: 8),
-        SizedBox(height: 54, child: FilledButton(
+        if (!widget.formOnly) SizedBox(height: 54, child: FilledButton(
           onPressed: busy ? null : () async {
             if (!formVisible && selectedSavedAddress < 0) {
               setState(() => error = 'Please add or select a delivery address.');
@@ -420,7 +454,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
             }
           },
           style: FilledButton.styleFrom(backgroundColor: const Color(0xFF51408F), elevation: 2, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-          child: Text(widget.formOnly ? 'SAVE ADDRESS & CONTINUE' : 'CONTINUE TO CONFIRM DETAILS', style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: .2)),
+          child: Text(widget.formOnly ? ((widget.initialAddress['id'] ?? '').toString().isEmpty ? 'SAVE ADDRESS' : 'UPDATE ADDRESS') : 'CONTINUE TO CONFIRM DETAILS', style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: .2)),
         )),
       ]),
     ),
