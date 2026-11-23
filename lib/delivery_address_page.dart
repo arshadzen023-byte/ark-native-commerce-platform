@@ -75,9 +75,6 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     if (selectedSavedAddress >= 0 && selectedSavedAddress < savedAddresses.length) {
       value['id'] = savedAddresses[selectedSavedAddress]['id'] ?? '';
     }
-    if (selectedSavedAddress >= 0 && selectedSavedAddress < savedAddresses.length) {
-      value['id'] = savedAddresses[selectedSavedAddress]['id'] ?? '';
-    }
     final key = _savedAddressKey;
     final prefs = await SharedPreferences.getInstance();
     final index = savedAddresses.indexWhere((e) => e['address_1'] == value['address_1'] && e['postcode'] == value['postcode'] && e['first_name'] == value['first_name']);
@@ -96,6 +93,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         throw Exception('Address was kept on this device but could not be synced to your account: ${e.toString().replaceFirst('Exception: ', '')}');
       }
     }
+    selectedSavedAddress = savedAddresses.indexWhere((e) =>
+      (e['address_1'] ?? '') == value['address_1'] &&
+      (e['postcode'] ?? '') == value['postcode'] &&
+      (e['first_name'] ?? '') == value['first_name']);
     if (mounted) setState(() {});
   }
 
