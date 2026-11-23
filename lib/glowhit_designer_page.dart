@@ -48,8 +48,9 @@ class DesignerComponent {
 }
 
 class GlowHitDesignerPage extends StatefulWidget {
-  const GlowHitDesignerPage({super.key, required this.token});
+  const GlowHitDesignerPage({super.key, required this.token, this.loadRemoteConfig = true});
   final String token;
+  final bool loadRemoteConfig;
 
   @override
   State<GlowHitDesignerPage> createState() => _GlowHitDesignerPageState();
@@ -206,25 +207,27 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
 
   Future<void> _loadDraft() async {
     final prefs = await SharedPreferences.getInstance();
-    try {
-      final remote = await ArkCustomerApi(widget.token).request('designer/config');
-      if (remote is Map && remote['pages'] is Map) {
-        final remotePages = Map<String, dynamic>.from(remote['pages'] as Map);
-        for (final page in _pages) {
-          final pageConfig = remotePages[_wordpressPageKey(page)];
-          final sections = pageConfig is Map && pageConfig['sections'] is List
-              ? pageConfig['sections'] as List
-              : <dynamic>[];
-          pages[page] = <DesignerComponent>[];
-          for (final section in sections) {
-            if (section is Map) {
-              pages[page]!.add(await _fromWordPressSection(Map<String, dynamic>.from(section)));
+    if (widget.loadRemoteConfig) {
+      try {
+        final remote = await ArkCustomerApi(widget.token).request('designer/config');
+        if (remote is Map && remote['pages'] is Map) {
+          final remotePages = Map<String, dynamic>.from(remote['pages'] as Map);
+          for (final page in _pages) {
+            final pageConfig = remotePages[_wordpressPageKey(page)];
+            final sections = pageConfig is Map && pageConfig['sections'] is List
+                ? pageConfig['sections'] as List
+                : <dynamic>[];
+            pages[page] = <DesignerComponent>[];
+            for (final section in sections) {
+              if (section is Map) {
+                pages[page]!.add(await _fromWordPressSection(Map<String, dynamic>.from(section)));
+              }
             }
           }
         }
+      } catch (e) {
+        error = 'WordPress Designer config could not be loaded: $e';
       }
-    } catch (e) {
-      error = 'WordPress Designer config could not be loaded: $e';
     }
 
     final raw = prefs.getString(_storageKey);
