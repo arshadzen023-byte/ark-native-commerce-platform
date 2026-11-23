@@ -13,6 +13,7 @@ import 'checkout_page.dart';
 import 'woo_store_api.dart';
 import 'notification_service.dart';
 import 'notification_inbox_page.dart';
+import 'glowhit_designer_page.dart';
 
 const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
@@ -427,6 +428,17 @@ class _StoreHomeState extends State<StoreHome> {
       ),
     );
   }
+  Future<void> _openDesigner() async {
+    final token = customerToken;
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sign in to open ARK Designer.')));
+      setState(() => tab = 4);
+      return;
+    }
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GlowHitDesignerPage(token: token)));
+  }
+
   Widget catalog() => Column(children: [
     Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
     Container(margin: const EdgeInsets.symmetric(horizontal: 16), padding: const EdgeInsets.all(18), width: double.infinity, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF33205F), Color(0xFF92517F)]), borderRadius: BorderRadius.circular(18)), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('THE EVERYDAY EDIT', style: TextStyle(color: Colors.white70, letterSpacing: 2, fontSize: 10)), SizedBox(height: 8), Text('Find your next\nfavourite thing.', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)), SizedBox(height: 8), Text('SHOP THE COLLECTION  →', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))])),
@@ -449,6 +461,7 @@ class _StoreHomeState extends State<StoreHome> {
     else if (tab == 3) page = _cartPage();
     else page = account();
     return Scaffold(appBar: AppBar(title: Text(titles[tab]), actions: [
+      if (tab == 0) IconButton(tooltip: 'ARK Designer', onPressed: _openDesigner, icon: const Icon(Icons.design_services_rounded)),
       if (tab == 0) IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
       IconButton(
         tooltip: 'Notifications',
