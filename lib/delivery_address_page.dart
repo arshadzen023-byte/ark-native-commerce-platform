@@ -26,6 +26,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   List<Map<String, dynamic>> savedAddresses = [];
   String addressLabel = 'Home';
   int selectedSavedAddress = -1;
+  bool formVisible = true;
   static const _savedAddressKey = 'glowhit_saved_delivery_addresses';
 
   @override
@@ -56,11 +57,24 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     if (token != null) {
       try { final remote = await ArkCustomerApi(token).request('customer/addresses'); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses)); if (mounted) setState(() {}); } } catch (_) { /* Keep locally saved addresses available while offline. */ }
     }
+    if (mounted) setState(() {
+      formVisible = savedAddresses.isEmpty;
+      if (savedAddresses.isNotEmpty) {
+        selectedSavedAddress = 0;
+        for (final entry in fields.entries) {
+          entry.value.text = (savedAddresses.first[entry.key] ?? '').toString();
+        }
+        addressLabel = (savedAddresses.first['label'] ?? 'Home').toString();
+      }
+    });
   }
 
   Future<void> _saveCurrentAddress() async {
     final value = address;
     value['label'] = addressLabel;
+    if (selectedSavedAddress >= 0 && selectedSavedAddress < savedAddresses.length) {
+      value['id'] = savedAddresses[selectedSavedAddress]['id'] ?? '';
+    }
     if (selectedSavedAddress >= 0 && selectedSavedAddress < savedAddresses.length) {
       value['id'] = savedAddresses[selectedSavedAddress]['id'] ?? '';
     }
@@ -90,6 +104,32 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       entry.value.text = (value[entry.key] ?? '').toString();
     }
     setState(() { addressLabel = (value['label'] ?? 'Home').toString(); selectedSavedAddress = savedAddresses.indexOf(value); });
+  }
+
+  Future<void> _deleteSelectedAddress() async {
+    if (selectedSavedAddress < 0 || selectedSavedAddress >= savedAddresses.length) return;
+    final value = savedAddresses[selectedSavedAddress];
+    final id = (value['id'] ?? '').toString();
+    setState(() { busy = true; error = null; });
+    try {
+      if (widget.customerToken != null && id.isNotEmpty) {
+        await ArkCustomerApi(widget.customerToken!).request('customer/addresses', method: 'DELETE', query: {'id': id});
+      }
+      savedAddresses.removeAt(selectedSavedAddress);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses));
+      if (mounted) setState(() { selectedSavedAddress = -1; formVisible = savedAddresses.isEmpty; });
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  void _newAddress() {
+    for (final controller in fields.values) { controller.clear(); }
+    fields['country']!.text = 'IN';
+    setState(() { selectedSavedAddress = -1; addressLabel = 'Home'; formVisible = true; error = null; });
   }
 
   Future<void> _deleteSelectedAddress() async {
@@ -208,25 +248,52 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
           label: const Text('ADD NEW ADDRESS'),
         )),
         if (savedAddresses.isNotEmpty) ...[
-          DropdownButtonFormField<int>(
-            value: selectedSavedAddress,
-            decoration: const InputDecoration(labelText: 'Choose a saved address', border: OutlineInputBorder()),
-            items: [const DropdownMenuItem(value: -1, child: Text('Enter a new address')), ...List.generate(savedAddresses.length, (i) => DropdownMenuItem(value: i, child: Text((savedAddresses[i]['label'] ?? 'Address ${i + 1}').toString())))],
-            onChanged: (index) { if (index == null) return; if (index == -1) { for (final controller in fields.values) { controller.clear(); } fields['country']!.text = 'IN'; setState(() { selectedSavedAddress = -1; addressLabel = 'Home'; }); } else { _applySavedAddress(savedAddresses[index]); } },
-          ),
-          Row(children: [
-            TextButton.icon(
-              onPressed: selectedSavedAddress < 0 ? null : () => _applySavedAddress(savedAddresses[selectedSavedAddress]),
-              icon: const Icon(Icons.edit_outlined, size: 18), label: const Text('EDIT'),
-            ),
-            TextButton.icon(
-              onPressed: busy || selectedSavedAddress < 0 ? null : _deleteSelectedAddress,
-              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-              label: const Text('DELETE', style: TextStyle(color: Colors.red)),
-            ),
-          ]),
-          const SizedBox(height: 12),
+          ...List.generate(savedAddresses.length, (index) {
+            final item = savedAddresses[index];
+            final selected = selectedSavedAddress == index;
+            final summary = ['address_1','address_2','city','state','postcode','country']
+              .map((key) => item[key]).where((v) => v != null && v.toString().isNotEmpty).join(', ');
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: selected ? const Color(0xFF51408F) : Colors.black12, width: selected ? 1.5 : 1),
+              ),
+              child: Column(children: [
+                CheckboxListTile(
+                  value: selected,
+                  activeColor: const Color(0xFF51408F),
+                  onChanged: busy ? null : (_) {
+                    _applySavedAddress(item);
+                    setState(() { selectedSavedAddress = index; formVisible = false; });
+                  },
+                  title: Text((item['label'] ?? 'Address ${index + 1}').toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(summary),
+                  secondary: Icon((item['label'] == 'Office' || item['label'] == 'Work') ? Icons.work_outline : Icons.home_outlined, color: const Color(0xFF51408F)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8, bottom: 6),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                    TextButton.icon(onPressed: busy ? null : () {
+                      _applySavedAddress(item);
+                      setState(() { selectedSavedAddress = index; formVisible = true; });
+                    }, icon: const Icon(Icons.edit_outlined, size: 17), label: const Text('EDIT')),
+                    TextButton.icon(onPressed: busy ? null : () async {
+                      setState(() => selectedSavedAddress = index);
+                      await _deleteSelectedAddress();
+                    }, icon: const Icon(Icons.delete_outline, size: 17, color: Colors.red), label: const Text('DELETE', style: TextStyle(color: Colors.red))),
+                  ]),
+                ),
+              ]),
+            );
+          }),
         ],
+        SizedBox(width: double.infinity, child: OutlinedButton.icon(
+          onPressed: busy ? null : _newAddress,
+          icon: const Icon(Icons.add_location_alt_outlined),
+          label: const Text('ADD NEW ADDRESS'),
+        )),
+        if (formVisible) ...[
         DropdownButtonFormField<String>(
           value: addressLabel,
           decoration: const InputDecoration(labelText: 'Address type', border: OutlineInputBorder()),
@@ -245,6 +312,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         if (busy) const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())),
         const SizedBox(height: 16),
         OutlinedButton.icon(onPressed: busy ? null : () async { if (!formKey.currentState!.validate()) return; await _saveCurrentAddress(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address saved'))); }, icon: const Icon(Icons.bookmark_add_outlined), label: const Text('SAVE THIS ADDRESS')),
+        ],
         const SizedBox(height: 8),
         SizedBox(height: 54, child: FilledButton(
           onPressed: busy ? null : () async {
