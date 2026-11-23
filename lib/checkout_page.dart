@@ -60,7 +60,12 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
 
   Future<void> openPayment() async {
     final result = await Navigator.push<Map<String, dynamic>>(context, MaterialPageRoute(
-      builder: (_) => PaymentPage(api: widget.api, address: address, cart: cart),
+      builder: (_) => PaymentPage(
+        api: widget.api,
+        address: address,
+        cart: cart,
+        customerToken: widget.customerToken,
+      ),
     ));
     if (result == null || !mounted) return;
     await Navigator.push(context, MaterialPageRoute(
