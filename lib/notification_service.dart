@@ -28,6 +28,30 @@ class GlowHitPushService {
   String? _customerJwt;
   bool _ready = false;
 
+  String? _destinationFromData(Map<String, dynamic> data) {
+    final direct = (data['click_url'] ?? data['url'] ?? '').toString().trim();
+    if (direct.isNotEmpty) return direct;
+    final type = (data['target_type'] ?? data['type'] ?? '').toString().trim().toLowerCase();
+    final id = (data['target_id'] ?? data['order_id'] ?? data['product_id'] ?? data['category_id'] ?? '').toString().trim();
+    if (id.isEmpty) return null;
+    switch (type) {
+      case 'order':
+      case 'order_placed':
+      case 'order_status':
+        return 'ark://orders/$id';
+      case 'product':
+        return 'ark://product/$id';
+      case 'category':
+        return 'ark://category/$id';
+      case 'page':
+        return 'ark://page/$id';
+      case 'notifications':
+        return 'ark://notifications';
+      default:
+        return null;
+    }
+  }
+
   Future<void> initialize({String? customerJwt}) async {
     try {
       if (Firebase.apps.isEmpty) await Firebase.initializeApp();
@@ -39,16 +63,17 @@ class GlowHitPushService {
       );
       await _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(_channel);
       FirebaseMessaging.onMessage.listen((message) async {
+        final title = (message.notification?.title ?? message.data['title']?.toString() ?? '').trim();
+        final body = (message.notification?.body ?? message.data['body']?.toString() ?? '').trim();
+        if (title.isEmpty || body.isEmpty) return;
         onForeground();
-        final title = message.notification?.title ?? message.data['title']?.toString() ?? 'GlowHit';
-        final body = message.notification?.body ?? message.data['body']?.toString() ?? '';
         await _local.show(message.hashCode, title, body,
           NotificationDetails(android: AndroidNotificationDetails(_channel.id, _channel.name, channelDescription: _channel.description, importance: Importance.high, priority: Priority.high, icon: '@mipmap/ic_launcher')),
-          payload: message.data['click_url']?.toString());
+          payload: _destinationFromData(message.data));
       });
-      FirebaseMessaging.onMessageOpenedApp.listen((message) => onTap(message.data['click_url']?.toString()));
+      FirebaseMessaging.onMessageOpenedApp.listen((message) => onTap(_destinationFromData(message.data)));
       final initial = await FirebaseMessaging.instance.getInitialMessage();
-      if (initial != null) onTap(initial.data['click_url']?.toString());
+      if (initial != null) onTap(_destinationFromData(initial.data));
       _token = await FirebaseMessaging.instance.getToken();
       if (_token != null) await register(customerJwt: customerJwt);
       _customerJwt = customerJwt;
