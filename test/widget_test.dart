@@ -13,8 +13,6 @@ void main() {
 
   testWidgets('Designer shows page selector, components and add menu', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.view.setPhysicalSize(const Size(900, 1600));
-    await tester.view.setDevicePixelRatio(1);
     await tester.pumpWidget(const MaterialApp(home: GlowHitDesignerPage(token: 'test-token')));
     await tester.pumpAndSettle();
     expect(find.text('ARK Designer'), findsOneWidget);
@@ -26,13 +24,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Add a component'), findsOneWidget);
     expect(find.text('Banner layout'), findsOneWidget);
-    await tester.view.resetPhysicalSize();
   });
 
   testWidgets('Designer can edit component properties and save draft locally', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.view.setPhysicalSize(const Size(900, 1800));
-    await tester.view.setDevicePixelRatio(1);
     await tester.pumpWidget(const MaterialApp(home: GlowHitDesignerPage(token: 'test-token')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Main promotional banner'));
@@ -43,6 +38,5 @@ void main() {
     await tester.tap(find.text('SAVE'));
     await tester.pumpAndSettle();
     expect(find.text('ARK Designer'), findsOneWidget);
-    await tester.view.resetPhysicalSize();
   });
 }
