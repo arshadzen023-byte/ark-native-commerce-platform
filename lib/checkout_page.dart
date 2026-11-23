@@ -88,7 +88,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
         ]))),
       );
     }
-    final steps = ['Summary', 'Address', 'Payment'];
+    final steps = ['Summary', 'Address', 'Confirm details'];
     return Scaffold(
       appBar: AppBar(
         title: const Text('Checkout'),
@@ -144,19 +144,98 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
       return '${rate['currency_symbol'] ?? currency}${(value / divisor).toStringAsFixed(unit)}';
     }
     return ListView(padding: const EdgeInsets.all(16), children: [
-      const Text('Review order and delivery', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+      const Text('Confirm details', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 4),
+      Text('Review your delivery address, items and total before payment.', style: TextStyle(color: Colors.black54)),
       const SizedBox(height: 12),
-      Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Delivery address', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 6),
-        Text([address['first_name'], address['last_name'], address['address_1'], address['address_2'], address['city'], address['state'], address['postcode'], address['phone']].where((v) => v != null && v.toString().isNotEmpty).join(', ')),
-        Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => setState(() => step = 1), child: const Text('CHANGE ADDRESS'))),
-      ]))),
+      Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFE5E1EF)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(color: const Color(0xFFF0EDFA), borderRadius: BorderRadius.circular(14)),
+                child: const Icon(Icons.location_on_rounded, color: Color(0xFF51408F)),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(child: Text('Delivering to', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17))),
+              TextButton(onPressed: () => setState(() => step = 1), child: const Text('CHANGE')),
+            ]),
+            const SizedBox(height: 8),
+            Text(
+              [address['first_name'], address['last_name']].where((v) => v != null && v.toString().trim().isNotEmpty).join(' '),
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              [address['address_1'], address['address_2'], address['city'], address['state'], address['postcode'], address['country']]
+                  .where((v) => v != null && v.toString().trim().isNotEmpty).join(', '),
+              style: const TextStyle(height: 1.4),
+            ),
+            if ((address['phone'] ?? '').toString().isNotEmpty) ...[
+              const SizedBox(height: 7),
+              Row(children: [const Icon(Icons.phone_outlined, size: 17), const SizedBox(width: 7), Text(address['phone'].toString())]),
+            ],
+          ]),
+        ),
+      ),
       const SizedBox(height: 8),
-      Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Products', style: TextStyle(fontWeight: FontWeight.bold)),
-        for (final item in lines) ListTile(contentPadding: EdgeInsets.zero, title: Text((item['name'] ?? 'Product').toString()), subtitle: Text('Quantity: ${item['quantity'] ?? 1}'), trailing: Text((item['totals'] is Map ? (item['totals'] as Map)['line_total'] : '')?.toString() ?? '')),
-      ]))),
+      Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFE5E1EF)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Order items', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+            const SizedBox(height: 10),
+            for (final item in lines) ...[
+              Builder(builder: (context) {
+                final images = item['images'] as List? ?? const [];
+                final image = images.isNotEmpty && images.first is Map
+                    ? (images.first['thumbnail'] ?? images.first['src'] ?? '').toString()
+                    : '';
+                final itemTotals = item['totals'] is Map ? item['totals'] as Map : const {};
+                final lineTotal = int.tryParse('${itemTotals['line_total'] ?? '0'}') ?? 0;
+                final unit = (itemTotals['currency_minor_unit'] as num?)?.toInt() ?? digits;
+                final divisor = unit == 0 ? 1 : (unit == 1 ? 10 : 100);
+                final linePrice = '${itemTotals['currency_symbol'] ?? currency}${(lineTotal / divisor).toStringAsFixed(unit)}';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: 76, height: 76, color: const Color(0xFFF7F6FA),
+                        child: image.isEmpty
+                            ? const Icon(Icons.shopping_bag_outlined, color: Color(0xFF51408F))
+                            : Image.network(image, fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text((item['name'] ?? 'Product').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 5),
+                      Text('Qty: ${item['quantity'] ?? 1}', style: const TextStyle(color: Colors.black54)),
+                    ])),
+                    const SizedBox(width: 8),
+                    Text(linePrice, style: const TextStyle(fontWeight: FontWeight.w800)),
+                  ]),
+                );
+              }),
+            ],
+          ]),
+        ),
+      ),
       const SizedBox(height: 12),
       Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Choose shipping method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
@@ -178,7 +257,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
       const SizedBox(height: 10),
       Card(child: Padding(padding: const EdgeInsets.all(16), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Total payable', style: TextStyle(fontWeight: FontWeight.bold)), Text(amount, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF51408F)))]))),
       const SizedBox(height: 12),
-      SizedBox(height: 54, child: FilledButton(onPressed: loading || address['address_1'] == null || address['address_1'].toString().trim().isEmpty || (shippingRates.isNotEmpty && !shippingRates.any((r) => r['selected'] == true)) ? null : openPayment, child: const Text('CONTINUE TO PAYMENT'))),
+      SizedBox(height: 54, child: FilledButton(onPressed: loading || address['address_1'] == null || address['address_1'].toString().trim().isEmpty || (shippingRates.isNotEmpty && !shippingRates.any((r) => r['selected'] == true)) ? null : openPayment, child: const Text('CONTINUE TO PAYMENTS'))),
     ]);
   }
 }
