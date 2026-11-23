@@ -288,9 +288,26 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     ),
     body: Form(
       key: formKey,
-      child: ListView(padding: const EdgeInsets.all(16), children: [
-        const Text('Where should we deliver?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 12),
+      child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 28), children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF302052), Color(0xFF7655A8)]),
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [BoxShadow(color: const Color(0xFF51408F).withValues(alpha: .16), blurRadius: 18, offset: const Offset(0, 8))],
+          ),
+          child: Row(children: [
+            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('DELIVERY ADDRESS', style: TextStyle(color: Colors.white70, fontSize: 11, letterSpacing: 1.4, fontWeight: FontWeight.w700)),
+              SizedBox(height: 7),
+              Text('Where should we deliver?', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800)),
+              SizedBox(height: 4),
+              Text('Choose a saved place or add a new one.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            ])),
+            Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), borderRadius: BorderRadius.circular(18)), child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 36)),
+          ]),
+        ),
+        const SizedBox(height: 18),
         if (!widget.formOnly && savedAddresses.isNotEmpty) ...[
           ...List.generate(savedAddresses.length, (index) {
             final item = savedAddresses[index];
@@ -298,10 +315,13 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
             final summary = ['address_1','address_2','city','state','postcode','country']
               .map((key) => item[key]).where((v) => v != null && v.toString().isNotEmpty).join(', ');
             return Card(
-              margin: const EdgeInsets.only(bottom: 10),
+              margin: const EdgeInsets.only(bottom: 12),
+              elevation: selected ? 3 : 0,
+              shadowColor: const Color(0xFF51408F).withValues(alpha: .14),
+              color: selected ? const Color(0xFFF4F0FF) : Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: selected ? const Color(0xFF51408F) : Colors.black12, width: selected ? 1.5 : 1),
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: selected ? const Color(0xFF51408F) : const Color(0xFFE8E4F1), width: selected ? 1.7 : 1),
               ),
               child: Column(children: [
                 CheckboxListTile(
@@ -311,7 +331,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                     _applySavedAddress(item);
                     setState(() { selectedSavedAddress = index; formVisible = false; });
                   },
-                  title: Text((item['label'] ?? 'Address ${index + 1}').toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Row(children: [
+                    Expanded(child: Text((item['label'] ?? 'Address ${index + 1}').toString(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+                    if (selected) Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFE5F4FF), borderRadius: BorderRadius.circular(20)), child: const Text('SELECTED', style: TextStyle(color: Color(0xFF1769AA), fontSize: 10, fontWeight: FontWeight.w800))),
+                  ]),
                   subtitle: Text(summary),
                   secondary: Icon((item['label'] == 'Office' || item['label'] == 'Work') ? Icons.work_outline : Icons.home_outlined, color: const Color(0xFF51408F)),
                 ),
@@ -335,7 +358,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         if (!widget.formOnly) SizedBox(width: double.infinity, child: OutlinedButton.icon(
           onPressed: busy ? null : _openNewAddressPage,
           icon: const Icon(Icons.add_location_alt_outlined),
-          label: const Text('ADD NEW ADDRESS'),
+          style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF51408F), side: const BorderSide(color: Color(0xFF51408F)), padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+          label: const Text('ADD NEW ADDRESS', style: TextStyle(fontWeight: FontWeight.w800)),
         )),
         if (formVisible) ...[
         DropdownButtonFormField<String>(
@@ -395,7 +419,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
               if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
             }
           },
-          child: Text(widget.formOnly ? 'SAVE ADDRESS & CONTINUE' : 'CONTINUE TO CONFIRM DETAILS', style: const TextStyle(fontWeight: FontWeight.bold)),
+          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF51408F), elevation: 2, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+          child: Text(widget.formOnly ? 'SAVE ADDRESS & CONTINUE' : 'CONTINUE TO CONFIRM DETAILS', style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: .2)),
         )),
       ]),
     ),
