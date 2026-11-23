@@ -364,8 +364,15 @@ class _PaymentPageState extends State<PaymentPage> {
             );
           }),
           const SizedBox(height: 8),
-          const Text('Choose payment method', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(17),
+            decoration: BoxDecoration(color: const Color(0xFFF4F1FB), borderRadius: BorderRadius.circular(19)),
+            child: Row(children: [
+              const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('STEP 3 OF 3', style: TextStyle(fontSize: 10, letterSpacing: 1.3, color: Color(0xFF51408F), fontWeight: FontWeight.w800)), SizedBox(height: 5), Text('Choose payment method', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800)), SizedBox(height: 3), Text('Select a secure way to pay for your order.', style: TextStyle(color: Colors.black54, fontSize: 12))])),
+              const Icon(Icons.verified_user_rounded, color: Color(0xFF51408F), size: 34),
+            ]),
+          ),
+          const SizedBox(height: 14),
           Text('Select how you want to pay for your order.', style: TextStyle(color: Colors.grey.shade700)),
           const SizedBox(height: 18),
           if (createdOrder == null) ...[
@@ -388,9 +395,11 @@ class _PaymentPageState extends State<PaymentPage> {
                   groupValue: selected,
                   onChanged: paying ? null : (value) => setState(() { selected = value; error = null; }),
                   activeColor: _brand,
-                  secondary: CircleAvatar(
-                    backgroundColor: const Color(0xFFF0EDFA),
-                    child: Icon(isCod ? Icons.local_shipping_outlined : (isMethodUpi ? Icons.qr_code_2 : Icons.account_balance_wallet_outlined), color: _brand),
+                  secondary: Container(
+                    width: 54, height: 54,
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(color: const Color(0xFFF3F0FA), borderRadius: BorderRadius.circular(15)),
+                    child: Icon(isCod ? Icons.local_shipping_rounded : (isMethodUpi ? Icons.qr_code_2_rounded : Icons.account_balance_wallet_rounded), color: _brand, size: 29),
                   ),
                   title: Text((method['title'] ?? (isCod ? 'Cash on Delivery' : id)).toString(), style: const TextStyle(fontWeight: FontWeight.w700)),
                   subtitle: Text((method['description'] ?? (isCod ? 'Pay when your order is delivered' : 'Pay securely using your UPI app')).toString(), maxLines: 2, overflow: TextOverflow.ellipsis),
