@@ -386,6 +386,71 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     return Icon(icon, color: _designerPurple, size: size);
   }
 
+  Future<Map<String, dynamic>?> _chooseMedia() async {
+    final response = await ArkCustomerApi(widget.token).request(
+      'designer/media',
+      query: {'page': '1', 'per_page': '48'},
+    );
+    final rows = response is Map && response['items'] is List
+        ? (response['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : <Map<String, dynamic>>[];
+    if (!mounted) return null;
+    return showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(ctx).size.height * .72,
+          child: Column(children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Row(children: [
+                Icon(Icons.photo_library_outlined, color: _designerPurple),
+                SizedBox(width: 10),
+                Text('WordPress Media Library', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+              ]),
+            ),
+            Expanded(
+              child: rows.isEmpty
+                  ? const Center(child: Text('No images found in WordPress Media Library.'))
+                  : GridView.builder(
+                      padding: const EdgeInsets.all(12),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10,
+                      ),
+                      itemCount: rows.length,
+                      itemBuilder: (_, index) {
+                        final item = rows[index];
+                        final image = (item['thumbnail_url'] ?? item['source_url'] ?? '').toString();
+                        return InkWell(
+                          onTap: () => Navigator.pop(ctx, item),
+                          child: Card(
+                            clipBehavior: Clip.antiAlias,
+                            child: Column(children: [
+                              Expanded(
+                                child: image.isEmpty
+                                    ? const Icon(Icons.image_not_supported_outlined)
+                                    : Image.network(image, width: double.infinity, fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(5),
+                                child: Text((item['title'] ?? 'Image').toString(), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              ),
+                            ]),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+
   Widget _componentVisual(DesignerComponent component, {bool compact = false}) {
     final bg = _color(component.properties['background_color']?.toString() ?? '#F0ECF8');
     final titleColor = _color(component.properties['title_color']?.toString() ?? '#241D33');
@@ -463,6 +528,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       onSave: () => _persist(),
       onDelete: () => _removeComponent(item),
       visualBuilder: () => _componentVisual(item),
+      onChooseMedia: _chooseMedia,
     )));
   }
 
@@ -660,6 +726,7 @@ class _DesignerComponentEditor extends StatefulWidget {
     required this.onSave,
     required this.onDelete,
     required this.visualBuilder,
+    required this.onChooseMedia,
   });
 
   final DesignerComponent component;
@@ -667,6 +734,7 @@ class _DesignerComponentEditor extends StatefulWidget {
   final Future<void> Function() onSave;
   final Future<void> Function() onDelete;
   final Widget Function() visualBuilder;
+  final Future<Map<String, dynamic>?> Function() onChooseMedia;
 
   @override
   State<_DesignerComponentEditor> createState() => _DesignerComponentEditorState();
@@ -825,7 +893,53 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           TextField(decoration: const InputDecoration(labelText: 'Link / deep link', border: OutlineInputBorder()),
             onChanged: (v) => _change('link', v)),
           TextField(decoration: const InputDecoration(labelText: 'Image URL (optional)', border: OutlineInputBorder()),
+            controller: TextEditingController(text: (item.properties['image_url'] ?? '').toString()),
             onChanged: (v) => _change('image_url', v)),
+          FilledButton.icon(
+            onPressed: () async {
+              final media = await widget.onChooseMedia();
+              if (media == null) return;
+              final source = (media['source_url'] ?? '').toString();
+              final child = <String, dynamic>{
+                'attachment_id': media['id'],
+                'image_url': source,
+                'source_url': source,
+                'title': (media['title'] ?? '').toString(),
+                'alt_text': (media['alt_text'] ?? '').toString(),
+                'link_type': 'in_app',
+                'link_value': '',
+                'active': true,
+              };
+              final existing = item.properties['children'] is List
+                  ? (item.properties['children'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+                  : <Map<String, dynamic>>[];
+              existing.add(child);
+              _change('children', existing);
+              if ((item.properties['image_url'] ?? '').toString().isEmpty) _change('image_url', source);
+            },
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            label: const Text('Add image from WordPress Media Library'),
+          ),
+          if (item.properties['children'] is List)
+            ...(item.properties['children'] as List).asMap().entries.map((entry) {
+              final child = entry.value is Map ? Map<String, dynamic>.from(entry.value as Map) : <String, dynamic>{};
+              final src = (child['image_url'] ?? child['source_url'] ?? '').toString();
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: SizedBox(width: 52, height: 52, child: src.isEmpty
+                    ? const Icon(Icons.image_outlined)
+                    : Image.network(src, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined))),
+                title: Text((child['title'] ?? 'Banner image').toString(), maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: Text('Media ID: ${child['attachment_id'] ?? '—'}'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  onPressed: () {
+                    final updated = (item.properties['children'] as List).where((_, index) => index != entry.key).toList();
+                    _change('children', updated);
+                  },
+                ),
+              );
+            }),
         ]),
       ]),
     );
