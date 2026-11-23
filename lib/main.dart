@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'product_details_page.dart';
-import 'customer_account_page.dart' hide InputDecoration;
+import 'customer_account_page.dart';
 import 'checkout_page.dart';
 import 'woo_store_api.dart';
 import 'notification_service.dart';
