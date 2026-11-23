@@ -29,7 +29,6 @@ class OrderConfirmationPage extends StatelessWidget {
         ? 'Your order has been received. UPI payment is awaiting store verification; your order is not marked as paid yet.'
         : 'Thank you! Your order has been sent to the store.';
     return Scaffold(
-      appBar: AppBar(title: const Text('Order confirmation'), automaticallyImplyLeading: false),
       body: SafeArea(child: ListView(padding: const EdgeInsets.fromLTRB(22, 16, 22, 24), children: [
         SizedBox(height: 210, child: Lottie.network(
           orderSuccessAnimationUrl,
