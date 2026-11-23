@@ -239,7 +239,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return Scaffold(appBar: AppBar(title: const Text('Payment')), body: const Center(child: CircularProgressIndicator()));
+    if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     return Scaffold(
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
