@@ -174,6 +174,9 @@ class _StoreHomeState extends State<StoreHome> {
   String search = '';
   List<Map<String, dynamic>> products = [];
   List<Map<String, dynamic>> wishlist = [];
+  List<Map<String, dynamic>> storeCategories = [];
+  Map<String, dynamic> designerConfig = {};
+  final Map<String, Future<Map<String, dynamic>>> _sliderFutures = {};
   final WooStoreApi woo = WooStoreApi();
   Map<String, dynamic> liveCart = {};
   bool cartBusy = false;
@@ -187,6 +190,8 @@ class _StoreHomeState extends State<StoreHome> {
     push = GlowHitPushService(onTap: _handleNotificationLink, onForeground: _refreshNotificationCount);
     push.initialize(customerJwt: customerToken).then((_) => _refreshNotificationCount());
     load();
+    _loadDesignerConfig();
+    _loadStoreCategories();
     _refreshCart();
   }
   Future<void> _refreshNotificationCount({bool markSeen = false}) async {
@@ -448,9 +453,212 @@ class _StoreHomeState extends State<StoreHome> {
     }
     if (!mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GlowHitDesignerPage(token: token)));
+    await _loadDesignerConfig();
   }
 
-  Widget catalog() => Column(children: [
+  Future<void> _loadDesignerConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString('glowhit_published_designer_config');
+    if (cached != null) {
+      try {
+        final decoded = jsonDecode(cached);
+        if (decoded is Map && mounted) setState(() => designerConfig = Map<String, dynamic>.from(decoded));
+      } catch (_) {}
+    }
+    try {
+      final response = await http.get(
+        Uri.parse('$storeUrl/wp-json/ark-designer/v1/config'),
+        headers: const {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return;
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map && decoded['pages'] is Map) {
+        final value = Map<String, dynamic>.from(decoded);
+        await prefs.setString('glowhit_published_designer_config', jsonEncode(value));
+        _sliderFutures.clear();
+        if (mounted) setState(() => designerConfig = value);
+      }
+    } catch (_) {
+      // The last published configuration remains available from local cache.
+    }
+  }
+
+  Future<void> _loadStoreCategories() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$storeUrl/wp-json/wc/store/v1/products/categories?per_page=40&hide_empty=true'),
+        headers: const {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return;
+      final decoded = jsonDecode(response.body);
+      if (decoded is List && mounted) {
+        setState(() => storeCategories = decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList());
+      }
+    } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>> _loadDesignerSlider(String key) async {
+    final response = await http.get(
+      Uri.parse('$storeUrl/wp-json/ark-designer/v1/sliders/$key'),
+      headers: const {'Accept': 'application/json'},
+    ).timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200) throw Exception('Slider unavailable');
+    final value = jsonDecode(response.body);
+    if (value is! Map) throw Exception('Invalid slider response');
+    return Map<String, dynamic>.from(value);
+  }
+
+  List<Map<String, dynamic>> _designerProducts(Map<String, dynamic> section) {
+    final source = (section['source'] ?? 'latest').toString();
+    final categoryId = (section['category_id'] as num?)?.toInt() ?? 0;
+    var rows = products.where((p) {
+      if (source == 'sale') return p['on_sale'] == true;
+      if (source == 'featured') return p['is_featured'] == true;
+      if (source == 'wishlist') return wishlist.any((w) => w['id'] == p['id']);
+      if (source == 'category' && categoryId > 0) {
+        final ids = p['categories'] is List ? (p['categories'] as List).whereType<Map>().map((c) => (c['id'] as num?)?.toInt()).toList() : <int?>[];
+        return ids.contains(categoryId);
+      }
+      return true;
+    }).toList();
+    if (source == 'top_rated') {
+      rows.sort((a, b) => ((b['average_rating'] as num?) ?? 0).compareTo((a['average_rating'] as num?) ?? 0));
+    }
+    final limit = (section['limit'] as num?)?.toInt() ?? 8;
+    return rows.take(limit.clamp(1, 40)).toList();
+  }
+
+  Widget _designerSection(Map<String, dynamic> section) {
+    if (section['visible'] == false) return const SizedBox.shrink();
+    final type = (section['type'] ?? section['designer_component_type'] ?? '').toString();
+    final title = (section['title'] ?? '').toString();
+    final showTitle = section['show_title'] != false && title.isNotEmpty;
+    final background = (section['section_background'] ?? 'transparent').toString();
+    final textColor = (section['text_color'] ?? '#202733').toString();
+    final padding = (section['padding_top'] as num?)?.toDouble() ?? 12.0;
+
+    if (type == 'ark_live_slider' || type.startsWith('banner_') || section['designer_component_type']?.toString().startsWith('banner_') == true) {
+      final key = (section['slider_key'] ?? '').toString();
+      if (key.isEmpty) return const SizedBox.shrink();
+      final future = _sliderFutures.putIfAbsent(key, () => _loadDesignerSlider(key));
+      return FutureBuilder<Map<String, dynamic>>(
+        future: future,
+        builder: (context, snapshot) {
+          final slides = snapshot.data?['slides'] is List ? snapshot.data!['slides'] as List : const <dynamic>[];
+          final height = ((snapshot.data?['settings'] is Map ? (snapshot.data!['settings'] as Map)['height_px'] : section['height_px']) as num?)?.toDouble() ?? 180;
+          if (slides.isEmpty) return SizedBox(height: height, child: const Center(child: CircularProgressIndicator()));
+          return Padding(
+            padding: EdgeInsets.only(top: padding, bottom: (section['padding_bottom'] as num?)?.toDouble() ?? 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (showTitle) Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor)))),
+              SizedBox(
+                height: height,
+                child: PageView.builder(
+                  itemCount: slides.length,
+                  itemBuilder: (_, index) {
+                    final slide = slides[index] is Map ? Map<String, dynamic>.from(slides[index] as Map) : <String, dynamic>{};
+                    final image = (slide['image_url'] ?? '').toString();
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular((section['corner_radius'] as num?)?.toDouble() ?? 16),
+                        child: Stack(fit: StackFit.expand, children: [
+                          image.isEmpty ? Container(color: const Color(0xFFECE8F3)) : Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                          if ((slide['title'] ?? '').toString().isNotEmpty)
+                            Align(alignment: Alignment.bottomLeft, child: Container(width: double.infinity, padding: const EdgeInsets.all(12), color: Colors.black.withValues(alpha: .35), child: Text(slide['title'].toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ]),
+          );
+        },
+      );
+    }
+
+    if (type == 'category_grid' || type.startsWith('category_')) {
+      final layout = (section['category_layout'] ?? section['layout_variant'] ?? 'grid').toString();
+      final limit = (section['limit'] as num?)?.toInt() ?? 8;
+      final rows = storeCategories.take(limit.clamp(1, 40)).toList();
+      if (rows.isEmpty) return const SizedBox.shrink();
+      final cards = rows.map((category) {
+        final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
+        return SizedBox(
+          width: layout == 'list' || layout == 'list_tile' ? double.infinity : 112,
+          child: Card(
+            clipBehavior: Clip.antiAlias,
+            child: Column(children: [
+              if (image.isNotEmpty) SizedBox(height: 82, width: double.infinity, child: Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.category_outlined)))
+              else const SizedBox(height: 82, child: Center(child: Icon(Icons.category_outlined, size: 34))),
+              Padding(padding: const EdgeInsets.all(7), child: Text((category['name'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center)),
+            ]),
+          ),
+        );
+      }).toList();
+      return Container(
+        color: background == 'transparent' ? null : _safeColor(background),
+        padding: EdgeInsets.fromLTRB(12, padding, 12, (section['padding_bottom'] as num?)?.toDouble() ?? 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (showTitle) Padding(padding: const EdgeInsets.only(left: 4, bottom: 8), child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor)))),
+          if (layout == 'list' || layout == 'list_tile') Column(children: rows.map((c) => ListTile(leading: const Icon(Icons.category_outlined), title: Text((c['name'] ?? '').toString()))).toList())
+          else SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: cards.map((card) => SizedBox(width: 120, child: card)).toList())),
+        ]),
+      );
+    }
+
+    if (type == 'product_grid' || type == 'product_carousel' || type.startsWith('product_')) {
+      final rows = _designerProducts(section);
+      if (rows.isEmpty) return const SizedBox.shrink();
+      final layout = (section['layout_variant'] ?? section['designer_component_type'] ?? type).toString();
+      return Container(
+        color: background == 'transparent' ? null : _safeColor(background),
+        padding: EdgeInsets.fromLTRB(12, padding, 12, (section['padding_bottom'] as num?)?.toDouble() ?? 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (showTitle) Padding(padding: const EdgeInsets.only(left: 4, bottom: 8), child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor)))),
+          if (layout.contains('carousel') || layout.contains('slider'))
+            SizedBox(height: 260, child: ListView(scrollDirection: Axis.horizontal, children: rows.map((p) => SizedBox(width: 174, child: productCard(p))).toList()))
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: rows.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: ((section['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
+                childAspectRatio: (section['card_aspect_ratio'] as num?)?.toDouble() ?? .66,
+                crossAxisSpacing: (section['item_gap'] as num?)?.toDouble() ?? 8,
+                mainAxisSpacing: (section['item_gap'] as num?)?.toDouble() ?? 8,
+              ),
+              itemBuilder: (_, index) => productCard(rows[index]),
+            ),
+        ]),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Color _safeColor(String value) {
+    final raw = value.replaceFirst('#', '');
+    final parsed = int.tryParse(raw, radix: 16);
+    return Color(parsed == null ? 0xFF202733 : (raw.length == 6 ? 0xFF000000 | parsed : parsed));
+  }
+
+  Widget _designerCatalog() {
+    final page = designerConfig['pages'] is Map ? (designerConfig['pages'] as Map)['home'] : null;
+    final sections = page is Map && page['sections'] is List ? page['sections'] as List : const <dynamic>[];
+    return Column(children: [
+      Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
+      Expanded(child: ListView(
+        padding: const EdgeInsets.only(bottom: 20),
+        children: sections.whereType<Map>().map((s) => _designerSection(Map<String, dynamic>.from(s))).toList(),
+      )),
+    ]);
+  }
+
+  Widget catalog() => designerConfig['pages'] is Map && ((designerConfig['pages'] as Map)['home'] is Map) && (((designerConfig['pages'] as Map)['home'] as Map)['sections'] is List)
+      ? _designerCatalog()
+      : Column(children: [
     Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
     Container(margin: const EdgeInsets.symmetric(horizontal: 16), padding: const EdgeInsets.all(18), width: double.infinity, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF33205F), Color(0xFF92517F)]), borderRadius: BorderRadius.circular(18)), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('THE EVERYDAY EDIT', style: TextStyle(color: Colors.white70, letterSpacing: 2, fontSize: 10)), SizedBox(height: 8), Text('Find your next\nfavourite thing.', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)), SizedBox(height: 8), Text('SHOP THE COLLECTION  →', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))])),
     SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(12), child: Row(children: [
