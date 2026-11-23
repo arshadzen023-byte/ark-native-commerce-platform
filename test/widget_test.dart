@@ -34,13 +34,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Component Properties'), findsOneWidget);
     expect(find.text('LIVE COMPONENT PREVIEW'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Banner style'),
-      500,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Banner style'), findsOneWidget);
+    expect(find.text('Component layout'), findsOneWidget);
     await tester.tap(find.text('SAVE'));
     await tester.pumpAndSettle();
     expect(find.text('ARK Designer'), findsOneWidget);
