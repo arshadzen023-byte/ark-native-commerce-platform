@@ -141,28 +141,62 @@ class _PaymentPageState extends State<PaymentPage> {
       if (selected == 'wc-upi' && (upi['merchant_vpa'] ?? '').toString().trim().isEmpty) {
         throw Exception('The store has not configured its merchant UPI address. Please contact the store.');
       }
+
+      // Reconcile the exact address selected in checkout with the live
+      // WooCommerce cart before creating the order. This prevents a stale
+      // default address from replacing a customer's alternate address.
+      final selectedAddress = Map<String, dynamic>.from(widget.address);
+      final currentCart = await widget.api.getCart();
+      Map<String, dynamic> serverShipping = currentCart['shipping_address'] is Map
+          ? Map<String, dynamic>.from(currentCart['shipping_address'] as Map)
+          : <String, dynamic>{};
+      String fieldValue(Map<String, dynamic> value, String key) =>
+          (value[key] ?? '').toString().trim().toLowerCase();
+      final addressKeys = ['first_name', 'last_name', 'address_1', 'address_2', 'city', 'state', 'postcode', 'country'];
+      final addressMatches = addressKeys.every((key) =>
+          fieldValue(serverShipping, key) == fieldValue(selectedAddress, key));
+      Map<String, dynamic> authoritativeCart = currentCart;
+      if (!addressMatches) {
+        authoritativeCart = await widget.api.updateCustomer(
+          billing: selectedAddress,
+          shipping: selectedAddress,
+        );
+        final verifiedShipping = authoritativeCart['shipping_address'] is Map
+            ? Map<String, dynamic>.from(authoritativeCart['shipping_address'] as Map)
+            : <String, dynamic>{};
+        final verified = addressKeys.every((key) =>
+            fieldValue(verifiedShipping, key) == fieldValue(selectedAddress, key));
+        if (!verified) {
+          throw Exception('WooCommerce could not save the selected delivery address. Please return to Address and try again.');
+        }
+      }
+      if (authoritativeCart['items'] is List && (authoritativeCart['items'] as List).isEmpty) {
+        throw Exception('Your WooCommerce cart is empty. Add a product before placing the order.');
+      }
+      if (authoritativeCart['totals'] is Map) {
+        liveCart = Map<String, dynamic>.from(authoritativeCart);
+      }
+
       // The app collects payer proof only after the WooCommerce order is
       // created. The payer's own UPI address is intentionally not requested.
       const paymentData = <Map<String, dynamic>>[];
       final result = await widget.api.placeOrder(
-        billing: widget.address,
-        shipping: widget.address,
+        billing: selectedAddress,
+        shipping: selectedAddress,
         paymentMethod: selected!,
         paymentData: paymentData,
       );
-      // WooCommerce Store API checkout responses may contain the order ID/key
-      // but omit cart totals. Preserve the last authoritative cart totals so
-      // the confirmation page can always display the actual payable amount.
+      final orderId = WooStoreApi.confirmedOrderId(result);
       final resultWithTotals = <String, dynamic>{
         ...result,
+        'order_id': orderId,
         if (result['totals'] is! Map && liveCart['totals'] is Map)
           'totals': Map<String, dynamic>.from(liveCart['totals'] as Map),
       };
       if (selected == 'wc-upi') {
-        final id = int.tryParse('${resultWithTotals['order_id'] ?? resultWithTotals['id'] ?? ''}');
         final key = (resultWithTotals['order_key'] ?? resultWithTotals['key'] ?? '').toString();
-        if (id == null || key.isEmpty) {
-          throw Exception('WooCommerce created no usable UPI order reference. The order response did not include order ID and order key.');
+        if (key.isEmpty) {
+          throw Exception('WooCommerce created order #$orderId but did not return its verification key. Contact the store before paying.');
         }
         if (mounted) setState(() { createdOrder = resultWithTotals; paying = false; });
       } else {
@@ -241,6 +275,21 @@ class _PaymentPageState extends State<PaymentPage> {
   Widget build(BuildContext context) {
     if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Payments'),
+        leading: IconButton(
+          tooltip: 'Back to order details',
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.maybePop(context),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh payment methods',
+            onPressed: paying || submittingUpi ? null : loadMethods,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
