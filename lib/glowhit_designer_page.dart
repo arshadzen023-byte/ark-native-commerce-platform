@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
 import 'customer_account_page.dart';
 
@@ -56,11 +57,12 @@ class GlowHitDesignerPage extends StatefulWidget {
 
 class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   static const _storageKey = 'glowhit_designer_draft_v1';
-  static const _pages = ['Home', 'Product', 'Categories', 'Account'];
+  static const _pages = ['Home', 'Search', 'Categories', 'Wishlist', 'Product', 'Account'];
   static const _layoutTypes = <String, List<String>>{
     'Banner': ['Banner Grid', 'Banner List', 'Banner Scroll', 'Banner Slider'],
     'Category': ['Category List', 'Category Grid', 'Category List Tile', 'Category Slider', 'Category Scroll'],
     'Product': ['Product Grid', 'Product Slider', 'Product List'],
+    'Other': ['Existing section'],
   };
   static const _defaultComponents = <String, List<Map<String, dynamic>>>{
     'Home': [
@@ -69,6 +71,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       {'type': 'Product', 'title': 'Featured products', 'layout': 'Product Grid'},
       {'type': 'Product', 'title': 'Best sellers', 'layout': 'Product Slider'},
     ],
+    'Search': [],
+    'Wishlist': [],
     'Product': [
       {'type': 'Product', 'title': 'Product gallery and details', 'layout': 'Product List'},
       {'type': 'Banner', 'title': 'Related products banner', 'layout': 'Banner Scroll'},
@@ -108,8 +112,121 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
 
   String _id() => DateTime.now().microsecondsSinceEpoch.toString();
 
+  String _wordpressPageKey(String page) => switch (page) {
+    'Home' => 'home',
+    'Search' => 'search',
+    'Categories' => 'categories',
+    'Wishlist' => 'wishlist',
+    'Product' => 'product',
+    'Account' => 'account',
+    _ => page.toLowerCase(),
+  };
+
+  Future<DesignerComponent> _fromWordPressSection(Map<String, dynamic> section) async {
+    final rawType = (section['designer_component_type'] ?? section['type'] ?? '').toString().toLowerCase();
+    String type = 'Other';
+    String layout = 'Existing section';
+    if (rawType.startsWith('banner') || rawType == 'ark_live_slider') {
+      type = 'Banner';
+      layout = switch (rawType) {
+        'banner_grid' => 'Banner Grid',
+        'banner_list' => 'Banner List',
+        'banner_scroll' => 'Banner Scroll',
+        _ => 'Banner Slider',
+      };
+    } else if (rawType.startsWith('category')) {
+      type = 'Category';
+      layout = switch (rawType) {
+        'category_list' => 'Category List',
+        'category_list_tile' => 'Category List Tile',
+        'category_slider' => 'Category Slider',
+        'category_scroll' => 'Category Scroll',
+        _ => 'Category Grid',
+      };
+    } else if (rawType.startsWith('product')) {
+      type = 'Product';
+      layout = switch (rawType) {
+        'product_list' => 'Product List',
+        'product_carousel' || 'product_slider' => 'Product Slider',
+        _ => 'Product Grid',
+      };
+    }
+
+    final properties = Map<String, dynamic>.from(section);
+    properties['background_color'] = section['section_background'] ?? section['background_color'] ?? '#FFFFFF';
+    properties['title_color'] = section['text_color'] ?? section['title_color'] ?? '#241D33';
+    properties['height'] = section['height_px'] ?? section['height'] ?? 180;
+    properties['width'] = ((section['width_pct'] as num?)?.toDouble() ?? 100) / 100;
+    properties['max_cross_axis_extent'] = section['max_width_px'] ?? 300;
+    properties['main_axis_spacing'] = section['item_gap'] ?? 10;
+    properties['cross_axis_spacing'] = section['item_gap'] ?? 10;
+    properties['border_radius'] = section['corner_radius'] ?? 16;
+    properties['cross_axis_count'] = section['columns'] ?? 2;
+    properties['cross_aspect_ratio'] = section['card_aspect_ratio'] ?? 1;
+    properties['elevation'] = section['card_depth'] ?? 1;
+    properties['fixed_grid_view_count'] = section['limit'] ?? 12;
+    properties['parent_category_id'] = section['category_id'] ?? 0;
+    properties['show_all_categories'] = (section['limit'] as num?)?.toInt() == 100;
+    properties['arrows'] = section['show_arrows'] ?? false;
+    properties['dots'] = section['show_dots'] ?? false;
+    properties['view_fraction'] = section['card_width'] ?? 1;
+    properties['pause'] = section['pause_on_interaction'] ?? true;
+    properties['link'] = section['tap_url'] ?? '';
+    properties['image_url'] = section['image_url'] ?? section['background_image_url'] ?? '';
+    properties['children'] = section['children'] ?? section['slides'] ?? <dynamic>[];
+
+    final sliderKey = (section['slider_key'] ?? '').toString();
+    if (sliderKey.isNotEmpty) {
+      try {
+        final uri = Uri.parse('https://pluginstore.shop/wp-json/ark-designer/v1/sliders/$sliderKey');
+        final response = await http.get(uri).timeout(const Duration(seconds: 12));
+        if (response.statusCode == 200) {
+          final payload = jsonDecode(response.body);
+          if (payload is Map && payload['slides'] is List) {
+            properties['children'] = payload['slides'];
+            properties['slider_settings'] = payload['settings'] is Map
+                ? Map<String, dynamic>.from(payload['settings'] as Map)
+                : <String, dynamic>{};
+          }
+        }
+      } catch (_) {
+        // Keep the last saved section data visible when the SQL slider endpoint is offline.
+      }
+    }
+
+    return DesignerComponent(
+      id: (section['id'] ?? _id()).toString(),
+      type: type,
+      title: (section['title'] ?? 'New component').toString(),
+      layout: layout,
+      enabled: section['visible'] != false,
+      properties: properties,
+    );
+  }
+
   Future<void> _loadDraft() async {
     final prefs = await SharedPreferences.getInstance();
+    try {
+      final remote = await ArkCustomerApi(widget.token).request('designer/config');
+      if (remote is Map && remote['pages'] is Map) {
+        final remotePages = Map<String, dynamic>.from(remote['pages'] as Map);
+        for (final page in _pages) {
+          final pageConfig = remotePages[_wordpressPageKey(page)];
+          final sections = pageConfig is Map && pageConfig['sections'] is List
+              ? pageConfig['sections'] as List
+              : <dynamic>[];
+          pages[page] = <DesignerComponent>[];
+          for (final section in sections) {
+            if (section is Map) {
+              pages[page]!.add(await _fromWordPressSection(Map<String, dynamic>.from(section)));
+            }
+          }
+        }
+      }
+    } catch (e) {
+      error = 'WordPress Designer config could not be loaded: $e';
+    }
+
     final raw = prefs.getString(_storageKey);
     if (raw != null) {
       try {
@@ -128,8 +245,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         error = 'Saved draft could not be read. A fresh draft was loaded.';
       }
     }
+
     for (final page in _pages) {
-      pages.putIfAbsent(page, () => _defaultComponents[page]!.map((item) =>
+      pages.putIfAbsent(page, () => (_defaultComponents[page] ?? <Map<String, dynamic>>[]).map((item) =>
         DesignerComponent(id: _id(), type: item['type'] as String, title: item['title'] as String,
           layout: item['layout'] as String)).toList());
     }
@@ -157,19 +275,18 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       final json = const JsonEncoder.withIndent('  ').convert(data);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, json);
-      if (publish) {
-        try {
-          await ArkCustomerApi(widget.token).request('designer/config', method: 'POST', body: {
-            'config': data,
-            'schema': 'ark-glowhit-designer/v1',
-            'status': 'published',
-          });
-        } catch (_) {
-          // Keep the local published JSON available, but explicitly report that
-          // the connected WordPress bridge has not confirmed publication.
-          if (mounted) setState(() => error = 'Draft saved on this device, but WordPress did not confirm publish. Check that the Designer API is enabled.');
-          return;
-        }
+      try {
+        await ArkCustomerApi(widget.token).request('designer/config', method: 'POST', body: {
+          'config': data,
+          'schema': 'ark-glowhit-designer/v1',
+          'status': publish ? 'published' : 'draft',
+        });
+      } catch (e) {
+        // The device draft remains available, but do not claim WordPress saved or published it.
+        if (mounted) setState(() => error = publish
+            ? 'Draft is saved on this device, but WordPress did not confirm Publish: $e'
+            : 'Draft is saved on this device, but WordPress did not confirm the server draft: $e');
+        return;
       }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(publish ? 'Published configuration synced to WordPress.' : 'Designer draft saved on this device.'),
@@ -260,7 +377,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final icon = switch (type) {
       'Banner' => Icons.view_carousel_rounded,
       'Category' => Icons.category_rounded,
-      _ => Icons.shopping_bag_rounded,
+      'Product' => Icons.shopping_bag_rounded,
+      _ => Icons.widgets_rounded,
     };
     return Icon(icon, color: _designerPurple, size: size);
   }
