@@ -386,6 +386,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   Widget _componentVisual(DesignerComponent component, {bool compact = false}) {
     final bg = _color(component.properties['background_color']?.toString() ?? '#F0ECF8');
     final titleColor = _color(component.properties['title_color']?.toString() ?? '#241D33');
+    final children = component.properties['children'] is List ? component.properties['children'] as List : const <dynamic>[];
+    final firstChild = children.isNotEmpty && children.first is Map ? Map<String, dynamic>.from(children.first as Map) : <String, dynamic>{};
+    final previewImage = (component.properties['image_url'] ?? component.properties['background_image_url'] ?? firstChild['image_url'] ?? firstChild['source_url'] ?? firstChild['url'] ?? '').toString();
     final height = compact ? 78.0 : ((component.properties['height'] as num?)?.toDouble() ?? 160.0).clamp(90.0, 280.0);
     return Container(
       height: height,
@@ -411,6 +414,23 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         ],
       ),
       child: Stack(children: [
+        if (previewImage.isNotEmpty)
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: compact ? 76 : 112,
+                height: compact ? 54 : 78,
+                child: Image.network(
+                  previewImage,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(color: titleColor.withValues(alpha: .08), child: const Icon(Icons.broken_image_outlined)),
+                ),
+              ),
+            ),
+          ),
         Positioned(right: 4, top: 2, child: _componentIcon(component.type, size: compact ? 26 : 36)),
         Align(alignment: Alignment.centerLeft, child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(component.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: titleColor, fontWeight: FontWeight.w800, fontSize: compact ? 12 : 16)),
@@ -690,7 +710,15 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
 
   Widget _switch(String label, String key) => SwitchListTile(
     contentPadding: EdgeInsets.zero, title: Text(label), activeColor: _designerPurple,
-    value: item.properties[key] == true, onChanged: (value) => _change(key, value),
+    value: key == 'enabled' ? item.enabled : item.properties[key] == true,
+    onChanged: (value) {
+      if (key == 'enabled') {
+        setState(() => item.enabled = value);
+        widget.onChanged();
+      } else {
+        _change(key, value);
+      }
+    },
   );
 
   @override
