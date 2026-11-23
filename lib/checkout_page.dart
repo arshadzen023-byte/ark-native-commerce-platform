@@ -45,6 +45,19 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
     await openPayment();
   }
 
+  Future<void> _selectShippingRate(Map<String, dynamic> rate) async {
+    final rateId = (rate['rate_id'] ?? rate['id'] ?? '').toString();
+    final packageId = (rate['package_id'] as num?)?.toInt() ?? 0;
+    if (rateId.isEmpty) return;
+    setState(() { loading = true; error = null; });
+    try {
+      final updated = await widget.api.selectShippingRate(packageId, rateId);
+      if (mounted) setState(() { cart = updated; loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { error = e.toString().replaceFirst('Exception: ', ''); loading = false; });
+    }
+  }
+
   Future<void> openPayment() async {
     final result = await Navigator.push<Map<String, dynamic>>(context, MaterialPageRoute(
       builder: (_) => PaymentPage(api: widget.api, address: address, cart: cart),
@@ -116,6 +129,20 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
     final raw = int.tryParse('${totals['total_price'] ?? '0'}') ?? 0;
     final digits = (totals['currency_minor_unit'] as num?)?.toInt() ?? 2;
     final amount = '$currency${(raw / (digits == 0 ? 1 : digits == 1 ? 10 : 100)).toStringAsFixed(digits)}';
+    final packages = (cart['shipping_rates'] as List? ?? cart['packages'] as List? ?? const []);
+    final shippingRates = <Map<String, dynamic>>[];
+    for (final package in packages.whereType<Map>()) {
+      final packageId = (package['package_id'] as num?)?.toInt() ?? 0;
+      for (final rate in (package['shipping_rates'] as List? ?? const []).whereType<Map>()) {
+        shippingRates.add({...Map<String, dynamic>.from(rate), 'package_id': packageId});
+      }
+    }
+    String shippingPrice(Map rate) {
+      final value = int.tryParse('${rate['price'] ?? rate['cost'] ?? '0'}') ?? 0;
+      final unit = (rate['currency_minor_unit'] as num?)?.toInt() ?? digits;
+      final divisor = unit == 0 ? 1 : (unit == 1 ? 10 : 100);
+      return '${rate['currency_symbol'] ?? currency}${(value / divisor).toStringAsFixed(unit)}';
+    }
     return ListView(padding: const EdgeInsets.all(16), children: [
       const Text('Review order and delivery', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
       const SizedBox(height: 12),
@@ -130,10 +157,28 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
         const Text('Products', style: TextStyle(fontWeight: FontWeight.bold)),
         for (final item in lines) ListTile(contentPadding: EdgeInsets.zero, title: Text((item['name'] ?? 'Product').toString()), subtitle: Text('Quantity: ${item['quantity'] ?? 1}'), trailing: Text((item['totals'] is Map ? (item['totals'] as Map)['line_total'] : '')?.toString() ?? '')),
       ]))),
+      const SizedBox(height: 12),
+      Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Choose shipping method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+        if (shippingRates.isEmpty)
+          Padding(padding: const EdgeInsets.only(top: 8), child: Text('No shipping rates returned for this address. Check the WooCommerce shipping zone.', style: TextStyle(color: Colors.orange.shade800))),
+        ...shippingRates.map((rate) {
+          final id = (rate['rate_id'] ?? rate['id'] ?? '').toString();
+          return RadioListTile<String>(
+            contentPadding: EdgeInsets.zero,
+            value: id,
+            groupValue: shippingRates.where((r) => r['selected'] == true).map((r) => (r['rate_id'] ?? r['id'] ?? '').toString()).firstOrNull,
+            onChanged: loading ? null : (_) => _selectShippingRate(rate),
+            title: Text((rate['name'] ?? rate['method_title'] ?? id).toString()),
+            subtitle: Text(shippingPrice(rate)),
+            activeColor: const Color(0xFF51408F),
+          );
+        }),
+      ]))),
       const SizedBox(height: 10),
       Card(child: Padding(padding: const EdgeInsets.all(16), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Total payable', style: TextStyle(fontWeight: FontWeight.bold)), Text(amount, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF51408F)))]))),
       const SizedBox(height: 12),
-      SizedBox(height: 54, child: FilledButton(onPressed: address['address_1'] == null || address['address_1'].toString().trim().isEmpty ? null : openPayment, child: const Text('CONTINUE TO PAYMENT'))),
+      SizedBox(height: 54, child: FilledButton(onPressed: loading || address['address_1'] == null || address['address_1'].toString().trim().isEmpty || (shippingRates.isNotEmpty && !shippingRates.any((r) => r['selected'] == true)) ? null : openPayment, child: const Text('CONTINUE TO PAYMENT'))),
     ]);
   }
 }
