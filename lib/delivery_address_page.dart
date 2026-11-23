@@ -135,12 +135,6 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     }
   }
 
-  void _newAddress() {
-    for (final controller in fields.values) { controller.clear(); }
-    fields['country']!.text = 'IN';
-    setState(() { selectedSavedAddress = -1; addressLabel = 'Home'; formVisible = true; error = null; });
-  }
-
   Future<void> _openNewAddressPage() async {
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
