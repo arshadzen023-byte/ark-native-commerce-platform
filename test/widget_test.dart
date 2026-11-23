@@ -13,7 +13,7 @@ void main() {
 
   testWidgets('Designer shows page selector, components and add menu', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const MaterialApp(home: GlowHitDesignerPage(token: 'test-token')));
+    await tester.pumpWidget(const MaterialApp(home: GlowHitDesignerPage(token: 'test-token', loadRemoteConfig: false)));
     await tester.pumpAndSettle();
     expect(find.text('ARK Designer'), findsOneWidget);
     expect(find.text('Edit page'), findsOneWidget);
@@ -28,7 +28,7 @@ void main() {
 
   testWidgets('Designer can edit component properties and save draft locally', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const MaterialApp(home: GlowHitDesignerPage(token: 'test-token')));
+    await tester.pumpWidget(const MaterialApp(home: GlowHitDesignerPage(token: 'test-token', loadRemoteConfig: false)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Main promotional banner').first);
     await tester.pumpAndSettle();
