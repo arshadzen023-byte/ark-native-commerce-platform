@@ -238,15 +238,6 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       child: ListView(padding: const EdgeInsets.all(16), children: [
         const Text('Where should we deliver?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
         const SizedBox(height: 12),
-        SizedBox(width: double.infinity, child: OutlinedButton.icon(
-          onPressed: busy ? null : () {
-            for (final controller in fields.values) { controller.clear(); }
-            fields['country']!.text = 'IN';
-            setState(() { selectedSavedAddress = -1; addressLabel = 'Home'; });
-          },
-          icon: const Icon(Icons.add_location_alt_outlined),
-          label: const Text('ADD NEW ADDRESS'),
-        )),
         if (savedAddresses.isNotEmpty) ...[
           ...List.generate(savedAddresses.length, (index) {
             final item = savedAddresses[index];
@@ -328,7 +319,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
               Navigator.pop(context, {'address': chosen, 'cart': chosenCart, 'shipping_selected': selectedRate != null || rates.isEmpty});
             }
           },
-          child: const Text('CONTINUE TO PAYMENT', style: TextStyle(fontWeight: FontWeight.bold)),
+          child: const Text('CONTINUE TO SUMMARY', style: TextStyle(fontWeight: FontWeight.bold)),
         )),
       ]),
     ),
