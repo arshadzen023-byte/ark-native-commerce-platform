@@ -62,7 +62,9 @@ jobs:
             echo "::error::Android sdkmanager not found at $SDKMANAGER"
             exit 1
           fi
+          set +o pipefail
           yes | "$SDKMANAGER" --licenses >/dev/null
+          set -o pipefail
           for attempt in 1 2 3; do
             echo "Installing $NDK_PACKAGE (attempt $attempt/3)"
             if "$SDKMANAGER" --install "$NDK_PACKAGE" --verbose; then
