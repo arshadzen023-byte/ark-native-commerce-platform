@@ -133,28 +133,6 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     setState(() { selectedSavedAddress = -1; addressLabel = 'Home'; formVisible = true; error = null; });
   }
 
-  Future<void> _deleteSelectedAddress() async {
-    if (selectedSavedAddress < 0 || selectedSavedAddress >= savedAddresses.length) return;
-    final value = savedAddresses[selectedSavedAddress];
-    final id = (value['id'] ?? '').toString();
-    setState(() { busy = true; error = null; });
-    try {
-      if (widget.customerToken != null && id.isNotEmpty) {
-        await ArkCustomerApi(widget.customerToken!).request(
-          'customer/addresses', method: 'DELETE', query: {'id': id},
-        );
-      }
-      savedAddresses.removeAt(selectedSavedAddress);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses));
-      if (mounted) setState(() { selectedSavedAddress = -1; });
-    } catch (e) {
-      if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) setState(() => busy = false);
-    }
-  }
-
   TextEditingController _controller(String key, {String fallback = ''}) =>
       TextEditingController(text: (widget.initialAddress[key] ?? fallback).toString());
 
