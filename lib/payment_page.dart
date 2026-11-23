@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'customer_account_page.dart';
+import 'customer_account_page.dart' show ArkCustomerApi;
 import 'woo_store_api.dart';
 import 'checkout_artwork.dart';
 
@@ -464,7 +464,7 @@ class _PaymentPageState extends State<PaymentPage> {
                             child: isCod
                               ? Image.memory(CheckoutArtwork.rupee, fit: BoxFit.contain, gaplessPlayback: true)
                               : isMethodUpi
-                                ? Image.memory(CheckoutArtwork.smartphone, fit: BoxFit.contain, gaplessPlayback: true)
+                                ? Image.memory(CheckoutArtwork.qrScan, fit: BoxFit.contain, gaplessPlayback: true)
                                 : Icon(Icons.account_balance_wallet_rounded, color: _brand, size: 34),
                           ),
                         ),

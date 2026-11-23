@@ -161,17 +161,17 @@ jobs:
         run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
-          name: glowhit-v1.0.13-checkout-artwork-animation
+          name: glowhit-v1.0.14-qr-saved-addresses
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
 
       - name: Publish installable APK release
-        if: github.ref == 'refs/heads/feature/glowhit-checkout-artwork-animation-2026-11-23'
+        if: github.ref == 'refs/heads/feature/glowhit-qr-saved-addresses-2026-11-23'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: glowhit-v1.0.13-checkout-artwork-animation-2026-11-23
-          name: GlowHit v1.0.13 — Checkout artwork and animated payments
+          tag_name: glowhit-v1.0.14-qr-saved-addresses-2026-11-23
+          name: GlowHit v1.0.14 — UPI QR and Saved Addresses
           prerelease: true
           generate_release_notes: true
           fail_on_unmatched_files: true

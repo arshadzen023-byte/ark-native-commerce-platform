@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' as material;
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -153,7 +154,7 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
                   child: TextField(
                     controller: fields[entry.$1],
                     keyboardType: entry.$1 == 'email' ? TextInputType.emailAddress : entry.$1 == 'billing_phone' ? TextInputType.phone : TextInputType.text,
-                    decoration: InputDecoration(
+                    decoration: material.InputDecoration(
                       labelText: entry.$2,
                       prefixIcon: Icon(entry.$3, color: _accountPurple),
                       filled: true,
@@ -174,6 +175,7 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
       ]);
     }
     final items = _asItems(data, widget.section == 'My Orders' ? 'orders' : widget.section == 'Downloads' ? 'downloads' : 'addresses');
+    if (widget.section == 'Saved Addresses') return _addressesBody(items);
     if (widget.section == 'My Orders') return _ordersBody(items);
     if (items.isEmpty) return Center(child: Text(widget.section == 'Downloads' ? 'No downloadable products found.' : 'No saved addresses found.'));
     return ListView.builder(padding: const EdgeInsets.all(12), itemCount: items.length, itemBuilder: (context, index) {
@@ -225,6 +227,188 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
       }
       return Card(child: ListTile(leading: const Icon(Icons.location_on_outlined, color: _accountPurple), title: Text((item['label'] ?? 'Address').toString()), subtitle: Text(['address_1','address_2','city','state','postcode','country'].map((k) => item[k]).where((v) => v != null && v.toString().isNotEmpty).join(', '))));
     });
+  }
+
+
+  Widget _addressesBody(List<Map<String, dynamic>> addresses) {
+    String addressText(Map<String, dynamic> item) => [
+      item['address_1'], item['address_2'], item['city'], item['state'],
+      item['postcode'], item['country'],
+    ].where((v) => v != null && v.toString().trim().isNotEmpty)
+      .map((v) => v.toString().trim()).join(', ');
+
+    Future<void> openForm([Map<String, dynamic>? item]) async {
+      final saved = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => SavedAddressFormPage(
+          token: widget.token,
+          initialAddress: item,
+        )),
+      );
+      if (saved == true && mounted) await load();
+    }
+
+    Future<void> removeAddress(Map<String, dynamic> item) async {
+      final id = (item['id'] ?? '').toString();
+      if (id.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This address has no server ID. Refresh addresses and try again.')),
+        );
+        return;
+      }
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Delete address?'),
+          content: Text('Remove “${item['label'] ?? 'Address'}” from your saved addresses?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('KEEP')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('DELETE'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      setState(() { saving = true; error = null; });
+      try {
+        await api.request('customer/addresses', method: 'DELETE', query: {'id': id});
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address deleted from your account.')));
+        await load();
+      } catch (e) {
+        if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
+      } finally {
+        if (mounted) setState(() => saving = false);
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(15, 14, 15, 28),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(19),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF33205F), Color(0xFF7655A8)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(23),
+            boxShadow: [BoxShadow(color: _accountPurple.withValues(alpha: .18), blurRadius: 18, offset: const Offset(0, 8))],
+          ),
+          child: Row(children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+              Text('YOUR DELIVERY PLACES', style: TextStyle(color: Colors.white70, fontSize: 10, letterSpacing: 1.4, fontWeight: FontWeight.w800)),
+              SizedBox(height: 9),
+              Text('Saved Addresses', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+              SizedBox(height: 5),
+              Text('Add, edit or remove the places where you shop.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            ])),
+            const SizedBox(width: 12),
+            Container(
+              width: 62, height: 62,
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: .16), borderRadius: BorderRadius.circular(18)),
+              child: const Icon(Icons.location_on_rounded, color: Colors.white, size: 34),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 52,
+          child: FilledButton.icon(
+            onPressed: saving ? null : () => openForm(),
+            icon: const Icon(Icons.add_location_alt_rounded),
+            label: const Text('ADD NEW ADDRESS', style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: .4)),
+            style: FilledButton.styleFrom(
+              backgroundColor: _accountPurple,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (addresses.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 18),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: .5)),
+            ),
+            child: const Column(children: [
+              Icon(Icons.location_off_outlined, color: _accountPurple, size: 42),
+              SizedBox(height: 10),
+              Text('No saved addresses yet', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              SizedBox(height: 5),
+              Text('Add your first delivery address to make checkout faster.', textAlign: TextAlign.center),
+            ]),
+          ),
+        for (final item in addresses) ...[
+          Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: .55)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(15),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Container(
+                    width: 45, height: 45,
+                    decoration: BoxDecoration(color: _accountPurple.withValues(alpha: .10), borderRadius: BorderRadius.circular(14)),
+                    child: Icon(
+                      (item['label'] ?? '').toString().toLowerCase() == 'work' ? Icons.work_outline_rounded : Icons.home_outlined,
+                      color: _accountPurple, size: 25,
+                    ),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text((item['label'] ?? 'Address').toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                    if ((item['first_name'] ?? '').toString().isNotEmpty || (item['last_name'] ?? '').toString().isNotEmpty)
+                      Text('${item['first_name'] ?? ''} ${item['last_name'] ?? ''}'.trim(), style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
+                  ])),
+                  const Icon(Icons.verified_user_outlined, color: _accountPurple, size: 19),
+                ]),
+                const SizedBox(height: 12),
+                Text(addressText(item), style: const TextStyle(height: 1.45, fontSize: 13.5)),
+                if ((item['phone'] ?? '').toString().isNotEmpty) ...[
+                  const SizedBox(height: 7),
+                  Row(children: [
+                    const Icon(Icons.call_outlined, size: 16, color: _accountPurple),
+                    const SizedBox(width: 7),
+                    Text(item['phone'].toString(), style: const TextStyle(fontWeight: FontWeight.w700)),
+                  ]),
+                ],
+                const Divider(height: 22),
+                Row(children: [
+                  Expanded(child: OutlinedButton.icon(
+                    onPressed: saving ? null : () => openForm(item),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('EDIT'),
+                    style: OutlinedButton.styleFrom(foregroundColor: _accountPurple, side: BorderSide(color: _accountPurple.withValues(alpha: .45))),
+                  )),
+                  const SizedBox(width: 10),
+                  Expanded(child: OutlinedButton.icon(
+                    onPressed: saving ? null : () => removeAddress(item),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    label: const Text('DELETE'),
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red.shade600, side: BorderSide(color: Colors.red.shade200)),
+                  )),
+                ]),
+              ]),
+            ),
+          ),
+        ],
+        if (saving) const Padding(
+          padding: EdgeInsets.all(12),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ],
+    );
   }
 
   String _normalStatus(dynamic raw) {
@@ -296,7 +480,7 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
         child: TextField(
           controller: orderSearch,
           onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(
+          decoration: material.InputDecoration(
             hintText: 'Search order number or product',
             prefixIcon: const Icon(Icons.search, color: _accountPurple),
             suffixIcon: orderSearch.text.isEmpty ? null : IconButton(onPressed: () { orderSearch.clear(); setState(() {}); }, icon: const Icon(Icons.close)),
@@ -753,7 +937,7 @@ class _OrderShippingAddressPageState extends State<OrderShippingAddressPage> {
         controller: fields[key],
         keyboardType: type,
         textCapitalization: key == 'country' ? TextCapitalization.characters : TextCapitalization.words,
-        decoration: InputDecoration(
+        decoration: material.InputDecoration(
           labelText: label,
           filled: true,
           fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .35),
@@ -845,4 +1029,176 @@ class _OrderShippingAddressPageState extends State<OrderShippingAddressPage> {
       ),
     ),
   );
+}
+
+
+/// Dedicated add/edit screen for WooCommerce-backed saved delivery addresses.
+class SavedAddressFormPage extends StatefulWidget {
+  const SavedAddressFormPage({super.key, required this.token, this.initialAddress});
+  final String token;
+  final Map<String, dynamic>? initialAddress;
+  @override State<SavedAddressFormPage> createState() => _SavedAddressFormPageState();
+}
+
+class _SavedAddressFormPageState extends State<SavedAddressFormPage> {
+  final _formKey = GlobalKey<FormState>();
+  late final ArkCustomerApi _api;
+  late final Map<String, TextEditingController> _fields;
+  String _label = 'Home';
+  bool _saving = false;
+  String? _error;
+
+  static const _definitions = <(String, String, IconData)>[
+    ('first_name', 'First name', Icons.person_outline),
+    ('last_name', 'Last name', Icons.person_outline),
+    ('phone', 'Mobile number', Icons.phone_outlined),
+    ('email', 'Email address', Icons.email_outlined),
+    ('address_1', 'House / street / area', Icons.home_outlined),
+    ('address_2', 'Landmark (optional)', Icons.near_me_outlined),
+    ('city', 'City', Icons.location_city_outlined),
+    ('state', 'State', Icons.map_outlined),
+    ('postcode', 'PIN code', Icons.markunread_mailbox_outlined),
+    ('country', 'Country code', Icons.flag_outlined),
+  ];
+
+  @override void initState() {
+    super.initState();
+    _api = ArkCustomerApi(widget.token);
+    final initial = widget.initialAddress ?? const <String, dynamic>{};
+    _label = (initial['label'] ?? 'Home').toString();
+    _fields = {
+      for (final entry in _definitions)
+        entry.$1: TextEditingController(text: (initial[entry.$1] ?? (entry.$1 == 'country' ? 'IN' : '')).toString()),
+    };
+  }
+
+  @override void dispose() {
+    for (final controller in _fields.values) { controller.dispose(); }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() { _saving = true; _error = null; });
+    try {
+      final payload = <String, dynamic>{
+        for (final entry in _fields.entries) entry.key: entry.value.text.trim(),
+        'label': _label,
+      };
+      final id = widget.initialAddress?['id'];
+      if (id != null && id.toString().isNotEmpty) payload['id'] = id;
+      await _api.request('customer/addresses', method: 'POST', body: payload);
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _input((String, String, IconData) definition) {
+    final key = definition.$1;
+    final optional = key == 'address_2';
+    final keyboard = key == 'email' ? TextInputType.emailAddress :
+      key == 'phone' || key == 'postcode' ? TextInputType.phone : TextInputType.text;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 13),
+      child: TextFormField(
+        controller: _fields[key],
+        keyboardType: keyboard,
+        textCapitalization: key == 'email' ? TextCapitalization.none : TextCapitalization.words,
+        validator: optional ? null : (value) {
+          final text = (value ?? '').trim();
+          if (text.isEmpty) return 'Required';
+          if (key == 'postcode' && text.length < 5) return 'Enter a valid PIN code';
+          if (key == 'phone' && text.replaceAll(RegExp(r'\D'), '').length < 10) return 'Enter a valid mobile number';
+          if (key == 'email' && !RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(text)) return 'Enter a valid email address';
+          return null;
+        },
+        decoration: material.InputDecoration(
+          labelText: definition.$2,
+          prefixIcon: Icon(definition.$3, color: _accountPurple),
+          filled: true,
+          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .32),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+          errorMaxLines: 2,
+        ),
+      ),
+    );
+  }
+
+  @override Widget build(BuildContext context) {
+    final editing = widget.initialAddress != null;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(editing ? 'Edit Address' : 'New Address'),
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : _save,
+            child: const Text('SAVE', style: TextStyle(fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF33205F), Color(0xFF7655A8)]),
+                borderRadius: BorderRadius.circular(21),
+              ),
+              child: Row(children: [
+                const Icon(Icons.location_on_rounded, color: Colors.white, size: 34),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(editing ? 'UPDATE DELIVERY PLACE' : 'ADD DELIVERY PLACE', style: const TextStyle(color: Colors.white70, fontSize: 10, letterSpacing: 1.1, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 5),
+                  Text(editing ? 'Keep your address up to date.' : 'Where should we deliver?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
+                ])),
+              ]),
+            ),
+            const SizedBox(height: 18),
+            DropdownButtonFormField<String>(
+              value: _label,
+              decoration: material.InputDecoration(
+                labelText: 'Address type',
+                prefixIcon: const Icon(Icons.bookmark_outline, color: _accountPurple),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .32),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'Home', child: Text('Home')),
+                DropdownMenuItem(value: 'Work', child: Text('Work')),
+                DropdownMenuItem(value: 'Other', child: Text('Other')),
+                DropdownMenuItem(value: 'Default', child: Text('Default')),
+              ],
+              onChanged: _saving ? null : (value) => setState(() => _label = value ?? 'Home'),
+            ),
+            const SizedBox(height: 14),
+            for (final definition in _definitions) _input(definition),
+            if (_error != null) Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.red.withValues(alpha: .08), borderRadius: BorderRadius.circular(12)),
+              child: Text(_error!, style: TextStyle(color: Colors.red.shade700)),
+            ),
+            SizedBox(
+              height: 54,
+              child: FilledButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: _saving ? const SizedBox(width: 19, height: 19, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.cloud_done_rounded),
+                label: Text(_saving ? 'SAVING TO YOUR ACCOUNT…' : editing ? 'UPDATE ADDRESS' : 'SAVE ADDRESS'),
+                style: FilledButton.styleFrom(backgroundColor: _accountPurple, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
