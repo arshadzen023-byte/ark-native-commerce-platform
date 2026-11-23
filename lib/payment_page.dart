@@ -145,7 +145,14 @@ class _PaymentPageState extends State<PaymentPage> {
       // Reconcile the exact address selected in checkout with the live
       // WooCommerce cart before creating the order. This prevents a stale
       // default address from replacing a customer's alternate address.
-      final selectedAddress = Map<String, dynamic>.from(widget.address);
+      const wooAddressFields = [
+        'first_name', 'last_name', 'company', 'address_1', 'address_2',
+        'city', 'state', 'postcode', 'country', 'email', 'phone',
+      ];
+      final selectedAddress = <String, dynamic>{
+        for (final key in wooAddressFields)
+          if (widget.address.containsKey(key)) key: widget.address[key],
+      };
       final currentCart = await widget.api.getCart();
       Map<String, dynamic> serverShipping = currentCart['shipping_address'] is Map
           ? Map<String, dynamic>.from(currentCart['shipping_address'] as Map)
