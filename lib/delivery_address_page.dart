@@ -80,8 +80,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   Future<void> _saveCurrentAddress() async {
     final value = address;
     value['label'] = addressLabel;
-    if (selectedSavedAddress >= 0 && selectedSavedAddress < savedAddresses.length) {
-      value['id'] = savedAddresses[selectedSavedAddress]['id'] ?? '';
+    if ((value['id'] ?? '').toString().isEmpty) {
+      value['id'] = 'local-${DateTime.now().microsecondsSinceEpoch}';
     }
     final key = _savedAddressKey;
     final prefs = await SharedPreferences.getInstance();
@@ -190,8 +190,15 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     super.dispose();
   }
 
-  Map<String, dynamic> get address => fields.map((key, value) => MapEntry(key, value.text.trim()))
-    ..['country'] = fields['country']!.text.trim().toUpperCase();
+  Map<String, dynamic> get address {
+    final value = fields.map((key, controller) => MapEntry(key, controller.text.trim()));
+    value['country'] = fields['country']!.text.trim().toUpperCase();
+    value['label'] = addressLabel;
+    if (selectedSavedAddress >= 0 && selectedSavedAddress < savedAddresses.length) {
+      value['id'] = savedAddresses[selectedSavedAddress]['id'] ?? '';
+    }
+    return value;
+  }
 
   Future<void> calculateShipping() async {
     if (!formKey.currentState!.validate()) return;
