@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'customer_account_page.dart';
 import 'woo_store_api.dart';
+import 'checkout_artwork.dart';
 
 class DeliveryAddressPage extends StatefulWidget {
   const DeliveryAddressPage({super.key, required this.api, this.initialAddress = const {}, this.customerToken, this.embedded = false, this.formOnly = false, this.onAddressSaved});
@@ -336,9 +337,49 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
               SizedBox(height: 4),
               Text('Choose a saved place or add a new one.', style: TextStyle(color: Colors.white70, fontSize: 12)),
             ])),
-            Container(width: 62, height: 62, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), borderRadius: BorderRadius.circular(18)), child: widget.embedded && !widget.formOnly
-              ? IconButton(tooltip: 'Add address', onPressed: busy ? null : _openNewAddressPage, icon: const Icon(Icons.add_location_alt_rounded, color: Colors.white, size: 32))
-              : const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 36)),
+            Container(
+              width: 82,
+              height: 82,
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .15),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: .88, end: 1),
+                    duration: const Duration(milliseconds: 520),
+                    curve: Curves.easeOutBack,
+                    builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
+                    child: Image.memory(
+                      CheckoutArtwork.fastDelivery,
+                      fit: BoxFit.contain,
+                      gaplessPlayback: true,
+                    ),
+                  ),
+                  if (widget.embedded && !widget.formOnly)
+                    Positioned(
+                      right: -10,
+                      bottom: -10,
+                      child: IconButton.filledTonal(
+                        tooltip: 'Add address',
+                        onPressed: busy ? null : _openNewAddressPage,
+                        icon: const Icon(Icons.add_location_alt_rounded, size: 19),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF51408F),
+                          minimumSize: const Size(34, 34),
+                          maximumSize: const Size(34, 34),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ]),
         ),
         const SizedBox(height: 18),
