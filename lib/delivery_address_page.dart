@@ -333,7 +333,19 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
         if (busy) const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())),
         const SizedBox(height: 16),
-        OutlinedButton.icon(onPressed: busy ? null : () async { if (!formKey.currentState!.validate()) return; await _saveCurrentAddress(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address saved'))); }, icon: const Icon(Icons.bookmark_add_outlined), label: const Text('SAVE THIS ADDRESS')),
+        OutlinedButton.icon(
+          onPressed: busy ? null : () async {
+            if (!formKey.currentState!.validate()) return;
+            try {
+              await _saveCurrentAddress();
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address saved')));
+            } catch (e) {
+              if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
+            }
+          },
+          icon: const Icon(Icons.bookmark_add_outlined),
+          label: const Text('SAVE THIS ADDRESS'),
+        ),
         ],
         const SizedBox(height: 8),
         SizedBox(height: 54, child: FilledButton(
@@ -343,15 +355,19 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
               return;
             }
             if (formVisible && !formKey.currentState!.validate()) return;
-            await _saveCurrentAddress();
-            if (rates.isEmpty) { await calculateShipping(); return; }
-            final chosen = address;
-            final chosenCart = updatedCart.isNotEmpty ? updatedCart : await widget.api.getCart();
-            if (!mounted) return;
-            if (widget.embedded && widget.onAddressSaved != null) {
-              widget.onAddressSaved!(chosen, chosenCart);
-            } else {
-              Navigator.pop(context, {'address': chosen, 'cart': chosenCart, 'shipping_selected': selectedRate != null || rates.isEmpty});
+            try {
+              await _saveCurrentAddress();
+              if (rates.isEmpty) { await calculateShipping(); return; }
+              final chosen = address;
+              final chosenCart = updatedCart.isNotEmpty ? updatedCart : await widget.api.getCart();
+              if (!mounted) return;
+              if (widget.embedded && widget.onAddressSaved != null) {
+                widget.onAddressSaved!(chosen, chosenCart);
+              } else {
+                Navigator.pop(context, {'address': chosen, 'cart': chosenCart, 'shipping_selected': selectedRate != null || rates.isEmpty});
+              }
+            } catch (e) {
+              if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
             }
           },
           child: Text(widget.formOnly ? 'SAVE ADDRESS & CONTINUE' : 'CONTINUE TO CONFIRM DETAILS', style: const TextStyle(fontWeight: FontWeight.bold)),
