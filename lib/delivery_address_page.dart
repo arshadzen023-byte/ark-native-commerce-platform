@@ -243,18 +243,6 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         Row(children: [Expanded(child: field('postcode', 'PIN code', type: TextInputType.number)), const SizedBox(width: 10), Expanded(child: field('country', 'Country code'))]),
         if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
         if (busy) const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())),
-        if (rates.isNotEmpty) ...[
-          const SizedBox(height: 18),
-          const Text('Available shipping methods', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ...rates.map((rate) {
-            final id = (rate['rate_id'] ?? rate['id'] ?? '').toString();
-            return RadioListTile<String>(
-              value: id, groupValue: selectedRate, onChanged: busy ? null : (_) => selectRate(rate),
-              title: Text((rate['name'] ?? rate['method_title'] ?? id).toString()),
-              subtitle: Text(ratePrice(rate)), activeColor: const Color(0xFF51408F),
-            );
-          }),
-        ],
         const SizedBox(height: 16),
         OutlinedButton.icon(onPressed: busy ? null : () async { if (!formKey.currentState!.validate()) return; await _saveCurrentAddress(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address saved'))); }, icon: const Icon(Icons.bookmark_add_outlined), label: const Text('SAVE THIS ADDRESS')),
         const SizedBox(height: 8),
@@ -263,10 +251,6 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
             if (!formKey.currentState!.validate()) return;
             await _saveCurrentAddress();
             if (rates.isEmpty) { await calculateShipping(); return; }
-            if (rates.isNotEmpty && selectedRate == null) {
-              setState(() => error = 'Please select a shipping method.');
-              return;
-            }
             final chosen = address;
             final chosenCart = updatedCart.isNotEmpty ? updatedCart : await widget.api.getCart();
             if (!mounted) return;
