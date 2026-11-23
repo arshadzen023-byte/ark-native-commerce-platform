@@ -1,0 +1,197 @@
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+class WooStoreApi {
+  WooStoreApi({this.baseUrl = 'https://pluginstore.shop'});
+  final String baseUrl;
+  static const _tokenKey = 'glowhit_wc_cart_token';
+  String? _cartToken;
+  String? nonce;
+
+  Uri _uri(String path) => Uri.parse(baseUrl).resolve('wp-json/wc/store/v1/$path');
+  String? _header(http.Response response, String name) {
+    for (final entry in response.headers.entries) {
+      if (entry.key.toLowerCase() == name.toLowerCase()) return entry.value;
+    }
+    return null;
+  }
+
+  Future<void> _captureSession(http.Response response) async {
+    final token = _header(response, 'Cart-Token');
+    if (token != null && token.isNotEmpty) {
+      _cartToken = token;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_tokenKey, token);
+    }
+    nonce = _header(response, 'Nonce') ?? _header(response, 'X-WC-Store-API-Nonce') ?? nonce;
+  }
+
+  Future<Map<String, dynamic>> _send(String path, {
+    String method = 'GET',
+    Map<String, String>? query,
+    Map<String, dynamic>? body,
+    bool ensureCart = true,
+    bool retrySession = true,
+  }) async {
+    if (ensureCart && _cartToken == null) await initialiseCart();
+    final uri = _uri(path).replace(queryParameters: query);
+    final headers = <String, String>{'Accept': 'application/json'};
+    if (body != null) headers['Content-Type'] = 'application/json';
+    if (_cartToken != null) headers['Cart-Token'] = _cartToken!;
+    if (nonce != null) {
+      headers['Nonce'] = nonce!;
+      headers['X-WC-Store-API-Nonce'] = nonce!;
+    }
+    final request = http.Request(method, uri)..headers.addAll(headers);
+    if (body != null) request.body = jsonEncode(body);
+    final client = http.Client();
+    try {
+      final streamed = await client.send(request).timeout(const Duration(seconds: 25));
+      final response = await http.Response.fromStream(streamed).timeout(const Duration(seconds: 25));
+      await _captureSession(response);
+      if ((response.statusCode == 401 || response.statusCode == 403) && retrySession && method == 'GET' && _cartToken != null) {
+        await initialiseCart(reset: true);
+        return await _send(path, method: method, query: query, body: body, ensureCart: ensureCart, retrySession: false);
+      }
+      dynamic decoded;
+      try {
+        decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
+      } catch (_) {
+        final contentType = _header(response, 'content-type') ?? 'unknown content-type';
+        final preview = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
+        final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
+        final looksHtml = preview.toLowerCase().startsWith('<!doctype') || preview.toLowerCase().startsWith('<html');
+        throw Exception('WooCommerce returned non-JSON data (HTTP ${response.statusCode}, $contentType). ${looksHtml ? 'The server returned an HTML page instead of Store API JSON (often a cache, firewall, security plugin or PHP error page).' : 'Response preview: $safePreview'}');
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final message = decoded is Map ? (decoded['message'] ?? decoded['code'] ?? response.body) : response.body;
+        throw Exception('Store API ${response.statusCode}: $message');
+      }
+      if (decoded is Map<String, dynamic>) return decoded;
+      throw Exception('Unexpected WooCommerce response format.');
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<Map<String, dynamic>> initialiseCart({bool reset = false}) async {
+    if (reset) {
+      _cartToken = null;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_tokenKey);
+    }
+    if (_cartToken == null) {
+      final prefs = await SharedPreferences.getInstance();
+      _cartToken = prefs.getString(_tokenKey);
+    }
+    final cart = await _send('cart', ensureCart: false);
+    if (_cartToken == null && nonce == null) {
+      throw Exception('WooCommerce returned neither Cart-Token nor Nonce. Check Store API/session configuration on pluginstore.shop.');
+    }
+    return cart;
+  }
+
+  Future<List<Map<String, dynamic>>> getRecommendedProducts({int limit = 6}) async {
+    final uri = Uri.parse(baseUrl).resolve('wp-json/wc/store/v1/products').replace(
+      queryParameters: {'per_page': limit.toString(), 'orderby': 'popularity', 'order': 'desc'},
+    );
+    final response = await http.get(uri, headers: const {'Accept': 'application/json'})
+        .timeout(const Duration(seconds: 20));
+    if (response.statusCode != 200) {
+      throw Exception('Recommended products unavailable (HTTP ${response.statusCode}).');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) throw Exception('Unexpected recommended-products response.');
+    return decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  Future<Map<String, dynamic>> getCart() => _send('cart');
+  Future<Map<String, dynamic>> addItem(int productId, {int quantity = 1}) =>
+      _send('cart/add-item', method: 'POST', body: {'id': productId, 'quantity': quantity});
+  Future<Map<String, dynamic>> updateItem(String key, int quantity) =>
+      _send('cart/update-item', method: 'POST', body: {'key': key, 'quantity': quantity});
+  Future<Map<String, dynamic>> removeItem(String key) =>
+      _send('cart/remove-item', method: 'POST', body: {'key': key});
+
+  Future<Map<String, dynamic>> updateCustomer({required Map<String, dynamic> billing, required Map<String, dynamic> shipping}) =>
+      _send('cart/update-customer', method: 'POST', body: {'billing_address': billing, 'shipping_address': shipping});
+
+  Future<Map<String, dynamic>> selectShippingRate(int packageId, String rateId) =>
+      _send('cart/select-shipping-rate', method: 'POST', body: {'package_id': packageId, 'rate_id': rateId});
+
+  Future<Map<String, dynamic>> getNativePaymentConfig() async {
+    final response = await http.get(
+      Uri.parse(baseUrl).resolve('wp-json/ark-native/v1/payment/config'),
+      headers: const {'Accept': 'application/json'},
+    ).timeout(const Duration(seconds: 20));
+    dynamic decoded;
+    try { decoded = jsonDecode(response.body); } catch (_) {
+      final contentType = _header(response, 'content-type') ?? 'unknown content-type';
+      final preview = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
+      final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
+      throw Exception('Payment configuration returned non-JSON data (HTTP ${response.statusCode}, $contentType). $safePreview');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300 || decoded is! Map) {
+      final message = decoded is Map ? decoded['message'] : null;
+      throw Exception(message?.toString() ?? 'Unable to load store payment methods.');
+    }
+    return Map<String, dynamic>.from(decoded);
+  }
+
+  Future<Map<String, dynamic>> submitUpiPayment({
+    required int orderId,
+    required String orderKey,
+    required String transactionId,
+    Uint8List? screenshotBytes,
+    String screenshotName = 'upi-payment.jpg',
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse(baseUrl).resolve('wp-json/ark-native/v1/payment/upi-submit'),
+    );
+    request.fields.addAll({
+      'order_id': orderId.toString(),
+      'order_key': orderKey,
+      'transaction_id': transactionId,
+    });
+    if (screenshotBytes != null) {
+      request.files.add(http.MultipartFile.fromBytes(
+        'screenshot',
+        screenshotBytes,
+        filename: screenshotName,
+      ));
+    }
+    final streamed = await request.send().timeout(const Duration(seconds: 45));
+    final response = await http.Response.fromStream(streamed);
+    dynamic decoded;
+    try { decoded = jsonDecode(response.body); } catch (_) {
+      final contentType = response.headers['content-type'] ?? 'unknown content-type';
+      final preview = response.body.replaceAll(RegExp(r'\s+'), ' ').trim();
+      final safePreview = preview.length > 180 ? '${preview.substring(0, 180)}…' : preview;
+      throw Exception('UPI submission returned non-JSON data (HTTP ${response.statusCode}, $contentType). $safePreview');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300 || decoded is! Map) {
+      final message = decoded is Map ? decoded['message'] : null;
+      throw Exception(message?.toString() ?? 'UPI details could not be submitted.');
+    }
+    return Map<String, dynamic>.from(decoded);
+  }
+
+  Future<Map<String, dynamic>> getCheckout() => _send('checkout');
+
+  Future<Map<String, dynamic>> placeOrder({
+    required Map<String, dynamic> billing,
+    required Map<String, dynamic> shipping,
+    required String paymentMethod,
+    String customerNote = '',
+    List<Map<String, dynamic>> paymentData = const [],
+  }) => _send('checkout', method: 'POST', body: {
+    'billing_address': billing,
+    'shipping_address': shipping,
+    'payment_method': paymentMethod,
+    'payment_data': paymentData,
+    'customer_note': customerNote,
+  });
+}
