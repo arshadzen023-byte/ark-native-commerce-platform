@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'customer_account_page.dart';
 import 'woo_store_api.dart';
 import 'checkout_artwork.dart';
-import 'qr_code_scan_illustration.dart';
 
 class PaymentPage extends StatefulWidget {
   const PaymentPage({super.key, required this.api, required this.address, required this.cart, this.customerToken});
@@ -465,7 +464,7 @@ class _PaymentPageState extends State<PaymentPage> {
                             child: isCod
                               ? Image.memory(CheckoutArtwork.rupee, fit: BoxFit.contain, gaplessPlayback: true)
                               : isMethodUpi
-                                ? const QrCodeScanIllustration()
+                                ? Image.memory(CheckoutArtwork.qrScan, fit: BoxFit.contain, gaplessPlayback: true)
                                 : Icon(Icons.account_balance_wallet_rounded, color: _brand, size: 34),
                           ),
                         ),
