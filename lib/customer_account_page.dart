@@ -505,6 +505,32 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
     finally { if (mounted) setState(() => loading = false); }
   }
 
+  Future<void> changeDeliveryAddress() async {
+    final id = (order['id'] ?? order['order_id'] ?? '').toString();
+    if (id.isEmpty) return;
+    final current = order['shipping'] is Map
+        ? Map<String, dynamic>.from(order['shipping'] as Map)
+        : <String, dynamic>{};
+    final updated = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrderShippingAddressPage(
+          token: widget.token,
+          orderId: id,
+          initialAddress: current,
+        ),
+      ),
+    );
+    if (updated == null || !mounted) return;
+    setState(() => order = updated);
+    await refresh();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Delivery address updated. Store may review shipping charges.')),
+      );
+    }
+  }
+
   Future<void> cancel() async {
     final id = (order['id'] ?? order['order_id'] ?? '').toString();
     if (id.isEmpty) return;
@@ -610,6 +636,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
     final lineItems = (order['items'] as List? ?? order['line_items'] as List? ?? const []).whereType<Map>().toList();
     final shipping = order['shipping'] is Map ? order['shipping'] as Map : const {};
     final canCancel = order['can_cancel'] == true || (order['can_cancel'] == null && ['payment-pending','hold','processing','confirmed'].contains(normalizedStatus));
+    final canChangeAddress = order['can_change_address'] == true ||
+        (order['can_change_address'] == null && ['payment-pending', 'hold'].contains(normalizedStatus));
     final subtotal = order['subtotal'] ?? order['cart_subtotal'] ?? order['line_items_subtotal'];
     final shippingTotal = order['shipping_total'] ?? order['shipping_cost'] ?? order['shipping_amount'];
     final tax = order['total_tax'] ?? order['tax_total'] ?? order['tax'];
@@ -647,9 +675,19 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
           detailRow('Payment status', (order['payment_status'] ?? (normalizedStatus == 'completed' || normalizedStatus == 'delivered' ? 'Paid' : statusLabel)).toString().toUpperCase()),
         ]))),
         Card(child: Padding(padding: const EdgeInsets.all(15), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('DELIVERY ADDRESS', style: TextStyle(fontWeight: FontWeight.w800)),
+          Row(children: [
+            const Expanded(child: Text('DELIVERY ADDRESS', style: TextStyle(fontWeight: FontWeight.w800))),
+            if (canChangeAddress)
+              TextButton.icon(
+                onPressed: loading ? null : changeDeliveryAddress,
+                icon: const Icon(Icons.edit_location_alt_outlined, size: 18),
+                label: const Text('CHANGE'),
+              ),
+          ]),
           const SizedBox(height: 8),
           Text([shipping['first_name'], shipping['last_name'], shipping['company'], shipping['address_1'], shipping['address_2'], shipping['city'], shipping['state'], shipping['postcode'], shipping['country']].where((v) => v != null && v.toString().isNotEmpty).join(', ').isEmpty ? 'Address not available' : [shipping['first_name'], shipping['last_name'], shipping['company'], shipping['address_1'], shipping['address_2'], shipping['city'], shipping['state'], shipping['postcode'], shipping['country']].where((v) => v != null && v.toString().isNotEmpty).join(', ')),
+          if (!canChangeAddress)
+            Padding(padding: const EdgeInsets.only(top: 8), child: Text('Address changes are locked after the order leaves the pending / on-hold stage.', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant))),
         ]))),
         if (error != null) Padding(padding: const EdgeInsets.all(8), child: Text(error!, style: const TextStyle(color: Colors.red))),
         if (canCancel) Padding(padding: const EdgeInsets.only(top: 6), child: OutlinedButton.icon(onPressed: loading ? null : cancel, icon: const Icon(Icons.cancel_outlined), label: const Text('CANCEL ORDER'))),
@@ -657,4 +695,154 @@ class _OrderDetailPageState extends State<OrderDetailPage> with SingleTickerProv
       ]),
     );
   }
+}
+
+
+class OrderShippingAddressPage extends StatefulWidget {
+  const OrderShippingAddressPage({
+    super.key,
+    required this.token,
+    required this.orderId,
+    required this.initialAddress,
+  });
+  final String token;
+  final String orderId;
+  final Map<String, dynamic> initialAddress;
+
+  @override
+  State<OrderShippingAddressPage> createState() => _OrderShippingAddressPageState();
+}
+
+class _OrderShippingAddressPageState extends State<OrderShippingAddressPage> {
+  final formKey = GlobalKey<FormState>();
+  late final Map<String, TextEditingController> fields;
+  bool saving = false;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    const keys = [
+      'first_name', 'last_name', 'phone', 'address_1', 'address_2',
+      'city', 'state', 'postcode', 'country',
+    ];
+    fields = {
+      for (final key in keys)
+        key: TextEditingController(
+          text: (widget.initialAddress[key] ?? (key == 'country' ? 'IN' : '')).toString(),
+        ),
+    };
+  }
+
+  @override
+  void dispose() {
+    for (final controller in fields.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Map<String, dynamic> get address =>
+      fields.map((key, controller) => MapEntry(key, controller.text.trim()))
+        ..['country'] = (fields['country']!.text.trim().isEmpty ? 'IN' : fields['country']!.text.trim()).toUpperCase();
+
+  Widget field(String key, String label, {bool required = true, TextInputType type = TextInputType.text}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 13),
+      child: TextFormField(
+        controller: fields[key],
+        keyboardType: type,
+        textCapitalization: key == 'country' ? TextCapitalization.characters : TextCapitalization.words,
+        decoration: InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .35),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+        ),
+        validator: (value) {
+          if (required && (value == null || value.trim().isEmpty)) return 'Enter $label';
+          if (key == 'postcode' && value != null && value.trim().length < 5) return 'Enter a valid PIN code';
+          return null;
+        },
+      ),
+    );
+  }
+
+  Future<void> save() async {
+    if (!formKey.currentState!.validate()) return;
+    setState(() { saving = true; error = null; });
+    try {
+      final response = await ArkCustomerApi(widget.token).request(
+        'customer/orders/${widget.orderId}/address',
+        method: 'PUT',
+        body: address,
+      );
+      final updated = response is Map && response['order'] is Map
+          ? response['order']
+          : response;
+      if (updated is! Map || updated['id'] == null) {
+        throw Exception('The store did not return the updated order details.');
+      }
+      if (mounted) Navigator.pop(context, Map<String, dynamic>.from(updated));
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Change delivery address')),
+    body: Form(
+      key: formKey,
+      child: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0EDFA),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Row(children: [
+              Icon(Icons.local_shipping_outlined, color: _accountPurple, size: 28),
+              SizedBox(width: 12),
+              Expanded(child: Text('Update the delivery address for this order. Available only before fulfilment begins.', style: TextStyle(fontWeight: FontWeight.w600))),
+            ]),
+          ),
+          const SizedBox(height: 18),
+          Row(children: [
+            Expanded(child: field('first_name', 'First name')),
+            const SizedBox(width: 10),
+            Expanded(child: field('last_name', 'Last name')),
+          ]),
+          field('phone', 'Mobile number', type: TextInputType.phone),
+          field('address_1', 'House / street / area'),
+          field('address_2', 'Landmark (optional)', required: false),
+          Row(children: [
+            Expanded(child: field('city', 'City')),
+            const SizedBox(width: 10),
+            Expanded(child: field('state', 'State')),
+          ]),
+          Row(children: [
+            Expanded(child: field('postcode', 'PIN code', type: TextInputType.number)),
+            const SizedBox(width: 10),
+            Expanded(child: field('country', 'Country code')),
+          ]),
+          if (error != null)
+            Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
+          SizedBox(
+            height: 54,
+            child: FilledButton.icon(
+              onPressed: saving ? null : save,
+              icon: saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.check_circle_outline),
+              label: Text(saving ? 'UPDATING…' : 'UPDATE DELIVERY ADDRESS'),
+              style: FilledButton.styleFrom(backgroundColor: _accountPurple),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
