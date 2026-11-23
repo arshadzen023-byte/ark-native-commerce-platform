@@ -34,7 +34,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Component Properties'), findsOneWidget);
     expect(find.text('LIVE COMPONENT PREVIEW'), findsOneWidget);
-    await tester.ensureVisible(find.text('Banner style'));
+    await tester.scrollUntilVisible(
+      find.text('Banner style'),
+      500,
+      scrollable: find.byType(ListView).last,
+    );
     await tester.pumpAndSettle();
     expect(find.text('Banner style'), findsOneWidget);
     await tester.tap(find.text('SAVE'));
