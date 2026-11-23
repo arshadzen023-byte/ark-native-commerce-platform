@@ -112,7 +112,16 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     for (final entry in fields.entries) {
       entry.value.text = (value[entry.key] ?? '').toString();
     }
-    setState(() { addressLabel = (value['label'] ?? 'Home').toString(); selectedSavedAddress = savedAddresses.indexOf(value); });
+    // A shipping quote belongs to the address that produced it. Never reuse
+    // the previous address' rates/cart after selecting a different saved card.
+    setState(() {
+      addressLabel = (value['label'] ?? 'Home').toString();
+      selectedSavedAddress = savedAddresses.indexOf(value);
+      rates = [];
+      selectedRate = null;
+      updatedCart = {};
+      error = null;
+    });
   }
 
   Future<void> _deleteSelectedAddress() async {
@@ -167,7 +176,13 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       selectedSavedAddress = savedAddresses.length - 1;
     }
     updatedCart = cart;
-    if (mounted) setState(() { addressLabel = (chosen['label'] ?? 'Home').toString(); formVisible = false; error = null; });
+    if (mounted) setState(() {
+      addressLabel = (chosen['label'] ?? 'Home').toString();
+      formVisible = false;
+      error = null;
+      rates = [];
+      selectedRate = null;
+    });
     if (widget.embedded && widget.onAddressSaved != null) {
       widget.onAddressSaved!(chosen, cart);
     } else {
@@ -242,7 +257,20 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         controller: fields[key],
         keyboardType: type,
         textCapitalization: key == 'email' ? TextCapitalization.none : TextCapitalization.words,
-        decoration: InputDecoration(labelText: label, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+        onChanged: (_) {
+          if (rates.isNotEmpty || updatedCart.isNotEmpty) {
+            setState(() { rates = []; selectedRate = null; updatedCart = {}; });
+          }
+        },
+        decoration: InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: const Color(0xFFF8F7FC),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFFE8E4F1))),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF51408F), width: 1.5)),
+        ),
         validator: (value) {
           if (required && (value == null || value.trim().isEmpty)) return 'Please enter $label';
           if (key == 'email' && value != null && value.isNotEmpty && !value.contains('@')) return 'Enter a valid email';
