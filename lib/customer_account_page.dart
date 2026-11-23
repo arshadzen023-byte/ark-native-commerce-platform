@@ -1174,6 +1174,7 @@ class _SavedAddressFormPageState extends State<SavedAddressFormPage> {
                 DropdownMenuItem(value: 'Home', child: Text('Home')),
                 DropdownMenuItem(value: 'Work', child: Text('Work')),
                 DropdownMenuItem(value: 'Other', child: Text('Other')),
+                DropdownMenuItem(value: 'Default', child: Text('Default')),
               ],
               onChanged: _saving ? null : (value) => setState(() => _label = value ?? 'Home'),
             ),
