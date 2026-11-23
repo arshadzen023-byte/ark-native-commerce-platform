@@ -892,8 +892,8 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
             onChanged: (v) => _change('child_order', v.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList())),
           TextField(decoration: const InputDecoration(labelText: 'Link / deep link', border: OutlineInputBorder()),
             onChanged: (v) => _change('link', v)),
-          TextField(decoration: const InputDecoration(labelText: 'Image URL (optional)', border: OutlineInputBorder()),
-            controller: TextEditingController(text: (item.properties['image_url'] ?? '').toString()),
+          TextFormField(decoration: const InputDecoration(labelText: 'Image URL (optional)', border: OutlineInputBorder()),
+            initialValue: (item.properties['image_url'] ?? '').toString(),
             onChanged: (v) => _change('image_url', v)),
           FilledButton.icon(
             onPressed: () async {
@@ -934,7 +934,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                 trailing: IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red),
                   onPressed: () {
-                    final updated = (item.properties['children'] as List).where((_, index) => index != entry.key).toList();
+                    final updated = (item.properties['children'] as List).asMap().entries.where((e) => e.key != entry.key).map((e) => e.value).toList();
                     _change('children', updated);
                   },
                 ),
