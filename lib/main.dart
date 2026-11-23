@@ -436,6 +436,17 @@ class _StoreHomeState extends State<StoreHome> {
       setState(() => tab = 4);
       return;
     }
+    try {
+      await ArkCustomerApi(token).request('designer/config');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('ARK Designer requires a WordPress administrator account. $e'),
+        ));
+      }
+      return;
+    }
+    if (!mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GlowHitDesignerPage(token: token)));
   }
 
