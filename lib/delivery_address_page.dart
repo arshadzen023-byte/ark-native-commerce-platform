@@ -190,15 +190,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     super.dispose();
   }
 
-  Map<String, dynamic> get address {
-    final value = fields.map((key, controller) => MapEntry(key, controller.text.trim()));
-    value['country'] = fields['country']!.text.trim().toUpperCase();
-    value['label'] = addressLabel;
-    if (selectedSavedAddress >= 0 && selectedSavedAddress < savedAddresses.length) {
-      value['id'] = savedAddresses[selectedSavedAddress]['id'] ?? '';
-    }
-    return value;
-  }
+  Map<String, dynamic> get address => fields.map((key, controller) => MapEntry(key, controller.text.trim()))
+    ..['country'] = fields['country']!.text.trim().toUpperCase();
 
   Future<void> calculateShipping() async {
     if (!formKey.currentState!.validate()) return;
@@ -365,7 +358,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
             try {
               await _saveCurrentAddress();
               if (rates.isEmpty) { await calculateShipping(); return; }
-              final chosen = address;
+              final chosen = <String, dynamic>{...address, 'label': addressLabel};
+              if (selectedSavedAddress >= 0 && selectedSavedAddress < savedAddresses.length) {
+                chosen['id'] = savedAddresses[selectedSavedAddress]['id'] ?? '';
+              }
               final chosenCart = updatedCart.isNotEmpty ? updatedCart : await widget.api.getCart();
               if (!mounted) return;
               if (widget.embedded && widget.onAddressSaved != null) {
