@@ -168,7 +168,6 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Delivery address')),
     body: Form(
       key: formKey,
       child: ListView(padding: const EdgeInsets.all(16), children: [
