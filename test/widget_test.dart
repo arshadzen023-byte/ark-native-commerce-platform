@@ -18,7 +18,7 @@ void main() {
     expect(find.text('ARK Designer'), findsOneWidget);
     expect(find.text('Edit page'), findsOneWidget);
     expect(find.text('Home'), findsWidgets);
-    expect(find.text('Main promotional banner'), findsOneWidget);
+    expect(find.text('Main promotional banner').first, findsOneWidget);
     expect(find.text('Add component'), findsOneWidget);
     await tester.tap(find.text('Add component'));
     await tester.pumpAndSettle();
@@ -30,7 +30,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const MaterialApp(home: GlowHitDesignerPage(token: 'test-token')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Main promotional banner'));
+    await tester.tap(find.text('Main promotional banner').first);
     await tester.pumpAndSettle();
     expect(find.text('Component Properties'), findsOneWidget);
     expect(find.text('LIVE COMPONENT PREVIEW'), findsOneWidget);
