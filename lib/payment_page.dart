@@ -6,6 +6,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'customer_account_page.dart';
 import 'woo_store_api.dart';
+import 'checkout_artwork.dart';
 
 class PaymentPage extends StatefulWidget {
   const PaymentPage({super.key, required this.api, required this.address, required this.cart, this.customerToken});
@@ -381,28 +382,95 @@ class _PaymentPageState extends State<PaymentPage> {
 
           ...methods.map((method) {
               final id = (method['id'] ?? '').toString();
+              final title = (method['title'] ?? id).toString();
+              final normalized = title.toLowerCase();
               final active = selected == id;
-              final isCod = id == 'cod';
-              final isMethodUpi = id == 'wc-upi';
-              return Card(
-                elevation: active ? 3 : 1,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: active ? _brand : Colors.grey.shade200, width: active ? 1.7 : 1),
-                ),
-                child: RadioListTile<String>(
-                  value: id,
-                  groupValue: selected,
-                  onChanged: paying ? null : (value) => setState(() { selected = value; error = null; }),
-                  activeColor: _brand,
-                  secondary: Container(
-                    width: 54, height: 54,
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(color: const Color(0xFFF3F0FA), borderRadius: BorderRadius.circular(15)),
-                    child: Icon(isCod ? Icons.local_shipping_rounded : (isMethodUpi ? Icons.qr_code_2_rounded : Icons.account_balance_wallet_rounded), color: _brand, size: 29),
+              final isCod = id.toLowerCase() == 'cod' ||
+                  id.toLowerCase().contains('cod') ||
+                  normalized.contains('cash on delivery');
+              final isMethodUpi = id.toLowerCase().contains('upi') ||
+                  normalized.contains('upi');
+              final description = (method['description'] ??
+                  (isCod ? 'Pay in cash when your order arrives.' :
+                   isMethodUpi ? 'Scan or open your UPI app to pay securely.' :
+                   'Pay securely using this payment option.')).toString();
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                margin: const EdgeInsets.only(bottom: 11),
+                decoration: BoxDecoration(
+                  color: active ? const Color(0xFFF2EDFF) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: active ? _brand : const Color(0xFFE9E5F0),
+                    width: active ? 2 : 1,
                   ),
-                  title: Text((method['title'] ?? (isCod ? 'Cash on Delivery' : id)).toString(), style: const TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: Text((method['description'] ?? (isCod ? 'Pay when your order is delivered' : 'Pay securely using your UPI app')).toString(), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _brand.withValues(alpha: active ? .13 : .045),
+                      blurRadius: active ? 16 : 7,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: paying ? null : () => setState(() {
+                      selected = id;
+                      error = null;
+                    }),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      child: Row(children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 25,
+                          height: 25,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: active ? _brand : Colors.black45, width: active ? 7 : 1.8),
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 13),
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 4),
+                            Text(description, maxLines: 2, overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12.5, height: 1.3, color: Colors.grey.shade700)),
+                            if (active) ...[
+                              const SizedBox(height: 6),
+                              const Text('SELECTED', style: TextStyle(color: _brand, fontSize: 10, letterSpacing: .8, fontWeight: FontWeight.w900)),
+                            ],
+                          ],
+                        )),
+                        const SizedBox(width: 10),
+                        AnimatedScale(
+                          scale: active ? 1.08 : 1,
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutBack,
+                          child: Container(
+                            width: 70,
+                            height: 70,
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: .78),
+                              borderRadius: BorderRadius.circular(17),
+                            ),
+                            child: isCod
+                              ? Image.memory(CheckoutArtwork.rupee, fit: BoxFit.contain, gaplessPlayback: true)
+                              : isMethodUpi
+                                ? Image.memory(CheckoutArtwork.smartphone, fit: BoxFit.contain, gaplessPlayback: true)
+                                : Icon(Icons.account_balance_wallet_rounded, color: _brand, size: 34),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ),
                 ),
               );
             }),
