@@ -61,6 +61,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   Future<void> _saveCurrentAddress() async {
     final value = address;
     value['label'] = addressLabel;
+    if (selectedSavedAddress >= 0 && selectedSavedAddress < savedAddresses.length) {
+      value['id'] = savedAddresses[selectedSavedAddress]['id'] ?? '';
+    }
     final key = _savedAddressKey;
     final prefs = await SharedPreferences.getInstance();
     final index = savedAddresses.indexWhere((e) => e['address_1'] == value['address_1'] && e['postcode'] == value['postcode'] && e['first_name'] == value['first_name']);
