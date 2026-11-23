@@ -648,7 +648,6 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           const Text('Parent category ID'),
           TextField(key: const ValueKey('parent_category_id'), keyboardType: TextInputType.number,
             decoration: const InputDecoration(border: OutlineInputBorder(), hintText: '0 = all categories'),
-            controller: TextEditingController(text: (item.properties['parent_category_id'] ?? '').toString()),
             onChanged: (v) => _change('parent_category_id', int.tryParse(v) ?? 0)),
         ]),
         if (item.type == 'Product') _section('Product settings', [
