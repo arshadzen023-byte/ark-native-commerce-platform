@@ -5,11 +5,12 @@ import 'customer_account_page.dart';
 import 'woo_store_api.dart';
 
 class DeliveryAddressPage extends StatefulWidget {
-  const DeliveryAddressPage({super.key, required this.api, this.initialAddress = const {}, this.customerToken, this.embedded = false, this.onAddressSaved});
+  const DeliveryAddressPage({super.key, required this.api, this.initialAddress = const {}, this.customerToken, this.embedded = false, this.formOnly = false, this.onAddressSaved});
   final WooStoreApi api;
   final String? customerToken;
   final Map<String, dynamic> initialAddress;
   final bool embedded;
+  final bool formOnly;
   final void Function(Map<String, dynamic> address, Map<String, dynamic> cart)? onAddressSaved;
   @override
   State<DeliveryAddressPage> createState() => _DeliveryAddressPageState();
@@ -48,6 +49,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   }
 
   Future<void> _loadSavedAddresses() async {
+    if (widget.formOnly) {
+      if (mounted) setState(() => formVisible = true);
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_savedAddressKey);
     if (raw != null) {
@@ -58,7 +63,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       try { final remote = await ArkCustomerApi(token).request('customer/addresses'); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses)); if (mounted) setState(() {}); } } catch (_) { /* Keep locally saved addresses available while offline. */ }
     }
     if (mounted) setState(() {
-      formVisible = savedAddresses.isEmpty;
+      if (savedAddresses.isEmpty && (widget.initialAddress['address_1'] ?? '').toString().trim().isNotEmpty) {
+        savedAddresses.add({...widget.initialAddress, 'label': 'Default', 'id': 'default'});
+      }
+      formVisible = false;
       if (savedAddresses.isNotEmpty) {
         selectedSavedAddress = 0;
         for (final entry in fields.entries) {
@@ -131,6 +139,46 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     for (final controller in fields.values) { controller.clear(); }
     fields['country']!.text = 'IN';
     setState(() { selectedSavedAddress = -1; addressLabel = 'Home'; formVisible = true; error = null; });
+  }
+
+  Future<void> _openNewAddressPage() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DeliveryAddressPage(
+          api: widget.api,
+          customerToken: widget.customerToken,
+          initialAddress: const {},
+          formOnly: true,
+        ),
+      ),
+    );
+    if (result == null || !mounted || result['address'] is! Map) return;
+    final chosen = Map<String, dynamic>.from(result['address'] as Map);
+    for (final entry in fields.entries) {
+      entry.value.text = (chosen[entry.key] ?? '').toString();
+    }
+    final cart = result['cart'] is Map
+        ? Map<String, dynamic>.from(result['cart'] as Map)
+        : await widget.api.getCart();
+    final existing = savedAddresses.indexWhere((item) =>
+        item['address_1'] == chosen['address_1'] &&
+        item['postcode'] == chosen['postcode'] &&
+        item['first_name'] == chosen['first_name']);
+    if (existing >= 0) {
+      savedAddresses[existing] = chosen;
+      selectedSavedAddress = existing;
+    } else {
+      savedAddresses.add(chosen);
+      selectedSavedAddress = savedAddresses.length - 1;
+    }
+    updatedCart = cart;
+    if (mounted) setState(() { addressLabel = (chosen['label'] ?? 'Home').toString(); formVisible = false; error = null; });
+    if (widget.embedded && widget.onAddressSaved != null) {
+      widget.onAddressSaved!(chosen, cart);
+    } else {
+      Navigator.pop(context, {'address': chosen, 'cart': cart, 'shipping_selected': true});
+    }
   }
 
   TextEditingController _controller(String key, {String fallback = ''}) =>
@@ -212,12 +260,16 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    appBar: widget.embedded ? null : AppBar(
+      title: Text(widget.formOnly ? 'Add new address' : 'Delivery address'),
+      centerTitle: false,
+    ),
     body: Form(
       key: formKey,
       child: ListView(padding: const EdgeInsets.all(16), children: [
         const Text('Where should we deliver?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
         const SizedBox(height: 12),
-        if (savedAddresses.isNotEmpty) ...[
+        if (!widget.formOnly && savedAddresses.isNotEmpty) ...[
           ...List.generate(savedAddresses.length, (index) {
             final item = savedAddresses[index];
             final selected = selectedSavedAddress == index;
@@ -258,8 +310,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
             );
           }),
         ],
-        SizedBox(width: double.infinity, child: OutlinedButton.icon(
-          onPressed: busy ? null : _newAddress,
+        if (!widget.formOnly) SizedBox(width: double.infinity, child: OutlinedButton.icon(
+          onPressed: busy ? null : _openNewAddressPage,
           icon: const Icon(Icons.add_location_alt_outlined),
           label: const Text('ADD NEW ADDRESS'),
         )),
@@ -286,7 +338,11 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         const SizedBox(height: 8),
         SizedBox(height: 54, child: FilledButton(
           onPressed: busy ? null : () async {
-            if (!formKey.currentState!.validate()) return;
+            if (!formVisible && selectedSavedAddress < 0) {
+              setState(() => error = 'Please add or select a delivery address.');
+              return;
+            }
+            if (formVisible && !formKey.currentState!.validate()) return;
             await _saveCurrentAddress();
             if (rates.isEmpty) { await calculateShipping(); return; }
             final chosen = address;
@@ -298,7 +354,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
               Navigator.pop(context, {'address': chosen, 'cart': chosenCart, 'shipping_selected': selectedRate != null || rates.isEmpty});
             }
           },
-          child: const Text('CONTINUE TO SUMMARY', style: TextStyle(fontWeight: FontWeight.bold)),
+          child: Text(widget.formOnly ? 'SAVE ADDRESS & CONTINUE' : 'CONTINUE TO CONFIRM DETAILS', style: const TextStyle(fontWeight: FontWeight.bold)),
         )),
       ]),
     ),
