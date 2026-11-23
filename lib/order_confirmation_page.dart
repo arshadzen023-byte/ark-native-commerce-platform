@@ -43,6 +43,21 @@ class OrderConfirmationPage extends StatelessWidget {
         Text(awaitingVerification ? 'Order received!' : 'Order placed successfully!', textAlign: TextAlign.center, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
         Text(message, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade700, height: 1.4)),
+        if ((order['account_link_warning'] ?? '').toString().trim().isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF5E8),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFFFD8A8)),
+            ),
+            child: Text(
+              'Your WooCommerce order #$id was created, but it could not be linked to My Orders. ${order['account_link_warning']}',
+              style: const TextStyle(color: Color(0xFF8A4B08), height: 1.35),
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         Card(child: Padding(padding: const EdgeInsets.all(18), child: Column(children: [
           _detail('Order ID', '#$id'),
