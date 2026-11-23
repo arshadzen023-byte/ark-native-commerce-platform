@@ -89,6 +89,28 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     setState(() { addressLabel = (value['label'] ?? 'Home').toString(); selectedSavedAddress = savedAddresses.indexOf(value); });
   }
 
+  Future<void> _deleteSelectedAddress() async {
+    if (selectedSavedAddress < 0 || selectedSavedAddress >= savedAddresses.length) return;
+    final value = savedAddresses[selectedSavedAddress];
+    final id = (value['id'] ?? '').toString();
+    setState(() { busy = true; error = null; });
+    try {
+      if (widget.customerToken != null && id.isNotEmpty) {
+        await ArkCustomerApi(widget.customerToken!).request(
+          'customer/addresses', method: 'DELETE', query: {'id': id},
+        );
+      }
+      savedAddresses.removeAt(selectedSavedAddress);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses));
+      if (mounted) setState(() { selectedSavedAddress = -1; });
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   TextEditingController _controller(String key, {String fallback = ''}) =>
       TextEditingController(text: (widget.initialAddress[key] ?? fallback).toString());
 
@@ -180,6 +202,17 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
             items: [const DropdownMenuItem(value: -1, child: Text('Enter a new address')), ...List.generate(savedAddresses.length, (i) => DropdownMenuItem(value: i, child: Text((savedAddresses[i]['label'] ?? 'Address ${i + 1}').toString())))],
             onChanged: (index) { if (index == null) return; if (index == -1) { setState(() => selectedSavedAddress = -1); } else { _applySavedAddress(savedAddresses[index]); } },
           ),
+          Row(children: [
+            TextButton.icon(
+              onPressed: selectedSavedAddress < 0 ? null : () => _applySavedAddress(savedAddresses[selectedSavedAddress]),
+              icon: const Icon(Icons.edit_outlined, size: 18), label: const Text('EDIT'),
+            ),
+            TextButton.icon(
+              onPressed: busy || selectedSavedAddress < 0 ? null : _deleteSelectedAddress,
+              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+              label: const Text('DELETE', style: TextStyle(color: Colors.red)),
+            ),
+          ]),
           const SizedBox(height: 12),
         ],
         DropdownButtonFormField<String>(
@@ -196,7 +229,6 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         field('address_2', 'Landmark (optional)', required: false),
         Row(children: [Expanded(child: field('city', 'City')), const SizedBox(width: 10), Expanded(child: field('state', 'State'))]),
         Row(children: [Expanded(child: field('postcode', 'PIN code', type: TextInputType.number)), const SizedBox(width: 10), Expanded(child: field('country', 'Country code'))]),
-        OutlinedButton.icon(onPressed: busy ? null : calculateShipping, icon: const Icon(Icons.local_shipping_outlined), label: const Text('CALCULATE SHIPPING')),
         if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
         if (busy) const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())),
         if (rates.isNotEmpty) ...[
@@ -218,6 +250,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
           onPressed: busy ? null : () async {
             if (!formKey.currentState!.validate()) return;
             await _saveCurrentAddress();
+            if (rates.isEmpty) { await calculateShipping(); return; }
             if (rates.isNotEmpty && selectedRate == null) {
               setState(() => error = 'Please select a shipping method.');
               return;
