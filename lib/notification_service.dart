@@ -112,7 +112,7 @@ class GlowHitPushService {
       method: 'POST',
       headers: headers,
       body: jsonEncode({
-        'token': token, 'platform': 'android', 'app_version': '1.0.9+89', 'installation_id': await _installationId(),
+        'token': token, 'platform': 'android', 'app_version': '1.0.10+90', 'installation_id': await _installationId(),
       }),
     );
     if (response.statusCode < 200 || response.statusCode >= 300) throw Exception('FCM registration failed (' + response.statusCode.toString() + ')');

@@ -18,7 +18,6 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
   Map<String, dynamic> address = {};
   bool loading = true;
   int step = 0;
-  Map<String, dynamic> completedOrder = {};
   String? error;
 
   @override
@@ -46,13 +45,32 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
     await openPayment();
   }
 
+  Future<void> _selectShippingRate(Map<String, dynamic> rate) async {
+    final rateId = (rate['rate_id'] ?? rate['id'] ?? '').toString();
+    final packageId = (rate['package_id'] as num?)?.toInt() ?? 0;
+    if (rateId.isEmpty) return;
+    setState(() { loading = true; error = null; });
+    try {
+      final updated = await widget.api.selectShippingRate(packageId, rateId);
+      if (mounted) setState(() { cart = updated; loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { error = e.toString().replaceFirst('Exception: ', ''); loading = false; });
+    }
+  }
+
   Future<void> openPayment() async {
     final result = await Navigator.push<Map<String, dynamic>>(context, MaterialPageRoute(
       builder: (_) => PaymentPage(api: widget.api, address: address, cart: cart),
     ));
     if (result == null || !mounted) return;
-    if (!mounted) return;
-    setState(() { completedOrder = Map<String, dynamic>.from(result); step = 3; });
+    await Navigator.push(context, MaterialPageRoute(
+      builder: (_) => OrderConfirmationPage(
+        order: result,
+        cart: cart,
+        api: widget.api,
+        onContinue: () => Navigator.of(context).popUntil((route) => route.isFirst),
+      ),
+    ));
   }
 
   @override
@@ -70,7 +88,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
         ]))),
       );
     }
-    final steps = ['Summary', 'Address', 'Payment', 'Received'];
+    final steps = ['Summary', 'Address', 'Payment'];
     return Scaffold(
       appBar: AppBar(
         title: const Text('Checkout'),
@@ -79,9 +97,9 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
       ),
       body: Column(children: [
         Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 14), child: Column(children: [
-          Row(children: List.generate(4, (i) => Expanded(child: Container(margin: EdgeInsets.only(right: i == 3 ? 0 : 6), height: 5, decoration: BoxDecoration(color: step >= i ? const Color(0xFF51408F) : Colors.grey.shade300, borderRadius: BorderRadius.circular(8)))))), 
+          Row(children: List.generate(3, (i) => Expanded(child: Container(margin: EdgeInsets.only(right: i == 2 ? 0 : 6), height: 5, decoration: BoxDecoration(color: step >= i ? const Color(0xFF51408F) : Colors.grey.shade300, borderRadius: BorderRadius.circular(8)))))),
           const SizedBox(height: 8),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(4, (i) => Text(steps[i], style: TextStyle(fontSize: 12, color: step >= i ? const Color(0xFF51408F) : Colors.grey, fontWeight: step == i ? FontWeight.bold : FontWeight.normal)))), 
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(3, (i) => Text(steps[i], style: TextStyle(fontSize: 12, color: step >= i ? const Color(0xFF51408F) : Colors.grey, fontWeight: step == i ? FontWeight.bold : FontWeight.normal)))),
         ])),
         Expanded(child: step == 0
           ? OrderSummaryPage(cart: cart, onContinue: () => setState(() => step = 1), onQuantityChanged: (key, quantity) async {
@@ -99,12 +117,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
             ? DeliveryAddressPage(api: widget.api, initialAddress: address, customerToken: widget.customerToken, embedded: true, onAddressSaved: (value, updated) {
                 setState(() { address = value; cart = updated; step = 2; error = null; });
               })
-            : step == 2 ? _paymentReview()
-            : OrderConfirmationPage(
-                order: completedOrder,
-                cart: cart,
-                onContinue: () => Navigator.of(context).popUntil((route) => route.isFirst),
-              )), 
+            : _paymentReview()),
       ]),
     );
   }
@@ -116,6 +129,20 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
     final raw = int.tryParse('${totals['total_price'] ?? '0'}') ?? 0;
     final digits = (totals['currency_minor_unit'] as num?)?.toInt() ?? 2;
     final amount = '$currency${(raw / (digits == 0 ? 1 : digits == 1 ? 10 : 100)).toStringAsFixed(digits)}';
+    final packages = (cart['shipping_rates'] as List? ?? cart['packages'] as List? ?? const []);
+    final shippingRates = <Map<String, dynamic>>[];
+    for (final package in packages.whereType<Map>()) {
+      final packageId = (package['package_id'] as num?)?.toInt() ?? 0;
+      for (final rate in (package['shipping_rates'] as List? ?? const []).whereType<Map>()) {
+        shippingRates.add({...Map<String, dynamic>.from(rate), 'package_id': packageId});
+      }
+    }
+    String shippingPrice(Map rate) {
+      final value = int.tryParse('${rate['price'] ?? rate['cost'] ?? '0'}') ?? 0;
+      final unit = (rate['currency_minor_unit'] as num?)?.toInt() ?? digits;
+      final divisor = unit == 0 ? 1 : (unit == 1 ? 10 : 100);
+      return '${rate['currency_symbol'] ?? currency}${(value / divisor).toStringAsFixed(unit)}';
+    }
     return ListView(padding: const EdgeInsets.all(16), children: [
       const Text('Review order and delivery', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
       const SizedBox(height: 12),
@@ -130,10 +157,28 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
         const Text('Products', style: TextStyle(fontWeight: FontWeight.bold)),
         for (final item in lines) ListTile(contentPadding: EdgeInsets.zero, title: Text((item['name'] ?? 'Product').toString()), subtitle: Text('Quantity: ${item['quantity'] ?? 1}'), trailing: Text((item['totals'] is Map ? (item['totals'] as Map)['line_total'] : '')?.toString() ?? '')),
       ]))),
+      const SizedBox(height: 12),
+      Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Choose shipping method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+        if (shippingRates.isEmpty)
+          Padding(padding: const EdgeInsets.only(top: 8), child: Text('No shipping rates returned for this address. Check the WooCommerce shipping zone.', style: TextStyle(color: Colors.orange.shade800))),
+        ...shippingRates.map((rate) {
+          final id = (rate['rate_id'] ?? rate['id'] ?? '').toString();
+          return RadioListTile<String>(
+            contentPadding: EdgeInsets.zero,
+            value: id,
+            groupValue: shippingRates.where((r) => r['selected'] == true).map((r) => (r['rate_id'] ?? r['id'] ?? '').toString()).firstOrNull,
+            onChanged: loading ? null : (_) => _selectShippingRate(rate),
+            title: Text((rate['name'] ?? rate['method_title'] ?? id).toString()),
+            subtitle: Text(shippingPrice(rate)),
+            activeColor: const Color(0xFF51408F),
+          );
+        }),
+      ]))),
       const SizedBox(height: 10),
       Card(child: Padding(padding: const EdgeInsets.all(16), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Total payable', style: TextStyle(fontWeight: FontWeight.bold)), Text(amount, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF51408F)))]))),
       const SizedBox(height: 12),
-      SizedBox(height: 54, child: FilledButton(onPressed: address['address_1'] == null || address['address_1'].toString().trim().isEmpty ? null : openPayment, child: const Text('CONTINUE TO PAYMENT'))),
+      SizedBox(height: 54, child: FilledButton(onPressed: loading || address['address_1'] == null || address['address_1'].toString().trim().isEmpty || (shippingRates.isNotEmpty && !shippingRates.any((r) => r['selected'] == true)) ? null : openPayment, child: const Text('CONTINUE TO PAYMENT'))),
     ]);
   }
 }

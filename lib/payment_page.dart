@@ -104,7 +104,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
   String money(Map? data) {
     if (data == null) return '₹0.00';
-    final raw = int.tryParse('${data['total_price'] ?? '0'}') ?? 0;
+    final raw = int.tryParse('${data['total_price'] ?? data['line_total'] ?? data['price'] ?? '0'}') ?? 0;
     final digits = (data['currency_minor_unit'] as num?)?.toInt() ?? 2;
     final divisor = digits == 0 ? 1 : (digits == 1 ? 10 : 100);
     return '${data['currency_symbol'] ?? '₹'}${(raw / divisor).toStringAsFixed(digits)}';
@@ -239,12 +239,34 @@ class _PaymentPageState extends State<PaymentPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return Scaffold(appBar: AppBar(title: const Text('Payment')), body: const Center(child: CircularProgressIndicator()));
+    if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     return Scaffold(
-      appBar: AppBar(title: const Text('Payment')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
+          ...((liveCart['items'] as List? ?? []).whereType<Map>()).map((item) {
+            final images = item['images'] as List? ?? const [];
+            final image = images.isNotEmpty && images.first is Map
+                ? (images.first['thumbnail'] ?? images.first['src'] ?? '').toString()
+                : '';
+            final line = item['totals'] is Map ? item['totals'] as Map : const {};
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              child: ListTile(
+                leading: SizedBox(
+                  width: 62, height: 62,
+                  child: image.isEmpty
+                    ? const Icon(Icons.shopping_bag_outlined)
+                    : Image.network(image, fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined)),
+                ),
+                title: Text((item['name'] ?? 'Product').toString(), maxLines: 2, overflow: TextOverflow.ellipsis),
+                subtitle: Text('Qty: ${item['quantity'] ?? 1}'),
+                trailing: Text(money(line), style: const TextStyle(fontWeight: FontWeight.w800, color: _brand)),
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
           const Text('Choose payment method', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800)),
           const SizedBox(height: 6),
           Text('Select how you want to pay for your order.', style: TextStyle(color: Colors.grey.shade700)),

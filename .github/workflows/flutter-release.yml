@@ -33,6 +33,7 @@ jobs:
           cp firebase/google-services.json android/app/google-services.json
           python3 - <<'PY'
           from pathlib import Path
+          import re
           settings = Path("android/settings.gradle.kts")
           app = Path("android/app/build.gradle.kts")
           kotlin_dsl = settings.exists() and app.exists()
@@ -103,6 +104,7 @@ jobs:
           app.write_text(app_text, encoding="utf-8")
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           text = manifest.read_text(encoding="utf-8")
+          text = re.sub(r'android:label="[^"]+"', 'android:label="GlowHit"', text, count=1)
           if "android.permission.POST_NOTIFICATIONS" not in text:
               end = text.find(">", text.find("<manifest"))
               text = text[:end+1] + '\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' + text[end+1:]
@@ -120,6 +122,35 @@ jobs:
           if 'android.permission.INTERNET' not in t:
               i=t.find('>',t.find('<manifest')); t=t[:i+1]+'\n    <uses-permission android:name="android.permission.INTERNET" />'+t[i+1:]; p.write_text(t)
           PY
+      - name: Install Android NDK with retry protection
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          NDK_PACKAGE="ndk;28.2.13676358"
+          if [[ ! -x "$SDKMANAGER" ]]; then
+            echo "::error::Android sdkmanager not found at $SDKMANAGER"
+            exit 1
+          fi
+          set +o pipefail
+          yes | "$SDKMANAGER" --licenses >/dev/null
+          set -o pipefail
+          for attempt in 1 2 3; do
+            echo "Installing $NDK_PACKAGE (attempt $attempt/3)"
+            if "$SDKMANAGER" --install "$NDK_PACKAGE" --verbose; then
+              if [[ -f "$SDK_ROOT/ndk/28.2.13676358/source.properties" ]]; then
+                echo "Verified NDK 28.2.13676358 installation"
+                exit 0
+              fi
+              echo "NDK install returned success but source.properties is missing"
+            fi
+            rm -rf "$SDK_ROOT/ndk/28.2.13676358"
+            rm -rf "$SDK_ROOT/.temp"/*
+            if [[ "$attempt" -lt 3 ]]; then sleep $((attempt * 15)); fi
+          done
+          echo "::error::NDK 28.2.13676358 failed to install after 3 attempts"
+          exit 1
       - name: Get dependencies
         run: flutter pub get
       - name: Analyze
@@ -130,7 +161,18 @@ jobs:
         run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
-          name: glowhit-v1.0.8-fcm-notifications
+          name: glowhit-v1.0.10-full-app-restored
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish installable APK release
+        if: github.ref == 'refs/heads/fix/glowhit-full-app-restore-2026-11-23'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: glowhit-v1.0.10-full-app-restored-2026-11-23
+          name: GlowHit v1.0.10 — Full app restored
+          prerelease: true
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: build/app/outputs/flutter-apk/app-release.apk

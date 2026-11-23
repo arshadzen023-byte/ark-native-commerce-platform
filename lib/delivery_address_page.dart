@@ -26,10 +26,8 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   List<Map<String, dynamic>> savedAddresses = [];
   String addressLabel = 'Home';
   int selectedSavedAddress = -1;
+  bool formVisible = true;
   static const _savedAddressKey = 'glowhit_saved_delivery_addresses';
-  String get _accountAddressKey => widget.customerToken == null
-      ? _savedAddressKey
-      : '${_savedAddressKey}_${widget.customerToken}';
 
   @override
   void initState() {
@@ -51,7 +49,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   Future<void> _loadSavedAddresses() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_accountAddressKey);
+    final raw = prefs.getString(_savedAddressKey);
     if (raw != null) {
       try { final list = jsonDecode(raw) as List; if (mounted) setState(() => savedAddresses = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()); } catch (_) { /* Ignore malformed local cache. */ }
     }
@@ -59,12 +57,25 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     if (token != null) {
       try { final remote = await ArkCustomerApi(token).request('customer/addresses'); if (remote is List) { savedAddresses = remote.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(); await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses)); if (mounted) setState(() {}); } } catch (_) { /* Keep locally saved addresses available while offline. */ }
     }
+    if (mounted) setState(() {
+      formVisible = savedAddresses.isEmpty;
+      if (savedAddresses.isNotEmpty) {
+        selectedSavedAddress = 0;
+        for (final entry in fields.entries) {
+          entry.value.text = (savedAddresses.first[entry.key] ?? '').toString();
+        }
+        addressLabel = (savedAddresses.first['label'] ?? 'Home').toString();
+      }
+    });
   }
 
   Future<void> _saveCurrentAddress() async {
     final value = address;
     value['label'] = addressLabel;
-    final key = _accountAddressKey;
+    if (selectedSavedAddress >= 0 && selectedSavedAddress < savedAddresses.length) {
+      value['id'] = savedAddresses[selectedSavedAddress]['id'] ?? '';
+    }
+    final key = _savedAddressKey;
     final prefs = await SharedPreferences.getInstance();
     final index = savedAddresses.indexWhere((e) => e['address_1'] == value['address_1'] && e['postcode'] == value['postcode'] && e['first_name'] == value['first_name']);
     if (index >= 0) { savedAddresses[index] = value; } else { savedAddresses.add(value); }
@@ -82,6 +93,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         throw Exception('Address was kept on this device but could not be synced to your account: ${e.toString().replaceFirst('Exception: ', '')}');
       }
     }
+    selectedSavedAddress = savedAddresses.indexWhere((e) =>
+      (e['address_1'] ?? '') == value['address_1'] &&
+      (e['postcode'] ?? '') == value['postcode'] &&
+      (e['first_name'] ?? '') == value['first_name']);
     if (mounted) setState(() {});
   }
 
@@ -90,6 +105,32 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       entry.value.text = (value[entry.key] ?? '').toString();
     }
     setState(() { addressLabel = (value['label'] ?? 'Home').toString(); selectedSavedAddress = savedAddresses.indexOf(value); });
+  }
+
+  Future<void> _deleteSelectedAddress() async {
+    if (selectedSavedAddress < 0 || selectedSavedAddress >= savedAddresses.length) return;
+    final value = savedAddresses[selectedSavedAddress];
+    final id = (value['id'] ?? '').toString();
+    setState(() { busy = true; error = null; });
+    try {
+      if (widget.customerToken != null && id.isNotEmpty) {
+        await ArkCustomerApi(widget.customerToken!).request('customer/addresses', method: 'DELETE', query: {'id': id});
+      }
+      savedAddresses.removeAt(selectedSavedAddress);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses));
+      if (mounted) setState(() { selectedSavedAddress = -1; formVisible = savedAddresses.isEmpty; });
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  void _newAddress() {
+    for (final controller in fields.values) { controller.clear(); }
+    fields['country']!.text = 'IN';
+    setState(() { selectedSavedAddress = -1; addressLabel = 'Home'; formVisible = true; error = null; });
   }
 
   TextEditingController _controller(String key, {String fallback = ''}) =>
@@ -171,21 +212,58 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Delivery address')),
     body: Form(
       key: formKey,
       child: ListView(padding: const EdgeInsets.all(16), children: [
         const Text('Where should we deliver?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
         const SizedBox(height: 12),
         if (savedAddresses.isNotEmpty) ...[
-          DropdownButtonFormField<int>(
-            value: selectedSavedAddress,
-            decoration: const InputDecoration(labelText: 'Choose a saved address', border: OutlineInputBorder()),
-            items: [const DropdownMenuItem(value: -1, child: Text('Enter a new address')), ...List.generate(savedAddresses.length, (i) => DropdownMenuItem(value: i, child: Text((savedAddresses[i]['label'] ?? 'Address ${i + 1}').toString())))],
-            onChanged: (index) { if (index == null) return; if (index == -1) { setState(() => selectedSavedAddress = -1); } else { _applySavedAddress(savedAddresses[index]); } },
-          ),
-          const SizedBox(height: 12),
+          ...List.generate(savedAddresses.length, (index) {
+            final item = savedAddresses[index];
+            final selected = selectedSavedAddress == index;
+            final summary = ['address_1','address_2','city','state','postcode','country']
+              .map((key) => item[key]).where((v) => v != null && v.toString().isNotEmpty).join(', ');
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: selected ? const Color(0xFF51408F) : Colors.black12, width: selected ? 1.5 : 1),
+              ),
+              child: Column(children: [
+                CheckboxListTile(
+                  value: selected,
+                  activeColor: const Color(0xFF51408F),
+                  onChanged: busy ? null : (_) {
+                    _applySavedAddress(item);
+                    setState(() { selectedSavedAddress = index; formVisible = false; });
+                  },
+                  title: Text((item['label'] ?? 'Address ${index + 1}').toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(summary),
+                  secondary: Icon((item['label'] == 'Office' || item['label'] == 'Work') ? Icons.work_outline : Icons.home_outlined, color: const Color(0xFF51408F)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8, bottom: 6),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                    TextButton.icon(onPressed: busy ? null : () {
+                      _applySavedAddress(item);
+                      setState(() { selectedSavedAddress = index; formVisible = true; });
+                    }, icon: const Icon(Icons.edit_outlined, size: 17), label: const Text('EDIT')),
+                    TextButton.icon(onPressed: busy ? null : () async {
+                      setState(() => selectedSavedAddress = index);
+                      await _deleteSelectedAddress();
+                    }, icon: const Icon(Icons.delete_outline, size: 17, color: Colors.red), label: const Text('DELETE', style: TextStyle(color: Colors.red))),
+                  ]),
+                ),
+              ]),
+            );
+          }),
         ],
+        SizedBox(width: double.infinity, child: OutlinedButton.icon(
+          onPressed: busy ? null : _newAddress,
+          icon: const Icon(Icons.add_location_alt_outlined),
+          label: const Text('ADD NEW ADDRESS'),
+        )),
+        if (formVisible) ...[
         DropdownButtonFormField<String>(
           value: addressLabel,
           decoration: const InputDecoration(labelText: 'Address type', border: OutlineInputBorder()),
@@ -200,32 +278,17 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         field('address_2', 'Landmark (optional)', required: false),
         Row(children: [Expanded(child: field('city', 'City')), const SizedBox(width: 10), Expanded(child: field('state', 'State'))]),
         Row(children: [Expanded(child: field('postcode', 'PIN code', type: TextInputType.number)), const SizedBox(width: 10), Expanded(child: field('country', 'Country code'))]),
-        OutlinedButton.icon(onPressed: busy ? null : calculateShipping, icon: const Icon(Icons.local_shipping_outlined), label: const Text('CALCULATE SHIPPING')),
         if (error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
         if (busy) const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())),
-        if (rates.isNotEmpty) ...[
-          const SizedBox(height: 18),
-          const Text('Available shipping methods', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ...rates.map((rate) {
-            final id = (rate['rate_id'] ?? rate['id'] ?? '').toString();
-            return RadioListTile<String>(
-              value: id, groupValue: selectedRate, onChanged: busy ? null : (_) => selectRate(rate),
-              title: Text((rate['name'] ?? rate['method_title'] ?? id).toString()),
-              subtitle: Text(ratePrice(rate)), activeColor: const Color(0xFF51408F),
-            );
-          }),
-        ],
         const SizedBox(height: 16),
         OutlinedButton.icon(onPressed: busy ? null : () async { if (!formKey.currentState!.validate()) return; await _saveCurrentAddress(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address saved'))); }, icon: const Icon(Icons.bookmark_add_outlined), label: const Text('SAVE THIS ADDRESS')),
+        ],
         const SizedBox(height: 8),
         SizedBox(height: 54, child: FilledButton(
           onPressed: busy ? null : () async {
             if (!formKey.currentState!.validate()) return;
             await _saveCurrentAddress();
-            if (rates.isNotEmpty && selectedRate == null) {
-              setState(() => error = 'Please select a shipping method.');
-              return;
-            }
+            if (rates.isEmpty) { await calculateShipping(); return; }
             final chosen = address;
             final chosenCart = updatedCart.isNotEmpty ? updatedCart : await widget.api.getCart();
             if (!mounted) return;
@@ -235,7 +298,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
               Navigator.pop(context, {'address': chosen, 'cart': chosenCart, 'shipping_selected': selectedRate != null || rates.isEmpty});
             }
           },
-          child: const Text('CONTINUE TO PAYMENT', style: TextStyle(fontWeight: FontWeight.bold)),
+          child: const Text('CONTINUE TO SUMMARY', style: TextStyle(fontWeight: FontWeight.bold)),
         )),
       ]),
     ),

@@ -9,7 +9,7 @@ class OrderSummaryPage extends StatelessWidget {
 
   String money(dynamic data) {
     if (data is! Map) return '';
-    final raw = int.tryParse('${data['total_price'] ?? data['line_total'] ?? '0'}') ?? 0;
+    final raw = int.tryParse('${data['total_price'] ?? data['line_total'] ?? data['price'] ?? '0'}') ?? 0;
     final digits = (data['currency_minor_unit'] as num?)?.toInt() ?? 2;
     final divisor = digits == 0 ? 1 : (digits == 1 ? 10 : 100);
     return '${data['currency_symbol'] ?? '₹'}${(raw / divisor).toStringAsFixed(digits)}';
@@ -20,7 +20,6 @@ class OrderSummaryPage extends StatelessWidget {
     final items = (cart['items'] as List? ?? []).whereType<Map>().toList();
     final totals = cart['totals'] is Map ? cart['totals'] as Map : const {};
     return Scaffold(
-      appBar: AppBar(title: const Text('Order summary')),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         const Text('Review your order', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
         const SizedBox(height: 6),
