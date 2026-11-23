@@ -54,6 +54,7 @@ class _WooCheckoutPageState extends State<WooCheckoutPage> {
       builder: (_) => OrderConfirmationPage(
         order: result,
         cart: cart,
+        api: widget.api,
         onContinue: () => Navigator.of(context).popUntil((route) => route.isFirst),
       ),
     ));
