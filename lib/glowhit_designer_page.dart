@@ -587,8 +587,11 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (component.properties['show_title'] != false && component.title.isNotEmpty)
-          Text(
-            component.title,
+          Container(
+            padding: EdgeInsets.all((component.properties['title_background_padding'] as num?)?.toDouble() ?? 0),
+            color: _color((component.properties['title_background_color'] ?? '#00000000').toString()),
+            child: Text(
+              component.title,
             maxLines: ((component.properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4),
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
