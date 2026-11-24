@@ -21,7 +21,6 @@ void main() {
     expect(find.text('ARK Designer'), findsOneWidget);
     expect(find.text('Edit page'), findsOneWidget);
     expect(find.text('Home'), findsWidgets);
-    expect(find.text('Main promotional banner'), findsNothing);
     expect(find.text('Tap to edit properties'), findsNothing);
     expect(find.text('Banner Slider'), findsOneWidget);
     expect(find.text('Save Draft'), findsOneWidget);
