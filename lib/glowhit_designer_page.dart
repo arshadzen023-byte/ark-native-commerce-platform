@@ -966,7 +966,6 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
   @override
   Widget build(BuildContext context) {
     final layouts = _GlowHitDesignerPageState._layoutTypes[item.type]!;
-    final jsonText = const JsonEncoder.withIndent('  ').convert(item.toJson());
     return Theme(
       data: ThemeData(
         brightness: Brightness.light,
