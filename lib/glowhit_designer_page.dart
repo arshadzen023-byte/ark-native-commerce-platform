@@ -918,6 +918,8 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
         if (item.type == 'Banner') _section('Banner style', [
           _switch('Carousel controls', 'control'),
           _switch('Autoplay', 'autoplay'),
+          if (item.properties['autoplay'] == true)
+            _slider('Autoplay interval (seconds)', 'autoplay_seconds', min: 2, max: 15),
           _switch('Fade transition', 'fade'),
           _switch('Pause when touched', 'pause'),
           _switch('Show dots', 'dots'),
