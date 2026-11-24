@@ -803,9 +803,19 @@ class _StoreHomeState extends State<StoreHome> {
     final sections = page is Map && page['sections'] is List ? page['sections'] as List : const <dynamic>[];
     return Column(children: [
       Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
-      Expanded(child: ListView(
-        padding: const EdgeInsets.only(bottom: 20),
-        children: sections.whereType<Map>().map((s) => _designerSection(Map<String, dynamic>.from(s))).toList(),
+      Expanded(child: RefreshIndicator(
+        onRefresh: _loadDesignerConfig,
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 20),
+          children: [
+            if (designerConfigLoading && sections.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ...sections.whereType<Map>().map((section) => _designerSection(Map<String, dynamic>.from(section))),
+          ],
+        ),
       )),
     ]);
   }
