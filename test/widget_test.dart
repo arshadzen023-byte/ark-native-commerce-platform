@@ -38,10 +38,15 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Main promotional banner').first);
     await tester.pumpAndSettle();
-    expect(find.text('Component Properties'), findsOneWidget);
+    // Assert against the reference-style editor labels currently rendered.
     expect(find.text('LIVE COMPONENT PREVIEW'), findsOneWidget);
     expect(find.text('Component layout'), findsOneWidget);
     expect(find.text('Title text style'), findsOneWidget);
+    expect(find.text('Layout'), findsOneWidget);
+    expect(find.text('Design'), findsOneWidget);
+    expect(find.text('JSON'), findsOneWidget);
+    expect(find.text('Live Preview'), findsOneWidget);
+    expect(find.text('Property'), findsOneWidget);
     // Banner-specific controls are below the initial viewport. Keep this
     // editor persistence test focused on the visible property form and save;
     // their interactive behavior is covered by dedicated widget tests.
