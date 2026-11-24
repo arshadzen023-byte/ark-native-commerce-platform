@@ -963,6 +963,279 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     },
   );
 
+  Widget _childrenPanel() {
+    final children = item.properties['children'] is List
+        ? List<dynamic>.from(item.properties['children'] as List)
+        : <dynamic>[];
+    return ListView(
+      padding: const EdgeInsets.all(14),
+      children: [
+        _section('Children', [
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            OutlinedButton.icon(
+              onPressed: () async {
+                final media = await widget.onChooseMedia();
+                if (media == null) return;
+                final source = (media['source_url'] ?? '').toString();
+                if (source.isEmpty) return;
+                final mime = (media['mime_type'] ?? '').toString();
+                final isVideo = mime.startsWith('video/');
+                children.add({
+                  'type': isVideo ? 'video' : 'image',
+                  'attachment_id': media['id'],
+                  'image_url': isVideo ? '' : source,
+                  'video_url': isVideo ? source : '',
+                  'source_url': source,
+                  'mime_type': mime,
+                  'title': (media['title'] ?? 'New').toString(),
+                  'alt_text': (media['alt_text'] ?? '').toString(),
+                  'link_type': 'in_app', 'link_value': '', 'active': true,
+                });
+                _change('children', children);
+              },
+              icon: const Icon(Icons.photo_library_outlined),
+              label: const Text('Add image / video'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final controller = TextEditingController();
+                final value = await showDialog<String>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text('Add text child'),
+                    content: TextField(controller: controller, autofocus: true),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+                      FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Add')),
+                    ],
+                  ),
+                );
+                controller.dispose();
+                if (value == null || value.isEmpty) return;
+                children.add({'type': 'text', 'title': value, 'text': value, 'active': true});
+                _change('children', children);
+              },
+              icon: const Icon(Icons.text_fields),
+              label: const Text('Add text'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final controller = TextEditingController();
+                final value = await showDialog<String>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text('Add link child'),
+                    content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: 'URL or ark:// route')),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+                      FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Add')),
+                    ],
+                  ),
+                );
+                controller.dispose();
+                if (value == null || value.isEmpty) return;
+                children.add({
+                  'type': 'link', 'title': value,
+                  'link_type': value.startsWith('ark://') ? 'deep_link' : 'url',
+                  'link_value': value, 'active': true,
+                });
+                _change('children', children);
+              },
+              icon: const Icon(Icons.link),
+              label: const Text('Add link'),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          if (children.isEmpty)
+            const Padding(padding: EdgeInsets.all(12), child: Text('No children added yet.'))
+          else
+            ...children.asMap().entries.map((entry) {
+              final child = entry.value is Map
+                  ? Map<String, dynamic>.from(entry.value as Map)
+                  : <String, dynamic>{};
+              final type = (child['type'] ?? 'image').toString();
+              final src = (child['image_url'] ?? child['video_url'] ?? child['source_url'] ?? '').toString();
+              return Card(
+                color: _designerField,
+                child: ListTile(
+                  onTap: () => _editChild(entry.key),
+                  leading: SizedBox(
+                    width: 54, height: 54,
+                    child: src.isEmpty
+                        ? Icon(type == 'link' ? Icons.link : type == 'text' ? Icons.text_fields : Icons.image)
+                        : Image.network(src, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)),
+                  ),
+                  title: Text((child['title'] ?? 'New').toString()),
+                  subtitle: Text(type.toUpperCase()),
+                  trailing: IconButton(
+                    tooltip: 'Delete child',
+                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                    onPressed: () {
+                      final updated = List<dynamic>.from(item.properties['children'] as List)..removeAt(entry.key);
+                      _change('children', updated);
+                    },
+                  ),
+                ),
+              );
+            }),
+          if (children.length > 1) ...[
+            const SizedBox(height: 10),
+            const Text('Child Reorder', style: TextStyle(fontWeight: FontWeight.w800)),
+            ReorderableListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              onReorder: (oldIndex, newIndex) {
+                final updated = List<dynamic>.from(item.properties['children'] as List);
+                if (newIndex > oldIndex) newIndex--;
+                final moved = updated.removeAt(oldIndex);
+                updated.insert(newIndex, moved);
+                _change('children', updated);
+              },
+              children: children.asMap().entries.map((entry) => ListTile(
+                key: ValueKey('child-order-${item.id}-${entry.key}'),
+                leading: const Icon(Icons.drag_handle),
+                title: Text((entry.value is Map ? (entry.value as Map)['title'] : 'Child')?.toString() ?? 'Child'),
+              )).toList(),
+            ),
+          ],
+        ]),
+      ],
+    );
+  }
+
+  Widget _titlePanel() => ListView(
+    padding: const EdgeInsets.all(14),
+    children: [
+      _section('Title', [
+        TextField(
+          controller: _title,
+          decoration: const InputDecoration(labelText: 'Title'),
+          onChanged: (value) { item.title = value; widget.onChanged(); setState(() {}); },
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _description,
+          maxLines: 2,
+          decoration: const InputDecoration(labelText: 'Description'),
+          onChanged: (value) => _change('description', value),
+        ),
+        _switch('Show Title', 'show_title'),
+        _switch('Countdown Time', 'countdown_enabled'),
+        if (item.properties['countdown_enabled'] == true)
+          TextFormField(
+            initialValue: (item.properties['countdown_time'] ?? '').toString(),
+            decoration: const InputDecoration(labelText: 'Countdown date and time'),
+            onChanged: (value) => _change('countdown_time', value),
+          ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _openTextStyle,
+          icon: const Icon(Icons.text_format_rounded),
+          label: const Text('Title Text Style'),
+        ),
+      ]),
+    ],
+  );
+
+  Widget _openColorPanel() => ListView(
+    padding: const EdgeInsets.all(14),
+    children: [
+      _section('Color', [
+        _colorChoice('Background Color', 'background_color', const ['#FFFFFF', '#F7F7FA', '#F1ECFF', '#E8F6F0', '#FFF0E6', '#202033']),
+        _colorChoice('Title Color', 'title_color', const ['#24212B', '#51408F', '#FFFFFF', '#B23B32', '#16734A']),
+        _colorChoice('Text Color', 'text_color', const ['#24212B', '#FFFFFF', '#7650B8', '#B23B32', '#16734A']),
+      ]),
+    ],
+  );
+
+  Widget _settingsPanel(List<String> layouts) => ListView(
+    padding: const EdgeInsets.all(14),
+    children: [
+      _section('Settings', [
+        _switch('Component Status', 'enabled'),
+        DropdownButtonFormField<String>(
+          initialValue: layouts.contains(item.layout) ? item.layout : layouts.first,
+          decoration: const InputDecoration(labelText: 'Layout'),
+          items: layouts.map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(),
+          onChanged: (value) { if (value != null) setState(() => item.layout = value); widget.onChanged(); },
+        ),
+        if (item.type == 'Category') ...[
+          _switch('Show All Categories', 'show_all_categories'),
+          TextFormField(
+            initialValue: (item.properties['parent_category_id'] ?? 0).toString(),
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Parent Category ID (0 = all)'),
+            onChanged: (value) => _change('parent_category_id', int.tryParse(value) ?? 0),
+          ),
+        ],
+        if (item.type == 'Product') ...[
+          DropdownButtonFormField<String>(
+            initialValue: (item.properties['source'] ?? 'featured').toString(),
+            decoration: const InputDecoration(labelText: 'Product source'),
+            items: const [
+              DropdownMenuItem(value: 'latest', child: Text('Latest / New Arrival')),
+              DropdownMenuItem(value: 'featured', child: Text('Featured')),
+              DropdownMenuItem(value: 'category', child: Text('Category')),
+              DropdownMenuItem(value: 'tag', child: Text('Product Tag')),
+              DropdownMenuItem(value: 'on_sale', child: Text('On Sale')),
+              DropdownMenuItem(value: 'wishlist', child: Text('Wishlist')),
+              DropdownMenuItem(value: 'best_selling', child: Text('Best Selling')),
+              DropdownMenuItem(value: 'top_rated', child: Text('Top Rated')),
+            ],
+            onChanged: (value) { if (value != null) _change('source', value); },
+          ),
+          if (['category','tag'].contains(item.properties['source']))
+            TextFormField(
+              initialValue: (item.properties['source_id'] ?? 0).toString(),
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(labelText: '${item.properties['source'] == 'tag' ? 'Tag' : 'Category'} ID'),
+              onChanged: (value) => _change('source_id', int.tryParse(value) ?? 0),
+            ),
+        ],
+      ]),
+      _childrenPanel(),
+    ],
+  );
+
+  Widget _stylePanel() {
+    if (item.type != 'Banner') {
+      return ListView(padding: const EdgeInsets.all(14), children: [
+        _section('Style', [
+          _switch('Italic', 'italic'),
+          _slider('Font Size', 'title_font_size', min: 8, max: 72),
+          _slider('Letter Spacing', 'letter_spacing', min: 0, max: 20),
+          _slider('Word Spacing', 'word_spacing', min: 0, max: 30),
+          OutlinedButton.icon(onPressed: _openTextStyle, icon: const Icon(Icons.font_download_outlined), label: Text('Font Family: ${item.properties['font_family'] ?? 'Roboto'}')),
+        ]),
+      ]);
+    }
+    return ListView(padding: const EdgeInsets.all(14), children: [
+      _section('Banner Style', [
+        _switch('Control', 'control'),
+        _switch('Autoplay', 'autoplay'),
+        if (item.properties['autoplay'] == true) _slider('Autoplay interval (seconds)', 'autoplay_seconds', min: 2, max: 15),
+        _slider('View Fraction', 'view_fraction', min: .4, max: 1),
+        _slider('Fade', 'fade_value', min: 0, max: 1),
+        _switch('Pause on touch', 'pause'),
+        _switch('Dot', 'dots'),
+        _switch('Arrow', 'arrows'),
+      ]),
+    ]);
+  }
+
+  Future<void> _openTextStyle() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => _DesignerTextStylePage(
+        properties: Map<String, dynamic>.from(item.properties),
+      )),
+    );
+    if (result != null) {
+      setState(() => item.properties.addAll(result));
+      widget.onChanged();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final layouts = _GlowHitDesignerPageState._layoutTypes[item.type]!;
@@ -971,310 +1244,102 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
         brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(seedColor: _designerPurple, brightness: Brightness.light, surface: _designerSurface),
         scaffoldBackgroundColor: _designerBackground,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: _designerSurface,
-          foregroundColor: _designerText,
-        ),
+        appBarTheme: const AppBarTheme(backgroundColor: _designerSurface, foregroundColor: _designerText),
         cardTheme: const CardThemeData(color: _designerSurface, surfaceTintColor: Colors.transparent),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: _designerField,
           labelStyle: const TextStyle(color: _designerMuted),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: _designerBorder),
-          ),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _designerBorder)),
         ),
       ),
       child: DefaultTabController(
-        length: 6,
+        length: 7,
         child: Scaffold(
           backgroundColor: _designerBackground,
           appBar: AppBar(
-            title: Text(item.type + ' Properties'),
+            title: Text('${item.type} Layout'),
             actions: [
               IconButton(
                 tooltip: 'Delete component',
                 icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                onPressed: () async {
-                  await widget.onDelete();
-                  if (context.mounted) Navigator.pop(context);
-                },
+                onPressed: () async { await widget.onDelete(); if (context.mounted) Navigator.pop(context); },
               ),
               TextButton(
-                onPressed: () async {
-                  await widget.onSave();
-                  if (context.mounted) Navigator.pop(context);
-                },
-                child: const Text('SAVE'),
+                onPressed: () async { await widget.onSave(); if (context.mounted) Navigator.pop(context); },
+                child: const Text('Done'),
               ),
             ],
           ),
-          body: Column(
-            children: [
-              // Keep the live preview visible while the user switches property tabs.
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _designerSurface,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: _designerBorder),
-                  ),
-                  padding: const EdgeInsets.all(10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('LIVE COMPONENT PREVIEW',
-                        style: TextStyle(letterSpacing: 1.1, color: _designerPurple, fontWeight: FontWeight.w800, fontSize: 11)),
-                      const SizedBox(height: 8),
-                      widget.visualBuilder(),
-                    ],
-                  ),
+          body: Column(children: [
+            Expanded(
+              flex: 5,
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _designerSurface,
+                  border: Border.all(color: _designerBorder),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: widget.visualBuilder(),
               ),
-              const TabBar(
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                labelColor: _designerPurple,
-                unselectedLabelColor: _designerMuted,
-                indicatorColor: _designerPurple,
-                tabs: [
-                  Tab(text: 'Padding'),
-                  Tab(text: 'Margin'),
-                  Tab(text: 'Dimension'),
-                  Tab(text: 'Settings'),
-                  Tab(text: 'Style'),
-                  Tab(text: 'Children'),
-                ],
-              ),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    ListView(padding: const EdgeInsets.all(14), children: [
-                      _section('Padding', [
-                        _slider('Top', 'padding_top'), _slider('Bottom', 'padding_bottom'),
-                        _slider('Left', 'padding_left'), _slider('Right', 'padding_right'),
-                      ]),
-                    ]),
-                    ListView(padding: const EdgeInsets.all(14), children: [
-                      _section('Margin', [
-                        _slider('Top', 'margin_top'), _slider('Bottom', 'margin_bottom'),
-                        _slider('Left', 'margin_left'), _slider('Right', 'margin_right'),
-                      ]),
-                    ]),
-                    ListView(padding: const EdgeInsets.all(14), children: [
-                      _section('Dimension', [
-                        _slider('Height', 'height', min: 40, max: 500),
-                        _slider('Width factor', 'width', min: .25, max: 1),
-                        _slider('Max cross-axis extent', 'max_cross_axis_extent', min: 80, max: 600),
-                        _slider('Main-axis spacing', 'main_axis_spacing', max: 60),
-                        _slider('Cross-axis spacing', 'cross_axis_spacing', max: 60),
-                        _slider('Border radius', 'border_radius', max: 60),
-                        _slider('Cross-axis count', 'cross_axis_count', min: 1, max: 6),
-                        _slider('Cross aspect ratio', 'cross_aspect_ratio', min: .4, max: 2.5),
-                        _slider('Elevation', 'elevation', max: 20),
-                        _slider('Fixed grid view count', 'fixed_grid_view_count', min: 1, max: 10),
-                        _switch('Horizontal layout', 'horizontal'),
-                      ]),
-                    ]),
-                    ListView(padding: const EdgeInsets.all(14), children: [
-                      _section('Settings', [
-                        _switch('Status', 'enabled'),
-                        _switch('Show title', 'show_title'),
-                        DropdownButtonFormField<String>(
-                          initialValue: layouts.contains(item.layout) ? item.layout : layouts.first,
-                          decoration: const InputDecoration(labelText: 'Layout type'),
-                          items: layouts.map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(),
-                          onChanged: (value) { if (value != null) setState(() => item.layout = value); widget.onChanged(); },
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(controller: _title, decoration: const InputDecoration(labelText: 'Title'),
-                          onChanged: (value) { item.title = value; widget.onChanged(); setState(() {}); }),
-                        const SizedBox(height: 12),
-                        TextField(controller: _description, maxLines: 2,
-                          decoration: const InputDecoration(labelText: 'Description'),
-                          onChanged: (value) => _change('description', value)),
-                        if (item.type == 'Banner') ...[
-                          _switch('Carousel controls', 'control'),
-                          _switch('Autoplay', 'autoplay'),
-                          if (item.properties['autoplay'] == true) _slider('Autoplay interval (seconds)', 'autoplay_seconds', min: 2, max: 15),
-                          _switch('Fade transition', 'fade'),
-                          _switch('Pause when touched', 'pause'),
-                          _switch('Show dots', 'dots'),
-                          _switch('Show arrows', 'arrows'),
-                        ],
-                        if (item.type == 'Category') _switch('Show all categories', 'show_all_categories'),
-                        if (item.type == 'Product') DropdownButtonFormField<String>(
-                          initialValue: (item.properties['source'] ?? 'featured').toString(),
-                          decoration: const InputDecoration(labelText: 'Product source'),
-                          items: const [
-                            DropdownMenuItem(value: 'latest', child: Text('Latest')),
-                            DropdownMenuItem(value: 'featured', child: Text('Featured')),
-                            DropdownMenuItem(value: 'category', child: Text('Category')),
-                            DropdownMenuItem(value: 'tag', child: Text('Tag')),
-                            DropdownMenuItem(value: 'on_sale', child: Text('On Sale')),
-                            DropdownMenuItem(value: 'new_arrival', child: Text('New Arrival')),
-                            DropdownMenuItem(value: 'wishlist', child: Text('Wishlist')),
-                            DropdownMenuItem(value: 'best_selling', child: Text('Best Selling')),
-                            DropdownMenuItem(value: 'top_rated', child: Text('Top Rated')),
-                          ],
-                          onChanged: (value) { if (value != null) _change('source', value); },
-                        ),
-                      ]),
-                    ]),
-                    ListView(padding: const EdgeInsets.all(14), children: [
-                      _section('Style', [
-                        _colorChoice('Background Color', 'background_color', const ['#FFFFFF', '#F7F7FA', '#F1ECFF', '#E8F6F0', '#FFF0E6', '#202033']),
-                        _colorChoice('Title Color', 'title_color', const ['#24212B', '#51408F', '#FFFFFF', '#B23B32', '#16734A']),
-                        _colorChoice('Text Color', 'text_color', const ['#24212B', '#FFFFFF', '#7650B8', '#B23B32', '#16734A']),
-                        _colorChoice('Text Background Color', 'text_background_color', const ['#FFFFFF', '#F1EFF5', '#202033', '#FFF0E6']),
-                        _slider('Font Size', 'title_font_size', min: 8, max: 72),
-                        _slider('Letter Spacing', 'letter_spacing', min: 0, max: 20),
-                        _slider('Word Spacing', 'word_spacing', min: 0, max: 30),
-                        _switch('Italic', 'italic'),
-                        OutlinedButton.icon(
-                          onPressed: _chooseFontFamily,
-                          icon: const Icon(Icons.font_download_outlined),
-                          label: Text('Font Family: ${item.properties['font_family'] ?? 'Roboto'}'),
-                        ),
-                        DropdownButtonFormField<String>(
-                          initialValue: (item.properties['title_font_weight'] ?? 'normal').toString(),
-                          decoration: const InputDecoration(labelText: 'Font weight'),
-                          items: const [
-                            DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                            DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                            DropdownMenuItem(value: 'bold', child: Text('Bold')),
-                          ],
-                          onChanged: (value) { if (value != null) _change('title_font_weight', value); },
-                        ),
-                        _slider('Maximum title lines', 'title_max_lines', min: 1, max: 5),
-                      ]),
-                      _section('Live Preview', [widget.visualBuilder()]),
-                    ]),
-                    ListView(padding: const EdgeInsets.all(14), children: [
-                      _section('Children', [
-                        Wrap(spacing: 8, runSpacing: 8, children: [
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              final media = await widget.onChooseMedia();
-                              if (media == null) return;
-                              final source = (media['source_url'] ?? '').toString();
-                              if (source.isEmpty) return;
-                              final mime = (media['mime_type'] ?? '').toString();
-                              final isVideo = mime.startsWith('video/');
-                              final rows = item.properties['children'] is List
-                                  ? List<dynamic>.from(item.properties['children'] as List) : <dynamic>[];
-                              rows.add({
-                                'type': isVideo ? 'video' : 'image',
-                                'attachment_id': media['id'],
-                                'image_url': isVideo ? '' : source,
-                                'video_url': isVideo ? source : '',
-                                'source_url': source,
-                                'mime_type': mime,
-                                'title': (media['title'] ?? 'New').toString(),
-                                'alt_text': (media['alt_text'] ?? '').toString(),
-                                'link_type': 'in_app', 'link_value': '', 'active': true,
-                              });
-                              _change('children', rows);
-                            },
-                            icon: const Icon(Icons.image_outlined), label: const Text('Add image / video'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              final controller = TextEditingController();
-                              final value = await showDialog<String>(
-                                context: context,
-                                builder: (dialogContext) => AlertDialog(
-                                  title: const Text('Add text child'),
-                                  content: TextField(controller: controller, autofocus: true),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-                                    FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Add')),
-                                  ],
-                                ),
-                              );
-                              controller.dispose();
-                              if (value == null || value.isEmpty) return;
-                              final rows = item.properties['children'] is List
-                                  ? List<dynamic>.from(item.properties['children'] as List) : <dynamic>[];
-                              rows.add({'type': 'text', 'title': value, 'text': value, 'active': true});
-                              _change('children', rows);
-                            },
-                            icon: const Icon(Icons.text_fields), label: const Text('Add text'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              final controller = TextEditingController();
-                              final value = await showDialog<String>(
-                                context: context,
-                                builder: (dialogContext) => AlertDialog(
-                                  title: const Text('Add link child'),
-                                  content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: 'URL or ark:// route')),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-                                    FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Add')),
-                                  ],
-                                ),
-                              );
-                              controller.dispose();
-                              if (value == null || value.isEmpty) return;
-                              final rows = item.properties['children'] is List
-                                  ? List<dynamic>.from(item.properties['children'] as List) : <dynamic>[];
-                              rows.add({'type': 'link', 'title': value, 'link_type': value.startsWith('ark://') ? 'deep_link' : 'url', 'link_value': value, 'active': true});
-                              _change('children', rows);
-                            },
-                            icon: const Icon(Icons.link), label: const Text('Add link'),
-                          ),
-                        ]),
-                        if (item.properties['children'] is List)
-                          ...(item.properties['children'] as List).asMap().entries.map((entry) {
-                            final child = entry.value is Map ? Map<String, dynamic>.from(entry.value as Map) : <String, dynamic>{};
-                            final type = (child['type'] ?? 'image').toString();
-                            final src = (child['image_url'] ?? child['video_url'] ?? child['source_url'] ?? '').toString();
-                            return Card(
-                              color: _designerField,
-                              child: ListTile(
-                                onTap: () => _editChild(entry.key),
-                                leading: SizedBox(width: 48, height: 48, child: src.isEmpty
-                                  ? Icon(type == 'link' ? Icons.link : type == 'text' ? Icons.text_fields : Icons.image)
-                                  : Image.network(src, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image))),
-                                title: Text((child['title'] ?? 'New').toString()),
-                                subtitle: Text(type),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                                  onPressed: () {
-                                    final rows = List<dynamic>.from(item.properties['children'] as List)..removeAt(entry.key);
-                                    _change('children', rows);
-                                  },
-                                ),
-                              ),
-                            );
-                          }),
-                        if (item.properties['children'] is List && (item.properties['children'] as List).length > 1)
-                          ReorderableListView(
-                            shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-                            onReorder: (oldIndex, newIndex) {
-                              final rows = List<dynamic>.from(item.properties['children'] as List);
-                              if (newIndex > oldIndex) newIndex--;
-                              final row = rows.removeAt(oldIndex);
-                              rows.insert(newIndex, row);
-                              _change('children', rows);
-                            },
-                            children: (item.properties['children'] as List).asMap().entries.map((entry) => ListTile(
-                              key: ValueKey('child-order-${item.id}-${entry.key}'),
-                              leading: const Icon(Icons.drag_handle),
-                              title: Text((entry.value is Map ? (entry.value as Map)['title'] : 'Child')?.toString() ?? 'Child'),
-                            )).toList(),
-                          ),
-                      ]),
-                    ]),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+            const TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              labelColor: _designerPurple,
+              unselectedLabelColor: _designerMuted,
+              indicatorColor: _designerPurple,
+              tabs: [
+                Tab(text: 'Color'),
+                Tab(text: 'Title'),
+                Tab(text: 'Padding'),
+                Tab(text: 'Margin'),
+                Tab(text: 'Dimension'),
+                Tab(text: 'Settings'),
+                Tab(text: 'Style'),
+              ],
+            ),
+            Expanded(
+              flex: 4,
+              child: TabBarView(children: [
+                _openColorPanel(),
+                _titlePanel(),
+                ListView(padding: const EdgeInsets.all(14), children: [
+                  _section('Padding', [
+                    _slider('Top', 'padding_top'), _slider('Bottom', 'padding_bottom'),
+                    _slider('Right', 'padding_right'), _slider('Left', 'padding_left'),
+                  ]),
+                ]),
+                ListView(padding: const EdgeInsets.all(14), children: [
+                  _section('Margin', [
+                    _slider('Top', 'margin_top'), _slider('Bottom', 'margin_bottom'),
+                    _slider('Right', 'margin_right'), _slider('Left', 'margin_left'),
+                  ]),
+                ]),
+                ListView(padding: const EdgeInsets.all(14), children: [
+                  _section('Dimension', [
+                    _slider('Height', 'height', min: 40, max: 500),
+                    _slider('Width', 'width', min: 0, max: 500),
+                    _slider('Max Cross Axis Extent', 'max_cross_axis_extent', min: 80, max: 600),
+                    _slider('Main Axis Spacing', 'main_axis_spacing', max: 60),
+                    _slider('Cross Axis Spacing', 'cross_axis_spacing', max: 60),
+                    _slider('Border Radius', 'border_radius', max: 60),
+                    _switch('Horizontal', 'horizontal'),
+                    _slider('Cross Axis Count', 'cross_axis_count', min: 1, max: 6),
+                    _slider('Cross Aspect Ratio', 'cross_aspect_ratio', min: .4, max: 2.5),
+                    _slider('Elevation', 'elevation', max: 20),
+                    _slider('Fixed Grid View Count', 'fixed_grid_view_count', min: 1, max: 20),
+                  ]),
+                ]),
+                _settingsPanel(layouts),
+                _stylePanel(),
+              ]),
+            ),
+          ]),
         ),
       ),
     );
