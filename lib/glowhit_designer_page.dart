@@ -1491,24 +1491,54 @@ class _DesignerChildEditPageState extends State<_DesignerChildEditPage> {
   }
 
   Future<void> _selectLink() async {
+    final searchController = TextEditingController();
     final choice = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: _designerSurface,
-      builder: (ctx) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.of(ctx).size.height * .82,
-          child: Column(children: [
-            const Padding(padding: EdgeInsets.all(16), child: Text('Search Links', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-            Expanded(child: ListView(children: destinations.map((name) => ListTile(
-              leading: const Icon(Icons.radio_button_unchecked),
-              title: Text(name),
-              onTap: () => Navigator.pop(ctx, name),
-            )).toList())),
-          ]),
-        ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, refresh) {
+          final query = searchController.text.trim().toLowerCase();
+          final filtered = destinations.where((name) => name.toLowerCase().contains(query)).toList();
+          return SafeArea(
+            child: SizedBox(
+              height: MediaQuery.of(ctx).size.height * .84,
+              child: Column(children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                  child: TextField(
+                    controller: searchController,
+                    onChanged: (_) => refresh(() {}),
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      hintText: 'Search Links',
+                      filled: true,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, index) => ListTile(
+                      leading: Icon(
+                        child['link_value'] == 'ark://${filtered[index].toLowerCase().replaceAll(' ', '-')}'
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color: _designerPurple,
+                      ),
+                      title: Text(filtered[index]),
+                      onTap: () => Navigator.pop(ctx, filtered[index]),
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+          );
+        },
       ),
     );
+    searchController.dispose();
     if (choice == null) return;
     final slug = choice.toLowerCase().replaceAll(' ', '-');
     setState(() {
