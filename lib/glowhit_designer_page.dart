@@ -986,6 +986,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                   'image_url': isVideo ? '' : source,
                   'video_url': isVideo ? source : '',
                   'source_url': source,
+                  'mime_type': mime,
                   'title': (media['title'] ?? '').toString(),
                   'alt_text': (media['alt_text'] ?? '').toString(),
                   'link_type': 'in_app',
