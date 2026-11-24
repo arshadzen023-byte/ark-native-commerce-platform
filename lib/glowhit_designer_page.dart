@@ -929,9 +929,9 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
         if (item.type == 'Category') _section('Category settings', [
           _switch('Show all categories', 'show_all_categories'),
           const Text('Parent category ID'),
-          TextField(
-            key: const ValueKey('parent_category_id'),
-            controller: TextEditingController(text: (item.properties['parent_category_id'] ?? 0).toString()),
+          TextFormField(
+            key: ValueKey('parent_category_id-${item.id}'),
+            initialValue: (item.properties['parent_category_id'] ?? 0).toString(),
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(border: OutlineInputBorder(), hintText: '0 = all categories'),
             onChanged: (v) => _change('parent_category_id', int.tryParse(v) ?? 0),
@@ -954,9 +954,9 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
             ],
             onChanged: (v) { if (v != null) _change('source', v); },
           ),
-          TextField(
-            key: const ValueKey('product-source-id'),
-            controller: TextEditingController(text: (item.properties['source_id'] ?? 0).toString()),
+          TextFormField(
+            key: ValueKey('product-source-id-${item.id}'),
+            initialValue: (item.properties['source_id'] ?? 0).toString(),
             decoration: const InputDecoration(labelText: 'Category / tag ID', border: OutlineInputBorder()),
             keyboardType: TextInputType.number,
             onChanged: (v) => _change('source_id', int.tryParse(v) ?? 0),
