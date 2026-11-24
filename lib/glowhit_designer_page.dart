@@ -533,9 +533,15 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final bg = _color(component.properties['background_color']?.toString() ?? '#F0ECF8');
     final titleColor = _color(component.properties['title_color']?.toString() ?? '#241D33');
     final children = component.properties['children'] is List ? component.properties['children'] as List : const <dynamic>[];
-    final firstChild = children.isNotEmpty && children.first is Map ? Map<String, dynamic>.from(children.first as Map) : <String, dynamic>{};
+    final activeChildren = children.where((child) => child is Map && child['active'] != false).whereType<Map>().toList();
+    final firstChild = activeChildren.isNotEmpty ? Map<String, dynamic>.from(activeChildren.first) : <String, dynamic>{};
     final previewImage = (component.properties['image_url'] ?? component.properties['background_image_url'] ?? firstChild['image_url'] ?? firstChild['source_url'] ?? firstChild['url'] ?? '').toString();
-    final height = compact ? 78.0 : ((component.properties['height'] as num?)?.toDouble() ?? 160.0).clamp(90.0, 280.0);
+    final height = compact ? 92.0 : ((component.properties['height'] as num?)?.toDouble() ?? 160.0).clamp(90.0, 320.0);
+    final columns = ((component.properties['cross_axis_count'] as num?)?.toInt() ?? 2).clamp(1, 4);
+    final radius = (component.properties['border_radius'] as num?)?.toDouble() ?? 16;
+    final childImages = activeChildren.where((child) =>
+      (child['type'] ?? 'image') == 'image' &&
+      ((child['image_url'] ?? child['source_url'] ?? '').toString().isNotEmpty)).toList();
     return Container(
       height: height,
       width: double.infinity,
@@ -553,42 +559,94 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       ),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular((component.properties['border_radius'] as num?)?.toDouble() ?? 16),
+        borderRadius: BorderRadius.circular(radius),
         boxShadow: [
           if (((component.properties['elevation'] as num?)?.toDouble() ?? 0) > 0)
             BoxShadow(color: Colors.black.withValues(alpha: .07), blurRadius: 12, offset: const Offset(0, 4)),
         ],
       ),
-      child: Stack(children: [
-        if (previewImage.isNotEmpty)
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: compact ? 76 : 112,
-                height: compact ? 54 : 78,
-                child: Image.network(
-                  previewImage,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(color: titleColor.withValues(alpha: .08), child: const Icon(Icons.broken_image_outlined)),
-                ),
-              ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (component.properties['show_title'] != false && component.title.isNotEmpty)
+          Text(
+            component.title,
+            maxLines: ((component.properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4),
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: titleColor,
+              fontSize: compact ? 12 : ((component.properties['title_font_size'] as num?)?.toDouble() ?? 18),
+              fontWeight: (component.properties['title_font_weight'] ?? 'bold') == 'normal'
+                  ? FontWeight.normal
+                  : (component.properties['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
             ),
           ),
-        Positioned(right: 4, top: 2, child: _componentIcon(component.type, size: compact ? 26 : 36)),
-        Align(alignment: Alignment.centerLeft, child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(component.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: titleColor, fontWeight: FontWeight.w800, fontSize: compact ? 12 : 16)),
-          if (!compact && (component.properties['description'] ?? '').toString().isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(component.properties['description'].toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: titleColor.withValues(alpha: .7), fontSize: 12)),
-          ],
-          const SizedBox(height: 7),
-          Container(height: 6, width: 110, decoration: BoxDecoration(color: titleColor.withValues(alpha: .12), borderRadius: BorderRadius.circular(10))),
-          const SizedBox(height: 5),
-          Container(height: 6, width: 78, decoration: BoxDecoration(color: titleColor.withValues(alpha: .09), borderRadius: BorderRadius.circular(10))),
-        ])),
+        if (!compact && (component.properties['description'] ?? '').toString().isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(component.properties['description'].toString(), maxLines: 2, overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: titleColor.withValues(alpha: .7), fontSize: 12)),
+        ],
+        const SizedBox(height: 8),
+        Expanded(
+          child: component.type == 'Category' || component.type == 'Product'
+              ? GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: childImages.isEmpty ? columns : childImages.length.clamp(1, 8),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: 6,
+                    mainAxisSpacing: 6,
+                    childAspectRatio: ((component.properties['cross_aspect_ratio'] as num?)?.toDouble() ?? 1).clamp(.5, 2),
+                  ),
+                  itemBuilder: (_, index) {
+                    final image = childImages.isEmpty ? '' : (childImages[index]['image_url'] ?? childImages[index]['source_url']).toString();
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(radius.clamp(0, 24)),
+                      child: image.isEmpty
+                          ? Container(color: titleColor.withValues(alpha: .08),
+                              child: Icon(component.type == 'Category' ? Icons.category_outlined : Icons.shopping_bag_outlined,
+                                color: titleColor.withValues(alpha: .5)))
+                          : Image.network(image, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(color: titleColor.withValues(alpha: .08),
+                                child: const Icon(Icons.broken_image_outlined))),
+                    );
+                  },
+                )
+              : childImages.isNotEmpty
+                  ? Row(children: childImages.take(component.layout == 'Banner Grid' ? 2 : 1).map((child) {
+                      final image = (child['image_url'] ?? child['source_url']).toString();
+                      return Expanded(child: Padding(
+                        padding: const EdgeInsets.only(right: 5),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(radius.clamp(0, 24)),
+                          child: Image.network(image, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                        ),
+                      ));
+                    }).toList())
+                  : previewImage.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(radius.clamp(0, 24)),
+                          child: Image.network(previewImage, width: double.infinity, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(color: titleColor.withValues(alpha: .08),
+                              child: const Icon(Icons.broken_image_outlined))),
+                        )
+                      : Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(color: titleColor.withValues(alpha: .06),
+                            borderRadius: BorderRadius.circular(radius.clamp(0, 24))),
+                          child: Center(child: _componentIcon(component.type, size: compact ? 26 : 36)),
+                        ),
+        ),
+        if (!compact && component.type == 'Banner' && component.layout == 'Banner Slider' &&
+            component.properties['dots'] == true && activeChildren.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(activeChildren.length, (index) => Container(
+                width: 6, height: 6, margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(color: index == 0 ? _designerPurple : titleColor.withValues(alpha: .25),
+                  shape: BoxShape.circle),
+              ))),
+          ),
       ]),
     );
   }
