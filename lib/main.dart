@@ -708,14 +708,41 @@ class _StoreHomeState extends State<StoreHome> {
     if (type == 'product_grid' || type == 'product_carousel' || type.startsWith('product_')) {
       final rows = _designerProducts(section);
       if (rows.isEmpty) return const SizedBox.shrink();
-      final layout = (section['layout_variant'] ?? section['designer_component_type'] ?? type).toString();
+      final layout = (section['layout_variant'] ?? section['designer_component_type'] ?? type).toString().toLowerCase();
+      final radius = (section['corner_radius'] as num?)?.toDouble() ?? 12;
+      final cardWidth = (section['max_width_px'] as num?)?.toDouble() ?? 174;
+      final cardHeight = (section['height_px'] as num?)?.toDouble() ?? 260;
+      final cards = rows.map((product) => SizedBox(
+        width: cardWidth,
+        child: productCard(product),
+      )).toList();
       return Container(
         color: background == 'transparent' ? null : _safeColor(background),
-        padding: EdgeInsets.fromLTRB(12, padding, 12, (section['padding_bottom'] as num?)?.toDouble() ?? 12),
+        padding: EdgeInsets.fromLTRB(
+          (section['padding_left'] as num?)?.toDouble() ?? 12,
+          padding,
+          (section['padding_right'] as num?)?.toDouble() ?? 12,
+          (section['padding_bottom'] as num?)?.toDouble() ?? 12,
+        ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (showTitle) Padding(padding: const EdgeInsets.only(left: 4, bottom: 8), child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor)))),
+          if (showTitle) Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
+          ),
           if (layout.contains('carousel') || layout.contains('slider'))
-            SizedBox(height: 260, child: ListView(scrollDirection: Axis.horizontal, children: rows.map((p) => SizedBox(width: 174, child: productCard(p))).toList()))
+            SizedBox(
+              height: cardHeight,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: cards,
+              ),
+            )
+          else if (layout.contains('list'))
+            Column(children: rows.map((product) => SizedBox(
+              width: double.infinity,
+              height: cardHeight,
+              child: productCard(product),
+            )).toList())
           else
             GridView.builder(
               shrinkWrap: true,
