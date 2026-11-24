@@ -1237,6 +1237,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                             return Card(
                               color: _designerField,
                               child: ListTile(
+                                onTap: () => _editChild(entry.key),
                                 leading: SizedBox(width: 48, height: 48, child: src.isEmpty
                                   ? Icon(type == 'link' ? Icons.link : type == 'text' ? Icons.text_fields : Icons.image)
                                   : Image.network(src, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image))),
@@ -1280,6 +1281,25 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     );
   }
 
+  Future<void> _editChild(int index) async {
+    final rows = item.properties['children'] is List ? List<dynamic>.from(item.properties['children'] as List) : <dynamic>[];
+    if (index < 0 || index >= rows.length || rows[index] is! Map) return;
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => _DesignerChildEditPage(
+        child: Map<String, dynamic>.from(rows[index] as Map),
+        onChooseMedia: widget.onChooseMedia,
+      )),
+    );
+    if (result == null) return;
+    if (result['_delete'] == true) {
+      rows.removeAt(index);
+    } else {
+      rows[index] = result;
+    }
+    _change('children', rows);
+  }
+
   Widget _colorChoice(String title, String key, List<String> choices) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1292,6 +1312,144 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           border: Border.all(color: item.properties[key] == hex ? _designerPurple : Colors.grey.shade400, width: item.properties[key] == hex ? 3 : 1),
         )),
       )).toList()),
+    ]),
+  );
+}
+
+class _DesignerChildEditPage extends StatefulWidget {
+  const _DesignerChildEditPage({required this.child, required this.onChooseMedia});
+  final Map<String, dynamic> child;
+  final Future<Map<String, dynamic>?> Function() onChooseMedia;
+
+  @override
+  State<_DesignerChildEditPage> createState() => _DesignerChildEditPageState();
+}
+
+class _DesignerChildEditPageState extends State<_DesignerChildEditPage> {
+  late Map<String, dynamic> child;
+  late final TextEditingController title;
+  late final TextEditingController link;
+  static const destinations = <String>[
+    'Category', 'Categories', 'Brands', 'All Brands', 'Product Tag',
+    'WordPress Post', 'WordPress Page', 'Page (WebView)', 'Product',
+    'Firebase Chat', 'Firebase Chat Room', 'Cart', 'Post Category Notification',
+    'Product Category Notification', 'App Page', 'Menu Group', 'Login',
+    'WishList', 'Orders', 'Subscriptions', 'Bookings', 'Table Booking',
+    'Address', 'Wallet'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    child = Map<String, dynamic>.from(widget.child);
+    title = TextEditingController(text: (child['title'] ?? 'New').toString());
+    link = TextEditingController(text: (child['link_value'] ?? '').toString());
+  }
+
+  @override
+  void dispose() { title.dispose(); link.dispose(); super.dispose(); }
+
+  Future<void> _selectImage() async {
+    final media = await widget.onChooseMedia();
+    if (media == null) return;
+    final url = (media['source_url'] ?? '').toString();
+    if (url.isEmpty) return;
+    setState(() {
+      child['type'] = 'image';
+      child['attachment_id'] = media['id'];
+      child['image_url'] = url;
+      child['source_url'] = url;
+      child['mime_type'] = media['mime_type'] ?? '';
+      child['alt_text'] = media['alt_text'] ?? '';
+    });
+  }
+
+  Future<void> _selectLink() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _designerSurface,
+      builder: (ctx) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(ctx).size.height * .82,
+          child: Column(children: [
+            const Padding(padding: EdgeInsets.all(16), child: Text('Search Links', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+            Expanded(child: ListView(children: destinations.map((name) => ListTile(
+              leading: const Icon(Icons.radio_button_unchecked),
+              title: Text(name),
+              onTap: () => Navigator.pop(ctx, name),
+            )).toList())),
+          ]),
+        ),
+      ),
+    );
+    if (choice == null) return;
+    final slug = choice.toLowerCase().replaceAll(' ', '-');
+    setState(() {
+      child['type'] = 'link';
+      child['link_type'] = choice == 'Page (WebView)' ? 'webview' : 'deep_link';
+      child['link_value'] = choice == 'Page (WebView)' ? 'webview' : 'ark://$slug';
+      link.text = (child['link_value'] ?? '').toString();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: _designerBackground,
+    appBar: AppBar(
+      title: const Text('Child'),
+      backgroundColor: _designerSurface,
+      foregroundColor: _designerText,
+      actions: [
+        IconButton(
+          tooltip: 'Delete child',
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => Navigator.pop(context, <String, dynamic>{'_delete': true}),
+        ),
+        TextButton(onPressed: () {
+          child['title'] = title.text;
+          child['link_value'] = link.text;
+          Navigator.pop(context, child);
+        }, child: const Text('SAVE')),
+      ],
+    ),
+    body: ListView(padding: const EdgeInsets.all(16), children: [
+      Card(color: _designerSurface, child: Column(children: [
+        ListTile(
+          leading: const Icon(Icons.image_outlined),
+          title: const Text('Image'),
+          subtitle: Text((child['image_url'] ?? 'Select an image').toString()),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _selectImage,
+        ),
+        const Divider(height: 1),
+        ListTile(
+          leading: const Icon(Icons.link),
+          title: const Text('Link'),
+          subtitle: Text((child['link_value'] ?? 'Navigate to respective page on click').toString()),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _selectLink,
+        ),
+        const Divider(height: 1),
+        ListTile(
+          leading: const Icon(Icons.upload_file),
+          title: const Text('Upload Image'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _selectImage,
+        ),
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: TextField(controller: title, decoration: const InputDecoration(labelText: 'Title')),
+        ),
+      ])),
+      const SizedBox(height: 12),
+      SwitchListTile(
+        tileColor: _designerSurface,
+        title: const Text('Status'),
+        value: child['active'] != false,
+        onChanged: (v) => setState(() => child['active'] = v),
+      ),
     ]),
   );
 }
