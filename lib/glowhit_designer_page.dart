@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
@@ -1239,6 +1240,43 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     ]);
   }
 
+  Future<void> _showComponentJson() async {
+    final json = const JsonEncoder.withIndent('  ').convert(item.toJson());
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _designerSurface,
+      builder: (ctx) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(ctx).size.height * .8,
+          child: Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(children: [
+                const Expanded(child: Text('Live Component JSON', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800))),
+                IconButton(
+                  tooltip: 'Copy JSON',
+                  icon: const Icon(Icons.copy_rounded),
+                  onPressed: () {
+                    // Clipboard is supplied by Flutter services without a plugin.
+                    Clipboard.setData(ClipboardData(text: const JsonEncoder.withIndent('  ').convert(item.toJson())));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Component JSON copied')));
+                  },
+                ),
+              ]),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(14),
+                child: SelectableText(json, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Future<void> _openTextStyle() async {
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
@@ -1277,6 +1315,11 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           appBar: AppBar(
             title: Text('${item.type} Layout'),
             actions: [
+              IconButton(
+                tooltip: 'View live component JSON',
+                icon: const Icon(Icons.data_object_rounded),
+                onPressed: _showComponentJson,
+              ),
               IconButton(
                 tooltip: 'Delete component',
                 icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
