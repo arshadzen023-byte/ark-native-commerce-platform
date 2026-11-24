@@ -55,10 +55,8 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
       _startTimer();
     }
     if (oldWidget.viewFraction != widget.viewFraction) {
-      final oldController = _controller;
-      // Use an updated PageController configuration when the fraction changes.
-      // The State keeps a stable controller in normal operation; current index
-      // is retained for child editors that update this widget in place.
+      // Keep the attached PageController stable during a live property edit.
+      // The next page mount picks up the newly selected viewport fraction.
     }
     if (_index >= widget.slides.length) {
       _index = widget.slides.isEmpty ? 0 : widget.slides.length - 1;
