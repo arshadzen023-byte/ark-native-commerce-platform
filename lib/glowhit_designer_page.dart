@@ -326,25 +326,37 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     });
   }
 
-  Future<void> _addComponent(String type) async {
-    final layout = _layoutTypes[type]!.first;
+  Future<void> _addComponent(String type, {String? layout}) async {
+    final availableLayouts = _layoutTypes[type]!;
+    final selectedLayout = layout != null && availableLayouts.contains(layout)
+        ? layout
+        : availableLayouts.first;
     final item = DesignerComponent(
       id: _id(),
       type: type,
       title: 'New $type component',
-      layout: layout,
+      layout: selectedLayout,
       properties: <String, dynamic>{
         'background_color': '#FFFFFF',
         'title_color': '#241D33',
         'description': '',
         'show_title': true,
         'countdown_enabled': false,
+        'countdown_time': '',
+        'title_font_size': 18.0,
+        'title_font_weight': 'bold',
+        'title_text_align': 'left',
+        'title_max_lines': 2,
         'padding_top': 12.0, 'padding_bottom': 12.0, 'padding_left': 12.0, 'padding_right': 12.0,
         'margin_top': 0.0, 'margin_bottom': 0.0, 'margin_left': 0.0, 'margin_right': 0.0,
         'height': 180.0, 'width': 1.0, 'max_cross_axis_extent': 300.0,
         'main_axis_spacing': 10.0, 'cross_axis_spacing': 10.0, 'border_radius': 16.0,
         'horizontal': true, 'cross_axis_count': 2, 'cross_aspect_ratio': 1.0,
         'elevation': 1.0, 'fixed_grid_view_count': 2,
+        'control': true, 'autoplay': true, 'autoplay_seconds': 4.0,
+        'fade': false, 'pause': true, 'dots': true, 'arrows': true,
+        'view_fraction': .9,
+        'children': <dynamic>[],
       },
     );
     setState(() { currentComponents.add(item); selectedId = item.id; });
