@@ -473,16 +473,19 @@ class _StoreHomeState extends State<StoreHome> {
         Uri.parse('$storeUrl/wp-json/ark-designer/v1/config'),
         headers: const {'Accept': 'application/json'},
       ).timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return;
-      final decoded = jsonDecode(response.body);
-      if (decoded is Map && decoded['pages'] is Map) {
-        final value = Map<String, dynamic>.from(decoded);
-        await prefs.setString('glowhit_published_designer_config', jsonEncode(value));
-        _sliderFutures.clear();
-        if (mounted) setState(() => designerConfig = value);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['pages'] is Map) {
+          final value = Map<String, dynamic>.from(decoded);
+          await prefs.setString('glowhit_published_designer_config', jsonEncode(value));
+          _sliderFutures.clear();
+          if (mounted) setState(() => designerConfig = value);
+        }
       }
     } catch (_) {
       // The last published configuration remains available from local cache.
+    } finally {
+      if (mounted) setState(() => designerConfigLoading = false);
     }
   }
 
