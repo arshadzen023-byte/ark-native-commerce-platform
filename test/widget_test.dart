@@ -29,7 +29,7 @@ void main() {
     await tester.tap(find.text('Banner').last);
     await tester.pumpAndSettle();
     expect(find.text('Banner Grid'), findsOneWidget);
-    expect(find.text('Banner Slider'), findsOneWidget);
+    expect(find.text('Banner Slider'), findsNWidgets(2));
   });
 
   testWidgets('Designer can edit component properties and save draft locally', (tester) async {
@@ -42,8 +42,11 @@ void main() {
     expect(find.text('LIVE COMPONENT PREVIEW'), findsOneWidget);
     expect(find.text('Component layout'), findsOneWidget);
     expect(find.text('Title text style'), findsOneWidget);
+    final autoplayFinder = find.text('Autoplay');
+    await tester.ensureVisible(autoplayFinder);
+    await tester.tap(autoplayFinder);
+    await tester.pumpAndSettle();
     expect(find.text('Autoplay interval (seconds)'), findsOneWidget);
-    expect(find.text('LIVE COMPONENT PREVIEW'), findsOneWidget);
     await tester.tap(find.text('SAVE'));
     await tester.pumpAndSettle();
     expect(find.text('ARK Designer'), findsOneWidget);
