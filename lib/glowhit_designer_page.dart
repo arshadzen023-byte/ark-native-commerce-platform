@@ -971,51 +971,138 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           TextFormField(decoration: const InputDecoration(labelText: 'Image URL (optional)', border: OutlineInputBorder()),
             initialValue: (item.properties['image_url'] ?? '').toString(),
             onChanged: (v) => _change('image_url', v)),
-          FilledButton.icon(
-            onPressed: () async {
-              final media = await widget.onChooseMedia();
-              if (media == null) return;
-              final source = (media['source_url'] ?? '').toString();
-              final child = <String, dynamic>{
-                'attachment_id': media['id'],
-                'image_url': source,
-                'source_url': source,
-                'title': (media['title'] ?? '').toString(),
-                'alt_text': (media['alt_text'] ?? '').toString(),
-                'link_type': 'in_app',
-                'link_value': '',
-                'active': true,
-              };
-              final existing = item.properties['children'] is List
-                  ? (item.properties['children'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-                  : <Map<String, dynamic>>[];
-              existing.add(child);
-              _change('children', existing);
-              if ((item.properties['image_url'] ?? '').toString().isEmpty) _change('image_url', source);
-            },
-            icon: const Icon(Icons.add_photo_alternate_outlined),
-            label: const Text('Add image from WordPress Media Library'),
-          ),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            OutlinedButton.icon(
+              onPressed: () async {
+                final media = await widget.onChooseMedia();
+                if (media == null) return;
+                final source = (media['source_url'] ?? '').toString();
+                if (source.isEmpty) return;
+                final mime = (media['mime_type'] ?? '').toString();
+                final isVideo = mime.startsWith('video/');
+                final child = <String, dynamic>{
+                  'type': isVideo ? 'video' : 'image',
+                  'attachment_id': media['id'],
+                  'image_url': isVideo ? '' : source,
+                  'video_url': isVideo ? source : '',
+                  'source_url': source,
+                  'title': (media['title'] ?? '').toString(),
+                  'alt_text': (media['alt_text'] ?? '').toString(),
+                  'link_type': 'in_app',
+                  'link_value': '',
+                  'active': true,
+                };
+                final existing = item.properties['children'] is List
+                    ? (item.properties['children'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+                    : <Map<String, dynamic>>[];
+                existing.add(child);
+                _change('children', existing);
+                if (!isVideo && (item.properties['image_url'] ?? '').toString().isEmpty) _change('image_url', source);
+              },
+              icon: const Icon(Icons.perm_media_outlined),
+              label: const Text('Add image / video'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final controller = TextEditingController();
+                final value = await showDialog<String>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text('Add text child'),
+                    content: TextField(controller: controller, autofocus: true, maxLines: 3,
+                      decoration: const InputDecoration(labelText: 'Text', border: OutlineInputBorder())),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+                      FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Add')),
+                    ],
+                  ),
+                );
+                controller.dispose();
+                if (value == null || value.isEmpty) return;
+                final existing = item.properties['children'] is List
+                    ? (item.properties['children'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+                    : <Map<String, dynamic>>[];
+                existing.add({'type': 'text', 'title': value, 'text': value, 'active': true});
+                _change('children', existing);
+              },
+              icon: const Icon(Icons.text_fields_rounded),
+              label: const Text('Add text'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final controller = TextEditingController();
+                final value = await showDialog<String>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text('Add linked child'),
+                    content: TextField(controller: controller, autofocus: true,
+                      decoration: const InputDecoration(labelText: 'URL or app route', hintText: 'https://… or ark://product/123', border: OutlineInputBorder())),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+                      FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Add')),
+                    ],
+                  ),
+                );
+                controller.dispose();
+                if (value == null || value.isEmpty) return;
+                final existing = item.properties['children'] is List
+                    ? (item.properties['children'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+                    : <Map<String, dynamic>>[];
+                existing.add({'type': 'link', 'title': value, 'link_type': value.startsWith('ark://') ? 'deep_link' : 'url', 'link_value': value, 'active': true});
+                _change('children', existing);
+              },
+              icon: const Icon(Icons.link_rounded),
+              label: const Text('Add link'),
+            ),
+          ]),
           if (item.properties['children'] is List)
-            ...(item.properties['children'] as List).asMap().entries.map((entry) {
+            ...((item.properties['children'] as List).asMap().entries.map((entry) {
               final child = entry.value is Map ? Map<String, dynamic>.from(entry.value as Map) : <String, dynamic>{};
-              final src = (child['image_url'] ?? child['source_url'] ?? '').toString();
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: SizedBox(width: 52, height: 52, child: src.isEmpty
-                    ? const Icon(Icons.image_outlined)
-                    : Image.network(src, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined))),
-                title: Text((child['title'] ?? 'Banner image').toString(), maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text('Media ID: ${child['attachment_id'] ?? '—'}'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  onPressed: () {
-                    final updated = (item.properties['children'] as List).asMap().entries.where((e) => e.key != entry.key).map((e) => e.value).toList();
-                    _change('children', updated);
-                  },
+              final type = (child['type'] ?? 'image').toString();
+              final src = (child['image_url'] ?? child['video_url'] ?? child['source_url'] ?? '').toString();
+              return Card(
+                margin: const EdgeInsets.only(top: 8),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  leading: SizedBox(width: 52, height: 52, child: type == 'text'
+                      ? const Icon(Icons.text_fields_rounded)
+                      : type == 'link'
+                          ? const Icon(Icons.link_rounded)
+                          : type == 'video'
+                              ? const Icon(Icons.video_library_outlined)
+                              : src.isEmpty
+                                  ? const Icon(Icons.image_outlined)
+                                  : Image.network(src, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined))),
+                  title: Text((child['title'] ?? 'Banner child').toString(), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text(type == 'text' ? 'Text child' : type == 'link' ? (child['link_value'] ?? 'Link child').toString() : 'Media ID: ${child['attachment_id'] ?? '—'}'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    onPressed: () {
+                      final updated = (item.properties['children'] as List).asMap().entries.where((e) => e.key != entry.key).map((e) => e.value).toList();
+                      _change('children', updated);
+                    },
+                  ),
                 ),
               );
-            }),
+            })),
+          if (item.properties['children'] is List && (item.properties['children'] as List).length > 1)
+            ReorderableListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              onReorder: (oldIndex, newIndex) {
+                final rows = List<dynamic>.from(item.properties['children'] as List);
+                if (newIndex > oldIndex) newIndex -= 1;
+                final row = rows.removeAt(oldIndex);
+                rows.insert(newIndex, row);
+                _change('children', rows);
+              },
+              children: (item.properties['children'] as List).asMap().entries.map((entry) => ListTile(
+                key: ValueKey('child-${item.id}-${entry.key}'),
+                dense: true,
+                leading: const Icon(Icons.drag_handle),
+                title: Text((entry.value is Map ? (entry.value as Map)['title'] : 'Child')?.toString() ?? 'Child'),
+              )).toList(),
+            ),
         ]),
       ]),
     );
