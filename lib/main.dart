@@ -845,6 +845,7 @@ class _StoreHomeState extends State<StoreHome> {
     else page = account();
     return Scaffold(appBar: AppBar(title: Text(titles[tab]), actions: [
       if (tab == 0) IconButton(tooltip: 'ARK Designer', onPressed: _openDesigner, icon: const Icon(Icons.design_services_rounded)),
+      if (tab == 0) IconButton(tooltip: 'Sync published layout', onPressed: _loadDesignerConfig, icon: const Icon(Icons.sync_rounded)),
       if (tab == 0) IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
       IconButton(
         tooltip: 'Notifications',
