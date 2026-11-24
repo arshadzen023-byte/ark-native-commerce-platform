@@ -809,13 +809,6 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showComponentPicker,
-        backgroundColor: _designerPurple,
-        foregroundColor: const Color(0xFF17121F),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add component'),
-      ),
       body: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
@@ -833,54 +826,74 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           ]),
         ),
         if (error != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Text(error!, style: const TextStyle(color: Colors.red))),
-        Expanded(child: currentComponents.isEmpty
-          ? const Center(child: Text('No components on this page. Tap Add component.'))
-          : ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-            itemCount: currentComponents.length,
-            itemBuilder: (context, index) {
-              final component = currentComponents[index];
-              final selected = component.id == selectedId;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(19),
-                  onTap: () => _editComponent(component),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _designerSurface,
-                      borderRadius: BorderRadius.circular(19),
-                      border: Border.all(color: selected ? _designerPurple : _designerBorder, width: selected ? 2 : 1),
-                    ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        _componentIcon(component.type),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(component.title, style: const TextStyle(fontWeight: FontWeight.w800))),
-                        Switch(value: component.enabled, activeThumbColor: _designerPurple, onChanged: (value) async { setState(() => component.enabled = value); await _persist(); }),
-                        IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => _editComponent(component)),
-                      ]),
-                      _componentVisual(component, compact: true),
-                      Padding(padding: const EdgeInsets.only(top: 7, left: 4), child: Row(children: [
-                        Text(component.layout, style: const TextStyle(color: _designerPurple, fontWeight: FontWeight.w700, fontSize: 12)),
-                        const Spacer(),
-                        Text('Tap to edit properties', style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
-                      ])),
-                    ]),
-                  ),
+        Expanded(
+          child: currentComponents.isEmpty
+              ? const Center(child: Text('No components on this page. Tap Add component.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                  itemCount: currentComponents.length,
+                  itemBuilder: (context, index) {
+                    final component = currentComponents[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => _editComponent(component),
+                        child: Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: _designerSurface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: _designerBorder),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              IgnorePointer(
+                                child: _componentVisual(component),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                                child: Row(children: [
+                                  Text(
+                                    component.layout,
+                                    style: const TextStyle(color: _designerPurple, fontWeight: FontWeight.w700),
+                                  ),
+                                  const Spacer(),
+                                  const Icon(Icons.tune_rounded, size: 17, color: _designerMuted),
+                                ]),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          )),
+        ),
         if (saving || publishing) LinearProgressIndicator(value: null, color: _designerPurple),
         SafeArea(top: false, child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+          padding: const EdgeInsets.fromLTRB(12, 7, 12, 10),
           child: Row(children: [
-            Expanded(child: OutlinedButton.icon(onPressed: saving || publishing ? null : () => _persist(), icon: const Icon(Icons.save_outlined), label: const Text('Save Draft'))),
-            const SizedBox(width: 10),
-            Expanded(child: FilledButton.icon(onPressed: saving || publishing ? null : () => _persist(publish: true), icon: const Icon(Icons.publish_rounded), label: const Text('Publish'))),
+            Expanded(child: OutlinedButton.icon(
+              onPressed: saving || publishing ? null : _showComponentPicker,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add'),
+            )),
+            const SizedBox(width: 8),
+            Expanded(child: OutlinedButton.icon(
+              onPressed: saving || publishing ? null : () => _persist(),
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('Save Draft'),
+            )),
+            const SizedBox(width: 8),
+            Expanded(child: FilledButton.icon(
+              onPressed: saving || publishing ? null : () => _persist(publish: true),
+              icon: const Icon(Icons.publish_rounded),
+              label: const Text('Publish'),
+            )),
           ]),
         )),
       ]),
