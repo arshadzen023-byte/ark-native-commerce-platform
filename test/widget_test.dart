@@ -13,16 +13,19 @@ void main() {
 
   testWidgets('Designer shows page selector, components and add menu', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const MaterialApp(home: GlowHitDesignerPage(token: 'test-token', loadRemoteConfig: false)));
+    await tester.pumpWidget(const MaterialApp(
+      home: GlowHitDesignerPage(token: 'test-token', loadRemoteConfig: false),
+    ));
     await tester.pumpAndSettle();
+
     expect(find.text('ARK Designer'), findsOneWidget);
     expect(find.text('Edit page'), findsOneWidget);
     expect(find.text('Home'), findsWidgets);
     expect(find.text('Main promotional banner').first, findsOneWidget);
     expect(find.text('Add component'), findsOneWidget);
+
     await tester.tap(find.text('Add component'));
     await tester.pumpAndSettle();
-    expect(find.text('Add component'), findsWidgets);
     expect(find.text('Banner'), findsWidgets);
     expect(find.text('Category'), findsWidgets);
     expect(find.text('Product'), findsWidgets);
@@ -32,24 +35,45 @@ void main() {
     expect(find.text('Banner Slider'), findsNWidgets(2));
   });
 
-  testWidgets('Designer can edit component properties and save draft locally', (tester) async {
+  testWidgets('Designer property editor exposes live preview, tabs and child tools', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const MaterialApp(home: GlowHitDesignerPage(token: 'test-token', loadRemoteConfig: false)));
+    await tester.pumpWidget(const MaterialApp(
+      home: GlowHitDesignerPage(token: 'test-token', loadRemoteConfig: false),
+    ));
     await tester.pumpAndSettle();
+
     await tester.tap(find.text('Main promotional banner').first);
     await tester.pumpAndSettle();
-    // Assert against the reference-style editor labels currently rendered.
+
+    // Assert the current reference-style editor, rather than the retired
+    // pre-redesign "Component layout / Design / JSON" labels.
     expect(find.text('LIVE COMPONENT PREVIEW'), findsOneWidget);
-    expect(find.text('Component layout'), findsOneWidget);
-    expect(find.text('Title text style'), findsOneWidget);
-    expect(find.text('Layout'), findsOneWidget);
-    expect(find.text('Design'), findsOneWidget);
-    expect(find.text('JSON'), findsOneWidget);
-    expect(find.text('Live Preview'), findsOneWidget);
-    expect(find.text('Property'), findsOneWidget);
-    // Banner-specific controls are below the initial viewport. Keep this
-    // editor persistence test focused on the visible property form and save;
-    // their interactive behavior is covered by dedicated widget tests.
+    expect(find.text('Padding'), findsOneWidget);
+    expect(find.text('Margin'), findsOneWidget);
+    expect(find.text('Dimension'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Style'), findsOneWidget);
+    expect(find.text('Children'), findsOneWidget);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Status'), findsOneWidget);
+    expect(find.text('Layout type'), findsOneWidget);
+    expect(find.text('Title'), findsWidgets);
+    expect(find.text('Description'), findsOneWidget);
+
+    await tester.tap(find.text('Style'));
+    await tester.pumpAndSettle();
+    expect(find.text('Background Color'), findsOneWidget);
+    expect(find.text('Title Color'), findsOneWidget);
+    expect(find.textContaining('Font Family:'), findsOneWidget);
+
+    await tester.tap(find.text('Children'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add image / video'), findsOneWidget);
+    expect(find.text('Add text'), findsOneWidget);
+    expect(find.text('Add link'), findsOneWidget);
+
     await tester.tap(find.text('SAVE'));
     await tester.pumpAndSettle();
     expect(find.text('ARK Designer'), findsOneWidget);
