@@ -43,9 +43,19 @@ void main() {
     expect(find.text('Component layout'), findsOneWidget);
     expect(find.text('Title text style'), findsOneWidget);
     final autoplayFinder = find.text('Autoplay');
-    await tester.ensureVisible(autoplayFinder);
+    await tester.scrollUntilVisible(
+      autoplayFinder,
+      320,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(autoplayFinder, findsOneWidget);
     await tester.tap(autoplayFinder);
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Autoplay interval (seconds)'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Autoplay interval (seconds)'), findsOneWidget);
     await tester.tap(find.text('SAVE'));
     await tester.pumpAndSettle();
