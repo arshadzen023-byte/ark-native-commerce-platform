@@ -605,6 +605,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               fontStyle: component.properties['italic'] == true ? FontStyle.italic : FontStyle.normal,
               letterSpacing: (component.properties['letter_spacing'] as num?)?.toDouble() ?? 0,
               wordSpacing: (component.properties['word_spacing'] as num?)?.toDouble() ?? 0,
+              ),
             ),
           ),
         if (!compact && (component.properties['description'] ?? '').toString().isNotEmpty) ...[
@@ -1112,9 +1113,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
               )).toList(),
             ),
           ],
-        ]),
-      ],
-    );
+        ]);
   }
 
   Widget _titlePanel() => ListView(
