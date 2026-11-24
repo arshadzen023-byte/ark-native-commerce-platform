@@ -48,12 +48,14 @@ void main() {
     // Assert the current reference-style editor, rather than the retired
     // pre-redesign "Component layout / Design / JSON" labels.
     expect(find.text('LIVE COMPONENT PREVIEW'), findsOneWidget);
-    expect(find.text('Padding'), findsOneWidget);
-    expect(find.text('Margin'), findsOneWidget);
-    expect(find.text('Dimension'), findsOneWidget);
-    expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Style'), findsOneWidget);
-    expect(find.text('Children'), findsOneWidget);
+    // Tab labels can also appear inside the selected tab's property panel.
+    // Assert the Tab widgets specifically to avoid matching section headings.
+    expect(find.byType(Tab).evaluate().where((e) => (e.widget as Tab).text == 'Padding'), hasLength(1));
+    expect(find.byType(Tab).evaluate().where((e) => (e.widget as Tab).text == 'Margin'), hasLength(1));
+    expect(find.byType(Tab).evaluate().where((e) => (e.widget as Tab).text == 'Dimension'), hasLength(1));
+    expect(find.byType(Tab).evaluate().where((e) => (e.widget as Tab).text == 'Settings'), hasLength(1));
+    expect(find.byType(Tab).evaluate().where((e) => (e.widget as Tab).text == 'Style'), hasLength(1));
+    expect(find.byType(Tab).evaluate().where((e) => (e.widget as Tab).text == 'Children'), hasLength(1));
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
