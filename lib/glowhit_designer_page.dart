@@ -283,22 +283,33 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       };
       final json = const JsonEncoder.withIndent('  ').convert(data);
       final prefs = await SharedPreferences.getInstance();
+
+      // Preserve a recoverable local copy before calling the server, but mark
+      // it explicitly as pending so the editor never confuses it with a publish.
       await prefs.setString(_storageKey, json);
       try {
-        await ArkCustomerApi(widget.token).request('designer/config', method: 'POST', body: {
+        final response = await ArkCustomerApi(widget.token).request('designer/config', method: 'POST', body: {
           'config': data,
           'schema': 'ark-glowhit-designer/v1',
           'status': publish ? 'published' : 'draft',
         });
+        if (response is Map) {
+          final status = (response['status'] ?? response['state'] ?? '').toString().toLowerCase();
+          if (publish && (response['success'] == false || status == 'draft' || status == 'failed')) {
+            throw Exception('WordPress returned a non-published configuration response.');
+          }
+        }
+        await prefs.setString('glowhit_published_designer_config', jsonEncode(data));
+        await prefs.setString('glowhit_designer_last_server_sync', DateTime.now().toUtc().toIso8601String());
       } catch (e) {
-        // The device draft remains available, but do not claim WordPress saved or published it.
+        // The device draft remains recoverable, but do not claim that the server saved it.
         if (mounted) setState(() => error = publish
-            ? 'Draft is saved on this device, but WordPress did not confirm Publish: $e'
-            : 'Draft is saved on this device, but WordPress did not confirm the server draft: $e');
+            ? 'Local draft saved. WordPress did not confirm Publish: $e'
+            : 'Local draft saved. WordPress did not confirm the server draft: $e');
         return;
       }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(publish ? 'Published configuration synced to WordPress.' : 'Designer draft saved on this device.'),
+        content: Text(publish ? 'Published configuration synced to WordPress.' : 'Draft synced to WordPress.'),
       ));
     } catch (e) {
       if (mounted) setState(() => error = e.toString());
