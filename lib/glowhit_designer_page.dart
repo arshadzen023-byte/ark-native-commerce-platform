@@ -170,10 +170,23 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     properties['show_all_categories'] = (section['limit'] as num?)?.toInt() == 100;
     properties['arrows'] = section['show_arrows'] ?? false;
     properties['dots'] = section['show_dots'] ?? false;
+    properties['control'] = section['control'] ?? true;
+    properties['autoplay'] = section['autoplay'] ?? true;
+    properties['autoplay_seconds'] = ((section['interval_ms'] as num?)?.toDouble() ?? 4000) / 1000;
+    properties['fade'] = (section['transition'] ?? '') == 'fade';
     properties['view_fraction'] = section['card_width'] ?? 1;
     properties['pause'] = section['pause_on_interaction'] ?? true;
+    properties['horizontal'] = section['horizontal'] ?? true;
     properties['link'] = section['tap_url'] ?? '';
     properties['image_url'] = section['image_url'] ?? section['background_image_url'] ?? '';
+    properties['source'] = section['source'] ?? 'featured';
+    properties['source_id'] = section['category_id'] ?? 0;
+    properties['title_font_size'] = section['title_font_size'] ?? 18;
+    properties['title_font_weight'] = section['title_font_weight'] ?? 'bold';
+    properties['title_text_align'] = section['title_text_align'] ?? 'left';
+    properties['title_max_lines'] = section['title_max_lines'] ?? 2;
+    properties['countdown_enabled'] = section['countdown_enabled'] ?? false;
+    properties['countdown_time'] = section['countdown_time'] ?? '';
     properties['children'] = section['children'] ?? section['slides'] ?? <dynamic>[];
 
     final sliderKey = (section['slider_key'] ?? '').toString();
