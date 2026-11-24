@@ -56,8 +56,15 @@ Future<http.Response> request(Uri uri, {String method = 'GET', Map<String, Strin
 }
 
 class StoreApi {
-  static Uri products({String order = 'date', String search = '', bool sale = false}) {
-    final params = <String, String>{'page':'1','per_page':'40','orderby':order,'order':'desc','catalog_visibility':'visible'};
+  static Uri products({String order = 'date', String search = '', bool sale = false, int page = 1}) {
+    final params = <String, String>{
+      'page': page.toString(),
+      'per_page': '40',
+      'orderby': order,
+      'order': 'desc',
+      'catalog_visibility': 'visible',
+      '_fields': 'id,name,slug,permalink,images,prices,on_sale,is_featured,average_rating,review_count,categories,tags,stock_status,date_created,total_sales',
+    };
     if (search.trim().isNotEmpty) params['search'] = search.trim();
     if (sale) params['on_sale'] = 'true';
     return Uri.parse(storeUrl).resolve('wp-json/wc/store/v1/products').replace(queryParameters: params);
