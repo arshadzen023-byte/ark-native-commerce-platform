@@ -418,10 +418,13 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   Future<Map<String, dynamic>?> _chooseMedia() async {
     final response = await ArkCustomerApi(widget.token).request(
       'designer/media',
-      query: {'page': '1', 'per_page': '48'},
+      query: {'page': '1', 'per_page': '60'},
     );
     final rows = response is Map && response['items'] is List
-        ? (response['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        ? (response['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).where((item) {
+            final mime = (item['mime_type'] ?? '').toString();
+            return mime.startsWith('image/') || mime.startsWith('video/');
+          }).toList()
         : <Map<String, dynamic>>[];
     if (!mounted) return null;
     return showModalBottomSheet<Map<String, dynamic>>(
@@ -430,19 +433,19 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       showDragHandle: true,
       builder: (ctx) => SafeArea(
         child: SizedBox(
-          height: MediaQuery.of(ctx).size.height * .72,
+          height: MediaQuery.of(ctx).size.height * .78,
           child: Column(children: [
             const Padding(
               padding: EdgeInsets.all(16),
               child: Row(children: [
-                Icon(Icons.photo_library_outlined, color: _designerPurple),
+                Icon(Icons.perm_media_outlined, color: _designerPurple),
                 SizedBox(width: 10),
                 Text('WordPress Media Library', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
               ]),
             ),
             Expanded(
               child: rows.isEmpty
-                  ? const Center(child: Text('No images found in WordPress Media Library.'))
+                  ? const Center(child: Text('No images or videos found in WordPress Media Library.'))
                   : GridView.builder(
                       padding: const EdgeInsets.all(12),
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -451,21 +454,36 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                       itemCount: rows.length,
                       itemBuilder: (_, index) {
                         final item = rows[index];
-                        final image = (item['thumbnail_url'] ?? item['source_url'] ?? '').toString();
+                        final mime = (item['mime_type'] ?? '').toString();
+                        final isVideo = mime.startsWith('video/');
+                        final source = (item['source_url'] ?? '').toString();
+                        final preview = (item['thumbnail_url'] ?? '').toString();
                         return InkWell(
                           onTap: () => Navigator.pop(ctx, item),
                           child: Card(
                             clipBehavior: Clip.antiAlias,
                             child: Column(children: [
                               Expanded(
-                                child: image.isEmpty
-                                    ? const Icon(Icons.image_not_supported_outlined)
-                                    : Image.network(image, width: double.infinity, fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                                child: isVideo
+                                    ? Stack(alignment: Alignment.center, children: [
+                                        if (preview.isNotEmpty)
+                                          Image.network(preview, width: double.infinity, height: double.infinity, fit: BoxFit.cover)
+                                        else
+                                          const Center(child: Icon(Icons.video_library_outlined, size: 34)),
+                                        const CircleAvatar(radius: 15, child: Icon(Icons.play_arrow_rounded, size: 20)),
+                                      ])
+                                    : source.isEmpty
+                                        ? const Icon(Icons.image_not_supported_outlined)
+                                        : Image.network(preview.isEmpty ? source : preview, width: double.infinity, fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
                               ),
                               Padding(
                                 padding: const EdgeInsets.all(5),
-                                child: Text((item['title'] ?? 'Image').toString(), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                child: Row(children: [
+                                  Icon(isVideo ? Icons.videocam_outlined : Icons.image_outlined, size: 13),
+                                  const SizedBox(width: 3),
+                                  Expanded(child: Text((item['title'] ?? (isVideo ? 'Video' : 'Image')).toString(), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                ]),
                               ),
                             ]),
                           ),
