@@ -62,8 +62,12 @@ void main() {
     expect(find.text('Description'), findsOneWidget);
     expect(find.text('Title Text Style'), findsOneWidget);
 
-    await tester.tap(find.text('Title Text Style'));
+    final titleStyleButton = find.text('Title Text Style');
+    await tester.ensureVisible(titleStyleButton);
     await tester.pumpAndSettle();
+    await tester.tap(titleStyleButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Text Style'), findsOneWidget);
     expect(find.text('Sample Text'), findsOneWidget);
     expect(find.text('Search Font'), findsNothing);
     expect(find.text('Font Family'), findsOneWidget);
