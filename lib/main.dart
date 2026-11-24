@@ -451,11 +451,18 @@ class _StoreHomeState extends State<StoreHome> {
       return;
     }
     try {
-      await ArkCustomerApi(token).request('designer/config');
+      final response = await ArkCustomerApi(token).request('designer/config');
+      if (response is Map && (response['pages'] is Map)) {
+        // The bridge returns the existing ARK Designer WordPress config.
+        // The editor reads this route itself; this call is a preflight only.
+      }
     } catch (e) {
+      final message = e.toString();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('ARK Designer requires a WordPress administrator account. $e'),
+          content: Text(message.contains('No route was found')
+              ? 'ARK Designer API route is missing. Update and activate ARK App Designer + ARK Native API Bridge.'
+              : 'ARK Designer access failed. Sign in with a WordPress administrator account. $e'),
         ));
       }
       return;
