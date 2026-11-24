@@ -512,18 +512,29 @@ class _StoreHomeState extends State<StoreHome> {
   List<Map<String, dynamic>> _designerProducts(Map<String, dynamic> section) {
     final source = (section['source'] ?? 'latest').toString();
     final categoryId = (section['category_id'] as num?)?.toInt() ?? 0;
+    final tagId = (section['tag_id'] as num?)?.toInt() ?? 0;
     var rows = products.where((p) {
       if (source == 'sale') return p['on_sale'] == true;
       if (source == 'featured') return p['is_featured'] == true;
       if (source == 'wishlist') return wishlist.any((w) => w['id'] == p['id']);
+      if (source == 'best_selling') return (p['total_sales'] as num?) != null;
+      if (source == 'new_arrival' || source == 'latest') return true;
       if (source == 'category' && categoryId > 0) {
         final ids = p['categories'] is List ? (p['categories'] as List).whereType<Map>().map((c) => (c['id'] as num?)?.toInt()).toList() : <int?>[];
         return ids.contains(categoryId);
+      }
+      if (source == 'tag' && tagId > 0) {
+        final ids = p['tags'] is List ? (p['tags'] as List).whereType<Map>().map((tag) => (tag['id'] as num?)?.toInt()).toList() : <int?>[];
+        return ids.contains(tagId);
       }
       return true;
     }).toList();
     if (source == 'top_rated') {
       rows.sort((a, b) => ((b['average_rating'] as num?) ?? 0).compareTo((a['average_rating'] as num?) ?? 0));
+    } else if (source == 'best_selling') {
+      rows.sort((a, b) => ((b['total_sales'] as num?) ?? 0).compareTo((a['total_sales'] as num?) ?? 0));
+    } else if (source == 'new_arrival' || source == 'latest') {
+      rows.sort((a, b) => (b['date_created'] ?? '').toString().compareTo((a['date_created'] ?? '').toString()));
     }
     final limit = (section['limit'] as num?)?.toInt() ?? 8;
     return rows.take(limit.clamp(1, 40)).toList();
