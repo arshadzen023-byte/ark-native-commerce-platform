@@ -984,10 +984,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     final children = item.properties['children'] is List
         ? List<dynamic>.from(item.properties['children'] as List)
         : <dynamic>[];
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        _section('Children', [
+    return _section('Children', [
           Wrap(spacing: 8, runSpacing: 8, children: [
             OutlinedButton.icon(
               onPressed: () async {
@@ -1232,7 +1229,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
         _switch('Autoplay', 'autoplay'),
         if (item.properties['autoplay'] == true) _slider('Autoplay interval (seconds)', 'autoplay_seconds', min: 2, max: 15),
         _slider('View Fraction', 'view_fraction', min: .4, max: 1),
-        _slider('Fade', 'fade_value', min: 0, max: 1),
+        _switch('Fade', 'fade'),
         _switch('Pause on touch', 'pause'),
         _switch('Dot', 'dots'),
         _switch('Arrow', 'arrows'),
