@@ -548,6 +548,12 @@ class _StoreHomeState extends State<StoreHome> {
     final background = (section['section_background'] ?? 'transparent').toString();
     final textColor = (section['text_color'] ?? '#202733').toString();
     final padding = (section['padding_top'] as num?)?.toDouble() ?? 12.0;
+    final margin = EdgeInsets.fromLTRB(
+      (section['margin_left'] as num?)?.toDouble() ?? 0,
+      (section['margin_top'] as num?)?.toDouble() ?? 0,
+      (section['margin_right'] as num?)?.toDouble() ?? 0,
+      (section['margin_bottom'] as num?)?.toDouble() ?? 0,
+    );
 
     if (type == 'ark_live_slider' || type.startsWith('banner_') || section['designer_component_type']?.toString().startsWith('banner_') == true) {
       final key = (section['slider_key'] ?? '').toString();
