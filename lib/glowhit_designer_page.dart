@@ -207,6 +207,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
 
   Future<void> _loadDraft() async {
     final prefs = await SharedPreferences.getInstance();
+    var loadedRemote = false;
     if (widget.loadRemoteConfig) {
       try {
         final remote = await ArkCustomerApi(widget.token).request('designer/config');
@@ -224,28 +225,33 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               }
             }
           }
+          loadedRemote = true;
         }
       } catch (e) {
         error = 'WordPress Designer config could not be loaded: $e';
       }
     }
 
-    final raw = prefs.getString(_storageKey);
-    if (raw != null) {
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is Map && decoded['pages'] is Map) {
-          pages = (decoded['pages'] as Map).map((key, value) => MapEntry(
-            key.toString(),
-            (value as List).whereType<Map>().map((item) =>
-              DesignerComponent.fromJson(Map<String, dynamic>.from(item))).toList(),
-          ));
-          if (decoded['templates'] is Map) {
-            templates = Map<String, dynamic>.from(decoded['templates'] as Map);
+    // A device draft is a fallback only. It must never overwrite a newer
+    // WordPress configuration just because a local cache exists.
+    if (!loadedRemote) {
+      final raw = prefs.getString(_storageKey);
+      if (raw != null) {
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is Map && decoded['pages'] is Map) {
+            pages = (decoded['pages'] as Map).map((key, value) => MapEntry(
+              key.toString(),
+              (value as List).whereType<Map>().map((item) =>
+                DesignerComponent.fromJson(Map<String, dynamic>.from(item))).toList(),
+            ));
+            if (decoded['templates'] is Map) {
+              templates = Map<String, dynamic>.from(decoded['templates'] as Map);
+            }
           }
+        } catch (_) {
+          error = 'Saved draft could not be read. A fresh draft was loaded.';
         }
-      } catch (_) {
-        error = 'Saved draft could not be read. A fresh draft was loaded.';
       }
     }
 
