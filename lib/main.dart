@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'designer_banner_carousel.dart';
 import 'product_details_page.dart';
 import 'customer_account_page.dart';
 import 'checkout_page.dart';
