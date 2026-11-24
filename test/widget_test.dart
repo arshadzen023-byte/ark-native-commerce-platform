@@ -41,6 +41,9 @@ void main() {
     expect(find.text('Component Properties'), findsOneWidget);
     expect(find.text('LIVE COMPONENT PREVIEW'), findsOneWidget);
     expect(find.text('Component layout'), findsOneWidget);
+    expect(find.text('Title text style'), findsOneWidget);
+    expect(find.text('Autoplay interval (seconds)'), findsOneWidget);
+    expect(find.text('LIVE COMPONENT PREVIEW'), findsOneWidget);
     await tester.tap(find.text('SAVE'));
     await tester.pumpAndSettle();
     expect(find.text('ARK Designer'), findsOneWidget);
