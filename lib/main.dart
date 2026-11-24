@@ -177,6 +177,7 @@ class _StoreHomeState extends State<StoreHome> {
   List<Map<String, dynamic>> wishlist = [];
   List<Map<String, dynamic>> storeCategories = [];
   Map<String, dynamic> designerConfig = {};
+  bool designerConfigLoading = false;
   final Map<String, Future<Map<String, dynamic>>> _sliderFutures = {};
   final WooStoreApi woo = WooStoreApi();
   Map<String, dynamic> liveCart = {};
@@ -460,6 +461,7 @@ class _StoreHomeState extends State<StoreHome> {
   Future<void> _loadDesignerConfig() async {
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString('glowhit_published_designer_config');
+    if (mounted) setState(() => designerConfigLoading = true);
     if (cached != null) {
       try {
         final decoded = jsonDecode(cached);
