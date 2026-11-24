@@ -22,8 +22,14 @@ void main() {
     expect(find.text('Add component'), findsOneWidget);
     await tester.tap(find.text('Add component'));
     await tester.pumpAndSettle();
-    expect(find.text('Add a component'), findsOneWidget);
-    expect(find.text('Banner layout'), findsOneWidget);
+    expect(find.text('Add component'), findsWidgets);
+    expect(find.text('Banner'), findsWidgets);
+    expect(find.text('Category'), findsWidgets);
+    expect(find.text('Product'), findsWidgets);
+    await tester.tap(find.text('Banner').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Banner Grid'), findsOneWidget);
+    expect(find.text('Banner Slider'), findsOneWidget);
   });
 
   testWidgets('Designer can edit component properties and save draft locally', (tester) async {
