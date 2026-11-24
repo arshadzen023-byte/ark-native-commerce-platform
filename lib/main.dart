@@ -540,45 +540,89 @@ class _StoreHomeState extends State<StoreHome> {
 
     if (type == 'ark_live_slider' || type.startsWith('banner_') || section['designer_component_type']?.toString().startsWith('banner_') == true) {
       final key = (section['slider_key'] ?? '').toString();
-      if (key.isEmpty) return const SizedBox.shrink();
-      final future = _sliderFutures.putIfAbsent(key, () => _loadDesignerSlider(key));
-      return FutureBuilder<Map<String, dynamic>>(
-        future: future,
-        builder: (context, snapshot) {
-          final slides = snapshot.data?['slides'] is List ? snapshot.data!['slides'] as List : const <dynamic>[];
-          final height = ((snapshot.data?['settings'] is Map ? (snapshot.data!['settings'] as Map)['height_px'] : section['height_px']) as num?)?.toDouble() ?? 180;
-          if (slides.isEmpty) return SizedBox(height: height, child: const Center(child: CircularProgressIndicator()));
-          return Padding(
-            padding: EdgeInsets.only(top: padding, bottom: (section['padding_bottom'] as num?)?.toDouble() ?? 12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              if (showTitle) Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor)))),
-              SizedBox(
-                height: height,
-                child: PageView.builder(
-                  itemCount: slides.length,
-                  itemBuilder: (_, index) {
-                    final slide = slides[index] is Map ? Map<String, dynamic>.from(slides[index] as Map) : <String, dynamic>{};
-                    final image = (slide['image_url'] ?? '').toString();
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular((section['corner_radius'] as num?)?.toDouble() ?? 16),
-                        child: Stack(fit: StackFit.expand, children: [
-                          image.isEmpty ? Container(color: const Color(0xFFECE8F3)) : Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
-                          if ((slide['title'] ?? '').toString().isNotEmpty)
-                            Align(alignment: Alignment.bottomLeft, child: Container(width: double.infinity, padding: const EdgeInsets.all(12), color: Colors.black.withValues(alpha: .35), child: Text(slide['title'].toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
-                        ]),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ]),
-          );
-        },
-      );
-    }
+      final inlineChildren = section['slides'] is List
+          ? (section['slides'] as List)
+          : (section['children'] is List ? section['children'] as List : const <dynamic>[]);
+      final normalizedInline = inlineChildren.whereType<Map>().map((slide) {
+        final item = Map<String, dynamic>.from(slide);
+        item['image_url'] = item['image_url'] ?? item['source_url'] ?? item['url'] ?? '';
+        return item;
+      }).where((slide) => (slide['image_url'] ?? '').toString().isNotEmpty).toList();
 
+      Widget renderCarousel(List<Map<String, dynamic>> slides, Map<String, dynamic> settings) {
+        final height = ((settings['height_px'] ?? section['height_px'] ?? section['height'] ?? 180) as num).toDouble();
+        final intervalMs = ((settings['interval_ms'] ?? section['interval_ms'] ?? (((section['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
+        final layout = (section['designer_component_type'] ?? section['type'] ?? '').toString();
+        final bannerStyle = layout == 'banner_grid' || layout == 'banner_list' || layout == 'banner_scroll';
+        return Padding(
+          padding: EdgeInsets.only(top: padding, bottom: (section['padding_bottom'] as num?)?.toDouble() ?? 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (showTitle) Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
+            ),
+            bannerStyle
+                ? SizedBox(
+                    height: height,
+                    child: ListView(
+                      scrollDirection: section['horizontal'] == false || layout == 'banner_list' ? Axis.vertical : Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      children: slides.map((slide) {
+                        final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
+                        return Padding(
+                          padding: EdgeInsets.all(((section['item_gap'] as num?)?.toDouble() ?? 8) / 2),
+                          child: SizedBox(
+                            width: (section['width_pct'] as num?)?.toDouble() == null ? 260 : MediaQuery.of(context).size.width * ((section['width_pct'] as num).toDouble() / 100),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular((section['corner_radius'] as num?)?.toDouble() ?? 16),
+                              child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  )
+                : ArkDesignerBannerCarousel(
+                    slides: slides,
+                    height: height,
+                    radius: (section['corner_radius'] as num?)?.toDouble() ?? 16,
+                    autoplay: section['autoplay'] != false,
+                    interval: Duration(milliseconds: intervalMs.clamp(1000, 30000)),
+                    pauseOnInteraction: section['pause_on_interaction'] != false,
+                    showDots: section['show_dots'] == true,
+                    showArrows: section['show_arrows'] == true,
+                    fade: section['transition'] == 'fade',
+                    viewFraction: ((section['card_width'] ?? section['view_fraction'] ?? 1) as num).toDouble(),
+                  ),
+          ]),
+        );
+      }
+
+      if (key.isNotEmpty) {
+        final future = _sliderFutures.putIfAbsent(key, () => _loadDesignerSlider(key));
+        return FutureBuilder<Map<String, dynamic>>(
+          future: future,
+          builder: (context, snapshot) {
+            final payload = snapshot.data ?? <String, dynamic>{};
+            final slides = payload['slides'] is List
+                ? (payload['slides'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+                : <Map<String, dynamic>>[];
+            final settings = payload['settings'] is Map ? Map<String, dynamic>.from(payload['settings'] as Map) : <String, dynamic>{};
+            if (slides.isEmpty) return SizedBox(height: (section['height_px'] as num?)?.toDouble() ?? 180, child: const Center(child: CircularProgressIndicator()));
+            return renderCarousel(slides, settings);
+          },
+        );
+      }
+      if (normalizedInline.isNotEmpty) {
+        return renderCarousel(normalizedInline, section);
+      }
+      if ((section['image_url'] ?? '').toString().isNotEmpty) {
+        return renderCarousel([
+          {'image_url': section['image_url'], 'title': title},
+        ], section);
+      }
+      return const SizedBox.shrink();
+    }
     if (type == 'category_grid' || type.startsWith('category_')) {
       final layout = (section['category_layout'] ?? section['layout_variant'] ?? 'grid').toString();
       final limit = (section['limit'] as num?)?.toInt() ?? 8;
