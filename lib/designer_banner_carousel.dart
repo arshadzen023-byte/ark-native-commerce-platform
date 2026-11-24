@@ -33,7 +33,7 @@ class ArkDesignerBannerCarousel extends StatefulWidget {
 }
 
 class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
-  late final PageController _controller;
+  late PageController _controller;
   Timer? _timer;
   int _index = 0;
   bool _interactionPaused = false;
@@ -55,8 +55,13 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
       _startTimer();
     }
     if (oldWidget.viewFraction != widget.viewFraction) {
-      // Keep the attached PageController stable during a live property edit.
-      // The next page mount picks up the newly selected viewport fraction.
+      final next = PageController(
+        initialPage: _index,
+        viewportFraction: widget.viewFraction.clamp(.4, 1),
+      );
+      final previous = _controller;
+      _controller = next;
+      WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
     }
     if (_index >= widget.slides.length) {
       _index = widget.slides.isEmpty ? 0 : widget.slides.length - 1;
