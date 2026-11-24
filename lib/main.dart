@@ -691,7 +691,6 @@ class _StoreHomeState extends State<StoreHome> {
         );
         return SizedBox(width: 128, height: cardHeight, child: card);
       }).toList();
-      final horizontal = section['horizontal'] != false && !layout.contains('list');
       return Container(
         margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
@@ -745,7 +744,6 @@ class _StoreHomeState extends State<StoreHome> {
       final rows = _designerProducts(section);
       if (rows.isEmpty) return const SizedBox.shrink();
       final layout = (section['layout_variant'] ?? section['designer_component_type'] ?? type).toString().toLowerCase();
-      final radius = (section['corner_radius'] as num?)?.toDouble() ?? 12;
       final cardWidth = (section['max_width_px'] as num?)?.toDouble() ?? 174;
       final cardHeight = (section['height_px'] as num?)?.toDouble() ?? 260;
       final cards = rows.map((product) => SizedBox(
