@@ -854,6 +854,41 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
             onChanged: (value) { _change('description', value); }),
           _switch('Show title', 'show_title'),
           _switch('Countdown enabled', 'countdown_enabled'),
+          if (item.properties['countdown_enabled'] == true)
+            TextFormField(
+              key: ValueKey('countdown-time-${item.id}'),
+              initialValue: (item.properties['countdown_time'] ?? '').toString(),
+              decoration: const InputDecoration(
+                labelText: 'Countdown target (ISO 8601)',
+                hintText: '2026-12-31T23:59:59+05:30',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) => _change('countdown_time', value),
+            ),
+          const SizedBox(height: 10),
+          const Text('Title text style', style: TextStyle(fontWeight: FontWeight.w700)),
+          _slider('Font size', 'title_font_size', min: 10, max: 36),
+          DropdownButtonFormField<String>(
+            initialValue: (item.properties['title_font_weight'] ?? 'bold').toString(),
+            decoration: const InputDecoration(labelText: 'Font weight', border: OutlineInputBorder()),
+            items: const [
+              DropdownMenuItem(value: 'normal', child: Text('Normal')),
+              DropdownMenuItem(value: 'medium', child: Text('Medium')),
+              DropdownMenuItem(value: 'bold', child: Text('Bold')),
+            ],
+            onChanged: (value) { if (value != null) _change('title_font_weight', value); },
+          ),
+          DropdownButtonFormField<String>(
+            initialValue: (item.properties['title_text_align'] ?? 'left').toString(),
+            decoration: const InputDecoration(labelText: 'Text alignment', border: OutlineInputBorder()),
+            items: const [
+              DropdownMenuItem(value: 'left', child: Text('Left')),
+              DropdownMenuItem(value: 'center', child: Text('Center')),
+              DropdownMenuItem(value: 'right', child: Text('Right')),
+            ],
+            onChanged: (value) { if (value != null) _change('title_text_align', value); },
+          ),
+          _slider('Maximum title lines', 'title_max_lines', min: 1, max: 4),
         ]),
         _section('Color', [
           _colorChoice('Background colour', 'background_color', const ['#FFFFFF', '#F1ECFF', '#E8F6F0', '#FFF0E6', '#202033']),
