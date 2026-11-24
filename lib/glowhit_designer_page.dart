@@ -1488,6 +1488,194 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
   );
 }
 
+
+class _DesignerTextStylePage extends StatefulWidget {
+  const _DesignerTextStylePage({required this.properties});
+  final Map<String, dynamic> properties;
+
+  @override
+  State<_DesignerTextStylePage> createState() => _DesignerTextStylePageState();
+}
+
+class _DesignerTextStylePageState extends State<_DesignerTextStylePage> {
+  late Map<String, dynamic> values;
+
+  static const _textColors = <String>['#24212B', '#FFFFFF', '#7650B8', '#B23B32', '#16734A', '#1B6CA8'];
+  static const _backgroundColors = <String>['#FFFFFF', '#F1EFF5', '#202033', '#FFF0E6', '#E8F6F0', '#00000000'];
+
+  @override
+  void initState() {
+    super.initState();
+    values = Map<String, dynamic>.from(widget.properties);
+  }
+
+  Color _color(String hex) {
+    final raw = hex.replaceFirst('#', '');
+    final parsed = int.tryParse(raw, radix: 16) ?? 0xFF24212B;
+    if (raw.length == 8) return Color(parsed);
+    return Color(0xFF000000 | parsed);
+  }
+
+  void _set(String key, dynamic value) => setState(() => values[key] = value);
+
+  Widget _swatches(String title, String key, List<String> colors) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 10),
+        Wrap(spacing: 10, runSpacing: 10, children: colors.map((hex) => InkWell(
+          onTap: () => _set(key, hex),
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            width: 38, height: 38,
+            decoration: BoxDecoration(
+              color: _color(hex),
+              shape: BoxShape.circle,
+              border: Border.all(color: values[key] == hex ? _designerPurple : _designerBorder, width: values[key] == hex ? 3 : 1),
+            ),
+          ),
+        )).toList()),
+      ]),
+    );
+  }
+
+  Widget _slider(String label, String key, {double min = 0, double max = 60, double fallback = 0}) {
+    final value = ((values[key] as num?)?.toDouble() ?? fallback).clamp(min, max);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(children: [
+        Row(children: [Expanded(child: Text(label)), Text(value.toStringAsFixed(1))]),
+        Slider(
+          value: value, min: min, max: max, activeColor: _designerPurple,
+          onChanged: (next) => _set(key, next),
+        ),
+      ]),
+    );
+  }
+
+  Future<void> _searchFont() async {
+    const fonts = <String>[
+      'Roboto', 'ABeeZee', 'Abel', 'Abhaya Libre', 'Aboreto', 'Abril Fatface',
+      'Abyssinica SIL', 'Afacad', 'Alegreya', 'Anton', 'Archivo', 'Barlow',
+      'Bebas Neue', 'Bitter', 'Cabin', 'Cairo', 'Comfortaa', 'DM Sans',
+      'Dancing Script', 'Exo 2', 'Fira Sans', 'Georgia', 'Inter', 'Lato',
+      'Merriweather', 'Montserrat', 'Nunito', 'Open Sans', 'Oswald',
+      'Playfair Display', 'Poppins', 'Raleway', 'Roboto Condensed', 'Ubuntu'
+    ];
+    final controller = TextEditingController();
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _designerSurface,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, refresh) {
+        final query = controller.text.toLowerCase();
+        final filtered = fonts.where((font) => font.toLowerCase().contains(query)).toList();
+        return SafeArea(child: SizedBox(
+          height: MediaQuery.of(ctx).size.height * .84,
+          child: Column(children: [
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: TextField(
+                controller: controller,
+                onChanged: (_) => refresh(() {}),
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search Font'),
+              ),
+            ),
+            Expanded(child: ListView.builder(
+              itemCount: filtered.length,
+              itemBuilder: (_, index) => ListTile(
+                title: Text('Almost before we knew it', style: TextStyle(fontFamily: filtered[index], fontSize: 19)),
+                subtitle: Text(filtered[index]),
+                onTap: () => Navigator.pop(ctx, filtered[index]),
+              ),
+            )),
+          ]),
+        ));
+      }),
+    );
+    controller.dispose();
+    if (selected != null) _set('font_family', selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = _color((values['title_color'] ?? '#24212B').toString());
+    final background = _color((values['title_background_color'] ?? '#00000000').toString());
+    final fontSize = (values['title_font_size'] as num?)?.toDouble() ?? 24;
+    return Theme(
+      data: ThemeData.light().copyWith(
+        scaffoldBackgroundColor: _designerBackground,
+        colorScheme: ColorScheme.fromSeed(seedColor: _designerPurple),
+        appBarTheme: const AppBarTheme(backgroundColor: _designerSurface, foregroundColor: _designerText),
+      ),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Text Style'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, values), child: const Text('DONE')),
+          ],
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(minHeight: 170),
+              alignment: Alignment.center,
+              color: background,
+              child: Text(
+                'Sample Text',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: textColor,
+                  backgroundColor: background,
+                  fontSize: fontSize,
+                  fontWeight: (values['title_font_weight'] ?? 'normal') == 'bold' ? FontWeight.bold
+                      : (values['title_font_weight'] ?? 'normal') == 'medium' ? FontWeight.w500 : FontWeight.normal,
+                  fontStyle: values['italic'] == true ? FontStyle.italic : FontStyle.normal,
+                  fontFamily: (values['font_family'] ?? 'Roboto').toString(),
+                  letterSpacing: (values['letter_spacing'] as num?)?.toDouble() ?? 0,
+                  wordSpacing: (values['word_spacing'] as num?)?.toDouble() ?? 0,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            _swatches('Color', 'title_color', _textColors),
+            _swatches('Background Color', 'title_background_color', _backgroundColors),
+            DropdownButtonFormField<String>(
+              initialValue: (values['title_font_weight'] ?? 'normal').toString(),
+              decoration: const InputDecoration(labelText: 'Font weight'),
+              items: const [
+                DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                DropdownMenuItem(value: 'bold', child: Text('Bold')),
+              ],
+              onChanged: (value) { if (value != null) _set('title_font_weight', value); },
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Italic'),
+              value: values['italic'] == true,
+              onChanged: (value) => _set('italic', value),
+            ),
+            _slider('Font Size', 'title_font_size', min: 8, max: 72, fallback: 24),
+            _slider('Letter Spacing', 'letter_spacing', max: 20),
+            _slider('Word Spacing', 'word_spacing', max: 30),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Font Family'),
+              subtitle: Text((values['font_family'] ?? 'Roboto').toString()),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _searchFont,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DesignerChildEditPage extends StatefulWidget {
   const _DesignerChildEditPage({required this.child, required this.onChooseMedia});
   final Map<String, dynamic> child;
