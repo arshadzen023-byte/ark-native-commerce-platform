@@ -929,15 +929,20 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
         if (item.type == 'Category') _section('Category settings', [
           _switch('Show all categories', 'show_all_categories'),
           const Text('Parent category ID'),
-          TextField(key: const ValueKey('parent_category_id'), keyboardType: TextInputType.number,
+          TextField(
+            key: const ValueKey('parent_category_id'),
+            controller: TextEditingController(text: (item.properties['parent_category_id'] ?? 0).toString()),
+            keyboardType: TextInputType.number,
             decoration: const InputDecoration(border: OutlineInputBorder(), hintText: '0 = all categories'),
-            onChanged: (v) => _change('parent_category_id', int.tryParse(v) ?? 0)),
+            onChanged: (v) => _change('parent_category_id', int.tryParse(v) ?? 0),
+          ),
         ]),
         if (item.type == 'Product') _section('Product settings', [
           DropdownButtonFormField<String>(
             initialValue: (item.properties['source'] ?? 'featured').toString(),
             decoration: const InputDecoration(labelText: 'Product source', border: OutlineInputBorder()),
             items: const [
+              DropdownMenuItem(value: 'latest', child: Text('Latest')),
               DropdownMenuItem(value: 'featured', child: Text('Featured')),
               DropdownMenuItem(value: 'category', child: Text('Category')),
               DropdownMenuItem(value: 'tag', child: Text('Tag')),
@@ -945,12 +950,17 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
               DropdownMenuItem(value: 'new_arrival', child: Text('New Arrival')),
               DropdownMenuItem(value: 'wishlist', child: Text('Wishlist')),
               DropdownMenuItem(value: 'best_selling', child: Text('Best Selling')),
+              DropdownMenuItem(value: 'top_rated', child: Text('Top Rated')),
             ],
             onChanged: (v) { if (v != null) _change('source', v); },
           ),
-          TextField(decoration: const InputDecoration(labelText: 'Category / tag ID', border: OutlineInputBorder()),
+          TextField(
+            key: const ValueKey('product-source-id'),
+            controller: TextEditingController(text: (item.properties['source_id'] ?? 0).toString()),
+            decoration: const InputDecoration(labelText: 'Category / tag ID', border: OutlineInputBorder()),
             keyboardType: TextInputType.number,
-            onChanged: (v) => _change('source_id', int.tryParse(v) ?? 0)),
+            onChanged: (v) => _change('source_id', int.tryParse(v) ?? 0),
+          ),
         ]),
         _section('Visibility and children', [
           _switch('Component enabled', 'enabled'),
