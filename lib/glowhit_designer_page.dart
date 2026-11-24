@@ -7,12 +7,13 @@ import 'package:http/http.dart' as http;
 import 'customer_account_page.dart';
 
 // Match the dark, purple-accented native Designer reference supplied by the user.
-const _designerPurple = Color(0xFF9A83C5);
-const _designerBackground = Color(0xFF0B0B0D);
-const _designerSurface = Color(0xFF19191D);
-const _designerText = Color(0xFFE5E1EA);
-const _designerField = Color(0xFF29272D);
-const _designerMuted = Color(0xFFAAA5B2);
+const _designerPurple = Color(0xFF7650B8);
+const _designerBackground = Color(0xFFF7F7FA);
+const _designerSurface = Color(0xFFFFFFFF);
+const _designerText = Color(0xFF24212B);
+const _designerField = Color(0xFFF1EFF5);
+const _designerMuted = Color(0xFF77717F);
+const _designerBorder = Color(0xFFE4E0EA);
 
 class DesignerComponent {
   DesignerComponent({
@@ -840,14 +841,14 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                     decoration: BoxDecoration(
                       color: _designerSurface,
                       borderRadius: BorderRadius.circular(19),
-                      border: Border.all(color: selected ? _designerPurple : const Color(0xFF34323A), width: selected ? 2 : 1),
+                      border: Border.all(color: selected ? _designerPurple : _designerBorder, width: selected ? 2 : 1),
                     ),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
                         _componentIcon(component.type),
                         const SizedBox(width: 8),
                         Expanded(child: Text(component.title, style: const TextStyle(fontWeight: FontWeight.w800))),
-                        Switch(value: component.enabled, activeColor: _designerPurple, onChanged: (value) async { setState(() => component.enabled = value); await _persist(); }),
+                        Switch(value: component.enabled, activeThumbColor: _designerPurple, onChanged: (value) async { setState(() => component.enabled = value); await _persist(); }),
                         IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => _editComponent(component)),
                       ]),
                       _componentVisual(component, compact: true),
@@ -922,7 +923,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     child: Card(
       elevation: 0,
       color: _designerSurface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17), side: const BorderSide(color: Color(0xFF34323A))),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17), side: const BorderSide(color: _designerBorder)),
       child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _designerPurple)),
         const SizedBox(height: 10),
@@ -956,12 +957,8 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     final jsonText = const JsonEncoder.withIndent('  ').convert(item.toJson());
     return Theme(
       data: ThemeData(
-        brightness: Brightness.dark,
-        colorScheme: const ColorScheme.dark(
-          primary: _designerPurple,
-          secondary: _designerPurple,
-          surface: _designerSurface,
-        ),
+        brightness: Brightness.light,
+        colorScheme: ColorScheme.fromSeed(seedColor: _designerPurple, brightness: Brightness.light, surface: _designerSurface),
         scaffoldBackgroundColor: _designerBackground,
         appBarTheme: const AppBarTheme(
           backgroundColor: _designerSurface,
@@ -975,7 +972,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFF494650)),
+            borderSide: const BorderSide(color: _designerBorder),
           ),
         ),
       ),
@@ -1012,7 +1009,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                   decoration: BoxDecoration(
                     color: _designerSurface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF34323A)),
+                    border: Border.all(color: _designerBorder),
                   ),
                   padding: const EdgeInsets.all(10),
                   child: Column(
