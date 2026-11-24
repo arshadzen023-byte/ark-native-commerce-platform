@@ -70,6 +70,10 @@ void main() {
     expect(find.text('Text Style'), findsOneWidget);
     expect(find.text('Sample Text'), findsOneWidget);
     expect(find.text('Search Font'), findsNothing);
+    // The typography controls are intentionally below the live preview and
+    // swatches in a scrollable property page; scroll them into the lazy list.
+    await tester.drag(find.byType(ListView).last, const Offset(0, -1400));
+    await tester.pumpAndSettle();
     expect(find.text('Font Family'), findsOneWidget);
     await tester.tap(find.text('Font Family'));
     await tester.pumpAndSettle();
