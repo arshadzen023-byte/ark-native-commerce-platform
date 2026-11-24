@@ -1026,130 +1026,76 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
               const TabBar(
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
+                labelColor: _designerPurple,
+                unselectedLabelColor: _designerMuted,
+                indicatorColor: _designerPurple,
                 tabs: [
-                  Tab(text: 'Layout'),
-                  Tab(text: 'Design'),
-                  Tab(text: 'JSON'),
-                  Tab(text: 'Live Preview'),
-                  Tab(text: 'Property'),
+                  Tab(text: 'Padding'),
+                  Tab(text: 'Margin'),
+                  Tab(text: 'Dimension'),
+                  Tab(text: 'Settings'),
+                  Tab(text: 'Style'),
+                  Tab(text: 'Children'),
                 ],
               ),
               Expanded(
                 child: TabBarView(
                   children: [
                     ListView(padding: const EdgeInsets.all(14), children: [
-                      _section('Component layout', [
+                      _section('Padding', [
+                        _slider('Top', 'padding_top'), _slider('Bottom', 'padding_bottom'),
+                        _slider('Left', 'padding_left'), _slider('Right', 'padding_right'),
+                      ]),
+                    ]),
+                    ListView(padding: const EdgeInsets.all(14), children: [
+                      _section('Margin', [
+                        _slider('Top', 'margin_top'), _slider('Bottom', 'margin_bottom'),
+                        _slider('Left', 'margin_left'), _slider('Right', 'margin_right'),
+                      ]),
+                    ]),
+                    ListView(padding: const EdgeInsets.all(14), children: [
+                      _section('Dimension', [
+                        _slider('Height', 'height', min: 40, max: 500),
+                        _slider('Width factor', 'width', min: .25, max: 1),
+                        _slider('Max cross-axis extent', 'max_cross_axis_extent', min: 80, max: 600),
+                        _slider('Main-axis spacing', 'main_axis_spacing', max: 60),
+                        _slider('Cross-axis spacing', 'cross_axis_spacing', max: 60),
+                        _slider('Border radius', 'border_radius', max: 60),
+                        _slider('Cross-axis count', 'cross_axis_count', min: 1, max: 6),
+                        _slider('Cross aspect ratio', 'cross_aspect_ratio', min: .4, max: 2.5),
+                        _slider('Elevation', 'elevation', max: 20),
+                        _slider('Fixed grid view count', 'fixed_grid_view_count', min: 1, max: 10),
+                        _switch('Horizontal layout', 'horizontal'),
+                      ]),
+                    ]),
+                    ListView(padding: const EdgeInsets.all(14), children: [
+                      _section('Settings', [
+                        _switch('Status', 'enabled'),
+                        _switch('Show title', 'show_title'),
                         DropdownButtonFormField<String>(
                           initialValue: layouts.contains(item.layout) ? item.layout : layouts.first,
                           decoration: const InputDecoration(labelText: 'Layout type'),
                           items: layouts.map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(),
-                          onChanged: (value) {
-                            if (value != null) setState(() => item.layout = value);
-                            widget.onChanged();
-                          },
+                          onChanged: (value) { if (value != null) setState(() => item.layout = value); widget.onChanged(); },
                         ),
                         const SizedBox(height: 12),
-                        TextField(controller: _title,
-                          decoration: const InputDecoration(labelText: 'Title'),
+                        TextField(controller: _title, decoration: const InputDecoration(labelText: 'Title'),
                           onChanged: (value) { item.title = value; widget.onChanged(); setState(() {}); }),
                         const SizedBox(height: 12),
                         TextField(controller: _description, maxLines: 2,
                           decoration: const InputDecoration(labelText: 'Description'),
                           onChanged: (value) => _change('description', value)),
-                        _switch('Show title', 'show_title'),
-                        _switch('Countdown enabled', 'countdown_enabled'),
-                        if (item.properties['countdown_enabled'] == true)
-                          TextFormField(
-                            key: ValueKey('countdown-time-${item.id}'),
-                            initialValue: (item.properties['countdown_time'] ?? '').toString(),
-                            decoration: const InputDecoration(labelText: 'Countdown target (ISO 8601)', hintText: '2026-12-31T23:59:59+05:30'),
-                            onChanged: (value) => _change('countdown_time', value),
-                          ),
-                        const SizedBox(height: 10),
-                        const Text('Title text style', style: TextStyle(fontWeight: FontWeight.w700)),
-                        _slider('Font size', 'title_font_size', min: 10, max: 36),
-                        DropdownButtonFormField<String>(
-                          initialValue: (item.properties['title_font_weight'] ?? 'bold').toString(),
-                          decoration: const InputDecoration(labelText: 'Font weight'),
-                          items: const [
-                            DropdownMenuItem(value: 'normal', child: Text('Normal')),
-                            DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                            DropdownMenuItem(value: 'bold', child: Text('Bold')),
-                          ],
-                          onChanged: (value) { if (value != null) _change('title_font_weight', value); },
-                        ),
-                        DropdownButtonFormField<String>(
-                          initialValue: (item.properties['title_text_align'] ?? 'left').toString(),
-                          decoration: const InputDecoration(labelText: 'Text alignment'),
-                          items: const [
-                            DropdownMenuItem(value: 'left', child: Text('Left')),
-                            DropdownMenuItem(value: 'center', child: Text('Center')),
-                            DropdownMenuItem(value: 'right', child: Text('Right')),
-                          ],
-                          onChanged: (value) { if (value != null) _change('title_text_align', value); },
-                        ),
-                        _slider('Maximum title lines', 'title_max_lines', min: 1, max: 4),
-                      ]),
-                    ]),
-                    ListView(padding: const EdgeInsets.all(14), children: [
-                      _section('Color', [
-                        _colorChoice('Background colour', 'background_color', const ['#FFFFFF', '#F1ECFF', '#E8F6F0', '#FFF0E6', '#202033']),
-                        _colorChoice('Title colour', 'title_color', const ['#241D33', '#51408F', '#FFFFFF', '#B23B32', '#16734A']),
-                      ]),
-                    ]),
-                    ListView(padding: const EdgeInsets.all(14), children: [
-                      _section('Published component JSON preview', [
-                        SelectableText(jsonText, style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: _designerText)),
-                      ]),
-                    ]),
-                    ListView(padding: const EdgeInsets.all(14), children: [
-                      _section('Live Preview', [widget.visualBuilder()]),
-                    ]),
-                    ListView(padding: const EdgeInsets.all(14), children: [
-                      _section('Padding', [
-                        _slider('Top', 'padding_top'), _slider('Bottom', 'padding_bottom'),
-                        _slider('Left', 'padding_left'), _slider('Right', 'padding_right'),
-                      ]),
-                      _section('Margin', [
-                        _slider('Top', 'margin_top'), _slider('Bottom', 'margin_bottom'),
-                        _slider('Left', 'margin_left'), _slider('Right', 'margin_right'),
-                      ]),
-                      _section('Dimensions', [
-                        _slider('Height', 'height', min: 60, max: 320),
-                        _slider('Width factor', 'width', min: .5, max: 1),
-                        _slider('Max cross-axis extent', 'max_cross_axis_extent', min: 80, max: 420),
-                        _slider('Main-axis spacing', 'main_axis_spacing', max: 40),
-                        _slider('Cross-axis spacing', 'cross_axis_spacing', max: 40),
-                        _slider('Border radius', 'border_radius', max: 40),
-                        _slider('Cross-axis count', 'cross_axis_count', min: 1, max: 5),
-                        _slider('Cross aspect ratio', 'cross_aspect_ratio', min: .5, max: 2),
-                        _slider('Elevation', 'elevation', max: 12),
-                        _slider('Fixed grid view count', 'fixed_grid_view_count', min: 1, max: 8),
-                        _switch('Horizontal layout', 'horizontal'),
-                      ]),
-                      if (item.type == 'Banner') _section('Banner style', [
-                        _switch('Carousel controls', 'control'),
-                        _switch('Autoplay', 'autoplay'),
-                        if (item.properties['autoplay'] == true)
-                          _slider('Autoplay interval (seconds)', 'autoplay_seconds', min: 2, max: 15),
-                        _switch('Fade transition', 'fade'),
-                        _switch('Pause when touched', 'pause'),
-                        _switch('Show dots', 'dots'),
-                        _switch('Show arrows', 'arrows'),
-                        _slider('View fraction', 'view_fraction', min: .4, max: 1),
-                      ]),
-                      if (item.type == 'Category') _section('Category settings', [
-                        _switch('Show all categories', 'show_all_categories'),
-                        TextFormField(
-                          key: ValueKey('parent-category-${item.id}'),
-                          initialValue: (item.properties['parent_category_id'] ?? 0).toString(),
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Parent category ID (0 = all)'),
-                          onChanged: (value) => _change('parent_category_id', int.tryParse(value) ?? 0),
-                        ),
-                      ]),
-                      if (item.type == 'Product') _section('Product settings', [
-                        DropdownButtonFormField<String>(
+                        if (item.type == 'Banner') ...[
+                          _switch('Carousel controls', 'control'),
+                          _switch('Autoplay', 'autoplay'),
+                          if (item.properties['autoplay'] == true) _slider('Autoplay interval (seconds)', 'autoplay_seconds', min: 2, max: 15),
+                          _switch('Fade transition', 'fade'),
+                          _switch('Pause when touched', 'pause'),
+                          _switch('Show dots', 'dots'),
+                          _switch('Show arrows', 'arrows'),
+                        ],
+                        if (item.type == 'Category') _switch('Show all categories', 'show_all_categories'),
+                        if (item.type == 'Product') DropdownButtonFormField<String>(
                           initialValue: (item.properties['source'] ?? 'featured').toString(),
                           decoration: const InputDecoration(labelText: 'Product source'),
                           items: const [
@@ -1165,29 +1111,39 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                           ],
                           onChanged: (value) { if (value != null) _change('source', value); },
                         ),
-                        TextFormField(
-                          key: ValueKey('product-source-id-${item.id}'),
-                          initialValue: (item.properties['source_id'] ?? 0).toString(),
-                          decoration: const InputDecoration(labelText: 'Category / tag ID'),
-                          keyboardType: TextInputType.number,
-                          onChanged: (value) => _change('source_id', int.tryParse(value) ?? 0),
-                        ),
                       ]),
-                      _section('Setting and children', [
-                        _switch('Component enabled', 'enabled'),
-                        TextField(
-                          decoration: const InputDecoration(labelText: 'Child reorder (comma-separated IDs)'),
-                          onChanged: (value) => _change('child_order', value.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()),
-                        ),
-                        TextField(
-                          decoration: const InputDecoration(labelText: 'Link / deep link'),
-                          onChanged: (value) => _change('link', value),
-                        ),
+                    ]),
+                    ListView(padding: const EdgeInsets.all(14), children: [
+                      _section('Style', [
+                        _colorChoice('Background Color', 'background_color', const ['#FFFFFF', '#F7F7FA', '#F1ECFF', '#E8F6F0', '#FFF0E6', '#202033']),
+                        _colorChoice('Title Color', 'title_color', const ['#24212B', '#51408F', '#FFFFFF', '#B23B32', '#16734A']),
+                        _colorChoice('Text Color', 'text_color', const ['#24212B', '#FFFFFF', '#7650B8', '#B23B32', '#16734A']),
+                        _colorChoice('Text Background Color', 'text_background_color', const ['#FFFFFF', '#F1EFF5', '#202033', '#FFF0E6']),
+                        _slider('Font Size', 'title_font_size', min: 8, max: 72),
+                        _slider('Letter Spacing', 'letter_spacing', min: 0, max: 20),
+                        _slider('Word Spacing', 'word_spacing', min: 0, max: 30),
+                        _switch('Italic', 'italic'),
                         TextFormField(
-                          initialValue: (item.properties['image_url'] ?? '').toString(),
-                          decoration: const InputDecoration(labelText: 'Image URL (optional)'),
-                          onChanged: (value) => _change('image_url', value),
+                          initialValue: (item.properties['font_family'] ?? 'Roboto').toString(),
+                          decoration: const InputDecoration(labelText: 'Font Family', hintText: 'Roboto, Poppins, Lato…'),
+                          onChanged: (value) => _change('font_family', value),
                         ),
+                        DropdownButtonFormField<String>(
+                          initialValue: (item.properties['title_font_weight'] ?? 'normal').toString(),
+                          decoration: const InputDecoration(labelText: 'Font weight'),
+                          items: const [
+                            DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                            DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                            DropdownMenuItem(value: 'bold', child: Text('Bold')),
+                          ],
+                          onChanged: (value) { if (value != null) _change('title_font_weight', value); },
+                        ),
+                        _slider('Maximum title lines', 'title_max_lines', min: 1, max: 5),
+                      ]),
+                      _section('Live Preview', [widget.visualBuilder()]),
+                    ]),
+                    ListView(padding: const EdgeInsets.all(14), children: [
+                      _section('Children', [
                         Wrap(spacing: 8, runSpacing: 8, children: [
                           OutlinedButton.icon(
                             onPressed: () async {
@@ -1197,28 +1153,22 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                               if (source.isEmpty) return;
                               final mime = (media['mime_type'] ?? '').toString();
                               final isVideo = mime.startsWith('video/');
-                              final child = <String, dynamic>{
+                              final rows = item.properties['children'] is List
+                                  ? List<dynamic>.from(item.properties['children'] as List) : <dynamic>[];
+                              rows.add({
                                 'type': isVideo ? 'video' : 'image',
                                 'attachment_id': media['id'],
                                 'image_url': isVideo ? '' : source,
                                 'video_url': isVideo ? source : '',
                                 'source_url': source,
                                 'mime_type': mime,
-                                'title': (media['title'] ?? '').toString(),
+                                'title': (media['title'] ?? 'New').toString(),
                                 'alt_text': (media['alt_text'] ?? '').toString(),
-                                'link_type': 'in_app',
-                                'link_value': '',
-                                'active': true,
-                              };
-                              final existing = item.properties['children'] is List
-                                  ? (item.properties['children'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-                                  : <Map<String, dynamic>>[];
-                              existing.add(child);
-                              _change('children', existing);
-                              if (!isVideo && (item.properties['image_url'] ?? '').toString().isEmpty) _change('image_url', source);
+                                'link_type': 'in_app', 'link_value': '', 'active': true,
+                              });
+                              _change('children', rows);
                             },
-                            icon: const Icon(Icons.perm_media_outlined),
-                            label: const Text('Add image / video'),
+                            icon: const Icon(Icons.image_outlined), label: const Text('Add image / video'),
                           ),
                           OutlinedButton.icon(
                             onPressed: () async {
@@ -1227,8 +1177,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                                 context: context,
                                 builder: (dialogContext) => AlertDialog(
                                   title: const Text('Add text child'),
-                                  content: TextField(controller: controller, autofocus: true, maxLines: 3,
-                                    decoration: const InputDecoration(labelText: 'Text')),
+                                  content: TextField(controller: controller, autofocus: true),
                                   actions: [
                                     TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
                                     FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Add')),
@@ -1237,14 +1186,12 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                               );
                               controller.dispose();
                               if (value == null || value.isEmpty) return;
-                              final existing = item.properties['children'] is List
-                                  ? (item.properties['children'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-                                  : <Map<String, dynamic>>[];
-                              existing.add({'type': 'text', 'title': value, 'text': value, 'active': true});
-                              _change('children', existing);
+                              final rows = item.properties['children'] is List
+                                  ? List<dynamic>.from(item.properties['children'] as List) : <dynamic>[];
+                              rows.add({'type': 'text', 'title': value, 'text': value, 'active': true});
+                              _change('children', rows);
                             },
-                            icon: const Icon(Icons.text_fields_rounded),
-                            label: const Text('Add text'),
+                            icon: const Icon(Icons.text_fields), label: const Text('Add text'),
                           ),
                           OutlinedButton.icon(
                             onPressed: () async {
@@ -1252,9 +1199,8 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                               final value = await showDialog<String>(
                                 context: context,
                                 builder: (dialogContext) => AlertDialog(
-                                  title: const Text('Add linked child'),
-                                  content: TextField(controller: controller, autofocus: true,
-                                    decoration: const InputDecoration(labelText: 'URL or app route', hintText: 'https://… or ark://product/123')),
+                                  title: const Text('Add link child'),
+                                  content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: 'URL or ark:// route')),
                                   actions: [
                                     TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
                                     FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Add')),
@@ -1263,61 +1209,49 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                               );
                               controller.dispose();
                               if (value == null || value.isEmpty) return;
-                              final existing = item.properties['children'] is List
-                                  ? (item.properties['children'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-                                  : <Map<String, dynamic>>[];
-                              existing.add({'type': 'link', 'title': value, 'link_type': value.startsWith('ark://') ? 'deep_link' : 'url', 'link_value': value, 'active': true});
-                              _change('children', existing);
+                              final rows = item.properties['children'] is List
+                                  ? List<dynamic>.from(item.properties['children'] as List) : <dynamic>[];
+                              rows.add({'type': 'link', 'title': value, 'link_type': value.startsWith('ark://') ? 'deep_link' : 'url', 'link_value': value, 'active': true});
+                              _change('children', rows);
                             },
-                            icon: const Icon(Icons.link_rounded),
-                            label: const Text('Add link'),
+                            icon: const Icon(Icons.link), label: const Text('Add link'),
                           ),
                         ]),
                         if (item.properties['children'] is List)
-                          ...((item.properties['children'] as List).asMap().entries.map((entry) {
+                          ...(item.properties['children'] as List).asMap().entries.map((entry) {
                             final child = entry.value is Map ? Map<String, dynamic>.from(entry.value as Map) : <String, dynamic>{};
                             final type = (child['type'] ?? 'image').toString();
                             final src = (child['image_url'] ?? child['video_url'] ?? child['source_url'] ?? '').toString();
                             return Card(
                               color: _designerField,
-                              margin: const EdgeInsets.only(top: 8),
                               child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                leading: SizedBox(width: 52, height: 52, child: type == 'text'
-                                    ? const Icon(Icons.text_fields_rounded)
-                                    : type == 'link'
-                                        ? const Icon(Icons.link_rounded)
-                                        : type == 'video'
-                                            ? const Icon(Icons.video_library_outlined)
-                                            : src.isEmpty
-                                                ? const Icon(Icons.image_outlined)
-                                                : Image.network(src, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined))),
-                                title: Text((child['title'] ?? 'Banner child').toString(), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                subtitle: Text(type == 'text' ? 'Text child' : type == 'link' ? (child['link_value'] ?? 'Link child').toString() : 'Media ID: ${child['attachment_id'] ?? '—'}'),
+                                leading: SizedBox(width: 48, height: 48, child: src.isEmpty
+                                  ? Icon(type == 'link' ? Icons.link : type == 'text' ? Icons.text_fields : Icons.image)
+                                  : Image.network(src, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image))),
+                                title: Text((child['title'] ?? 'New').toString()),
+                                subtitle: Text(type),
                                 trailing: IconButton(
                                   icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
                                   onPressed: () {
-                                    final updated = (item.properties['children'] as List).asMap().entries.where((candidate) => candidate.key != entry.key).map((candidate) => candidate.value).toList();
-                                    _change('children', updated);
+                                    final rows = List<dynamic>.from(item.properties['children'] as List)..removeAt(entry.key);
+                                    _change('children', rows);
                                   },
                                 ),
                               ),
                             );
-                          })),
+                          }),
                         if (item.properties['children'] is List && (item.properties['children'] as List).length > 1)
                           ReorderableListView(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
+                            shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
                             onReorder: (oldIndex, newIndex) {
                               final rows = List<dynamic>.from(item.properties['children'] as List);
-                              if (newIndex > oldIndex) newIndex -= 1;
+                              if (newIndex > oldIndex) newIndex--;
                               final row = rows.removeAt(oldIndex);
                               rows.insert(newIndex, row);
                               _change('children', rows);
                             },
                             children: (item.properties['children'] as List).asMap().entries.map((entry) => ListTile(
-                              key: ValueKey('child-${item.id}-${entry.key}'),
-                              dense: true,
+                              key: ValueKey('child-order-${item.id}-${entry.key}'),
                               leading: const Icon(Icons.drag_handle),
                               title: Text((entry.value is Map ? (entry.value as Map)['title'] : 'Child')?.toString() ?? 'Child'),
                             )).toList(),
