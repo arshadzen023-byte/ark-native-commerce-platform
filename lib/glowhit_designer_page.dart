@@ -366,7 +366,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         'main_axis_spacing': 10.0, 'cross_axis_spacing': 10.0, 'border_radius': 16.0,
         'horizontal': true, 'cross_axis_count': 2, 'cross_aspect_ratio': 1.0,
         'elevation': 1.0, 'fixed_grid_view_count': 2,
-        'control': true, 'autoplay': true, 'autoplay_seconds': 4.0,
+        'control': true, 'autoplay': false, 'autoplay_seconds': 4.0,
         'fade': false, 'pause': true, 'dots': true, 'arrows': true,
         'view_fraction': .9,
         'children': <dynamic>[],
