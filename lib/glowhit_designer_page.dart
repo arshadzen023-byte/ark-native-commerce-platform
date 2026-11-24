@@ -597,6 +597,10 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               fontWeight: (component.properties['title_font_weight'] ?? 'bold') == 'normal'
                   ? FontWeight.normal
                   : (component.properties['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
+              fontFamily: (component.properties['font_family'] ?? 'Roboto').toString(),
+              fontStyle: component.properties['italic'] == true ? FontStyle.italic : FontStyle.normal,
+              letterSpacing: (component.properties['letter_spacing'] as num?)?.toDouble() ?? 0,
+              wordSpacing: (component.properties['word_spacing'] as num?)?.toDouble() ?? 0,
             ),
           ),
         if (!compact && (component.properties['description'] ?? '').toString().isNotEmpty) ...[
@@ -977,7 +981,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
         ),
       ),
       child: DefaultTabController(
-        length: 5,
+        length: 6,
         child: Scaffold(
           backgroundColor: _designerBackground,
           appBar: AppBar(
