@@ -1134,10 +1134,10 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                         _slider('Letter Spacing', 'letter_spacing', min: 0, max: 20),
                         _slider('Word Spacing', 'word_spacing', min: 0, max: 30),
                         _switch('Italic', 'italic'),
-                        TextFormField(
-                          initialValue: (item.properties['font_family'] ?? 'Roboto').toString(),
-                          decoration: const InputDecoration(labelText: 'Font Family', hintText: 'Roboto, Poppins, Lato…'),
-                          onChanged: (value) => _change('font_family', value),
+                        OutlinedButton.icon(
+                          onPressed: _chooseFontFamily,
+                          icon: const Icon(Icons.font_download_outlined),
+                          label: Text('Font Family: ${item.properties['font_family'] ?? 'Roboto'}'),
                         ),
                         DropdownButtonFormField<String>(
                           initialValue: (item.properties['title_font_weight'] ?? 'normal').toString(),
@@ -1297,6 +1297,55 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
       rows[index] = result;
     }
     _change('children', rows);
+  }
+
+  Future<void> _chooseFontFamily() async {
+    final search = TextEditingController();
+    const fonts = <String>[
+      'Roboto', 'ABeeZee', 'Abel', 'Abhaya Libre', 'Aboreto', 'Abril Fatface',
+      'Abyssinica SIL', 'Afacad', 'Alegreya', 'Anton', 'Archivo', 'Barlow',
+      'Bebas Neue', 'Bitter', 'Cabin', 'Cairo', 'Comfortaa', 'DM Sans',
+      'Dancing Script', 'Exo 2', 'Fira Sans', 'Georgia', 'Inter', 'Lato',
+      'Merriweather', 'Montserrat', 'Nunito', 'Open Sans', 'Oswald',
+      'Playfair Display', 'Poppins', 'Raleway', 'Roboto Condensed', 'Ubuntu'
+    ];
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _designerSurface,
+      builder: (sheetContext) => StatefulBuilder(builder: (sheetContext, refresh) {
+        final query = search.text.toLowerCase();
+        final filtered = fonts.where((font) => font.toLowerCase().contains(query)).toList();
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(sheetContext).size.height * .82,
+            child: Column(children: [
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: TextField(
+                  controller: search,
+                  onChanged: (_) => refresh(() {}),
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Search Font',
+                  ),
+                ),
+              ),
+              Expanded(child: ListView.builder(
+                itemCount: filtered.length,
+                itemBuilder: (_, index) => ListTile(
+                  title: Text('Almost before we knew it', style: TextStyle(fontFamily: filtered[index], fontSize: 19)),
+                  subtitle: Text(filtered[index]),
+                  onTap: () => Navigator.pop(sheetContext, filtered[index]),
+                ),
+              )),
+            ]),
+          ),
+        );
+      }),
+    );
+    search.dispose();
+    if (selected != null) _change('font_family', selected);
   }
 
   Widget _colorChoice(String title, String key, List<String> choices) => Padding(
