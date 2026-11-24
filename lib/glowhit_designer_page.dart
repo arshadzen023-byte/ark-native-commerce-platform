@@ -10,9 +10,7 @@ import 'customer_account_page.dart';
 const _designerPurple = Color(0xFF9A83C5);
 const _designerBackground = Color(0xFF0B0B0D);
 const _designerSurface = Color(0xFF19191D);
-const _designerField = Color(0xFF29292E);
 const _designerText = Color(0xFFE5E1EA);
-const _designerMuted = Color(0xFFAAA5B2);
 
 class DesignerComponent {
   DesignerComponent({
