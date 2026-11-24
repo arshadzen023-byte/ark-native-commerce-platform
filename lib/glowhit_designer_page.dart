@@ -386,22 +386,53 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Add a component', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 14),
-            for (final type in _layoutTypes.keys)
-              ListTile(
-                leading: _componentIcon(type, size: 30),
-                title: Text('$type layout'),
-                subtitle: Text(_layoutTypes[type]!.join(' • ')),
-                trailing: const Icon(Icons.add_circle_outline),
-                onTap: () { Navigator.pop(sheetContext); _addComponent(type); },
+        child: SizedBox(
+          height: MediaQuery.of(sheetContext).size.height * .76,
+          child: DefaultTabController(
+            length: 3,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(18, 10, 18, 8),
+                child: Text('Add component', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
               ),
-          ]),
+              const TabBar(
+                isScrollable: true,
+                tabs: [
+                  Tab(text: 'Banner'),
+                  Tab(text: 'Category'),
+                  Tab(text: 'Product'),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(children: [
+                  _layoutPickerList(sheetContext, 'Banner'),
+                  _layoutPickerList(sheetContext, 'Category'),
+                  _layoutPickerList(sheetContext, 'Product'),
+                ]),
+              ),
+            ]),
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _layoutPickerList(BuildContext sheetContext, String type) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+      children: _layoutTypes[type]!.map((layout) => Card(
+        elevation: 0,
+        child: ListTile(
+          leading: _componentIcon(type, size: 28),
+          title: Text(layout, style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text('Add $layout to $selectedPage'),
+          trailing: const Icon(Icons.add_circle_outline),
+          onTap: () {
+            Navigator.pop(sheetContext);
+            _addComponent(type, layout: layout);
+          },
+        ),
+      )).toList(),
     );
   }
 
