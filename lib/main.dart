@@ -560,6 +560,7 @@ class _StoreHomeState extends State<StoreHome> {
       final inlineChildren = section['slides'] is List
           ? (section['slides'] as List)
           : (section['children'] is List ? section['children'] as List : const <dynamic>[]);
+      final sectionMargin = margin;
       final normalizedInline = inlineChildren.whereType<Map>().map((slide) {
         final item = Map<String, dynamic>.from(slide);
         item['image_url'] = item['image_url'] ?? item['source_url'] ?? item['url'] ?? '';
@@ -572,7 +573,12 @@ class _StoreHomeState extends State<StoreHome> {
         final layout = (section['designer_component_type'] ?? section['type'] ?? '').toString();
         final bannerStyle = layout == 'banner_grid' || layout == 'banner_list' || layout == 'banner_scroll';
         return Padding(
-          padding: EdgeInsets.only(top: padding, bottom: (section['padding_bottom'] as num?)?.toDouble() ?? 12),
+          padding: EdgeInsets.only(
+            left: sectionMargin.left,
+            right: sectionMargin.right,
+            top: sectionMargin.top + padding,
+            bottom: sectionMargin.bottom + ((section['padding_bottom'] as num?)?.toDouble() ?? 12),
+          ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (showTitle) Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -675,6 +681,7 @@ class _StoreHomeState extends State<StoreHome> {
       }).toList();
       final horizontal = section['horizontal'] != false && !layout.contains('list');
       return Container(
+        margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
         padding: EdgeInsets.fromLTRB(
           (section['padding_left'] as num?)?.toDouble() ?? 12,
@@ -734,6 +741,7 @@ class _StoreHomeState extends State<StoreHome> {
         child: productCard(product),
       )).toList();
       return Container(
+        margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
         padding: EdgeInsets.fromLTRB(
           (section['padding_left'] as num?)?.toDouble() ?? 12,
