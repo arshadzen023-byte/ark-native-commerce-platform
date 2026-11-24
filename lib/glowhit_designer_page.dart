@@ -1419,6 +1419,26 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     _change('children', rows);
   }
 
+  Widget _colorChoice(String title, String key, List<String> choices) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title),
+      Wrap(spacing: 10, children: choices.map((hex) => InkWell(
+        onTap: () => _change(key, hex),
+        child: Container(width: 32, height: 32, decoration: BoxDecoration(
+          color: Color(int.parse(hex.substring(1), radix: 16) | 0xFF000000),
+          shape: BoxShape.circle,
+          border: Border.all(color: item.properties[key] == hex ? _designerPurple : Colors.grey.shade400, width: item.properties[key] == hex ? 3 : 1),
+        )),
+      )).toList()),
+    ]),
+  );
+}
+
+class _DesignerTextStylePage extends StatefulWidget {
+  const _DesignerTextStylePage({required this.properties});
+  final Map<String, dynamic> properties;
+
   @override
   State<_DesignerTextStylePage> createState() => _DesignerTextStylePageState();
 }
