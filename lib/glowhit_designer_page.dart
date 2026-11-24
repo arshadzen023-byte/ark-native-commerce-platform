@@ -780,7 +780,14 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   @override
   Widget build(BuildContext context) {
     if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    return Scaffold(
+    return Theme(
+      data: ThemeData.light().copyWith(
+        scaffoldBackgroundColor: _designerBackground,
+        colorScheme: ColorScheme.fromSeed(seedColor: _designerPurple, brightness: Brightness.light),
+        appBarTheme: const AppBarTheme(backgroundColor: _designerSurface, foregroundColor: _designerText, elevation: 0),
+        dividerColor: _designerBorder,
+      ),
+      child: Scaffold(
       backgroundColor: _designerBackground,
       appBar: AppBar(
         backgroundColor: _designerSurface,
@@ -877,6 +884,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           ]),
         )),
       ]),
+      ),
     );
   }
 }
