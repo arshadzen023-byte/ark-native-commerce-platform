@@ -227,7 +227,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         if (remote is Map && remote['pages'] is Map) {
           final remotePages = Map<String, dynamic>.from(remote['pages'] as Map);
           for (final page in _pages) {
-            final pageConfig = remotePages[_wordpressPageKey(page)];
+            final pageKey = _wordpressPageKey(page);
+            final pageConfig = remotePages[pageKey];
             final sections = pageConfig is Map && pageConfig['sections'] is List
                 ? pageConfig['sections'] as List
                 : <dynamic>[];
