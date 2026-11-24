@@ -6,8 +6,13 @@ import 'package:http/http.dart' as http;
 
 import 'customer_account_page.dart';
 
-const _designerPurple = Color(0xFF51408F);
-const _designerBackground = Color(0xFFF7F5FB);
+// Match the dark, purple-accented native Designer reference supplied by the user.
+const _designerPurple = Color(0xFF9A83C5);
+const _designerBackground = Color(0xFF0B0B0D);
+const _designerSurface = Color(0xFF19191D);
+const _designerField = Color(0xFF29292E);
+const _designerText = Color(0xFFE5E1EA);
+const _designerMuted = Color(0xFFAAA5B2);
 
 class DesignerComponent {
   DesignerComponent({
@@ -773,6 +778,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     return Scaffold(
       backgroundColor: _designerBackground,
       appBar: AppBar(
+        backgroundColor: _designerSurface,
+        foregroundColor: _designerText,
         title: const Text('ARK Designer', style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           _designerMenu(),
@@ -793,7 +800,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showComponentPicker,
         backgroundColor: _designerPurple,
-        foregroundColor: Colors.white,
+        foregroundColor: const Color(0xFF17121F),
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add component'),
       ),
@@ -831,9 +838,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                     duration: const Duration(milliseconds: 220),
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: _designerSurface,
                       borderRadius: BorderRadius.circular(19),
-                      border: Border.all(color: selected ? _designerPurple : const Color(0xFFE5E1EA), width: selected ? 2 : 1),
+                      border: Border.all(color: selected ? _designerPurple : const Color(0xFF34323A), width: selected ? 2 : 1),
                     ),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
@@ -914,7 +921,8 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     padding: const EdgeInsets.only(bottom: 14),
     child: Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17), side: const BorderSide(color: Color(0xFFE5E1EA))),
+      color: _designerSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17), side: const BorderSide(color: Color(0xFF34323A))),
       child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _designerPurple)),
         const SizedBox(height: 10),
@@ -948,6 +956,8 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     return Scaffold(
       backgroundColor: _designerBackground,
       appBar: AppBar(
+        backgroundColor: _designerSurface,
+        foregroundColor: _designerText,
         title: const Text('Component Properties'),
         actions: [
           IconButton(tooltip: 'Delete component', icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () async { await widget.onDelete(); if (context.mounted) Navigator.pop(context); }),
@@ -955,7 +965,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
         ],
       ),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 30), children: [
-        Card(elevation: 0, clipBehavior: Clip.antiAlias, child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Card(color: _designerSurface, elevation: 0, clipBehavior: Clip.antiAlias, child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('LIVE COMPONENT PREVIEW', style: TextStyle(letterSpacing: 1.2, color: _designerPurple, fontWeight: FontWeight.w800, fontSize: 11)),
           const SizedBox(height: 10),
           widget.visualBuilder(),
