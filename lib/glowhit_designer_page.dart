@@ -462,7 +462,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   Future<Map<String, dynamic>?> _chooseMedia() async {
     final response = await ArkCustomerApi(widget.token).request(
       'designer/media',
-      query: {'page': '1', 'per_page': '60'},
+      query: {'page': '1', 'per_page': '60', 'media_type': 'all'},
     );
     final rows = response is Map && response['items'] is List
         ? (response['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).where((item) {
