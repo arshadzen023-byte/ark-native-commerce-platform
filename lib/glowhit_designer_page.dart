@@ -1711,12 +1711,15 @@ class _DesignerChildEditPageState extends State<_DesignerChildEditPage> {
     if (media == null) return;
     final url = (media['source_url'] ?? '').toString();
     if (url.isEmpty) return;
+    final mime = (media['mime_type'] ?? '').toString();
+    final isVideo = mime.startsWith('video/');
     setState(() {
-      child['type'] = 'image';
+      child['type'] = isVideo ? 'video' : 'image';
       child['attachment_id'] = media['id'];
-      child['image_url'] = url;
+      child['image_url'] = isVideo ? '' : url;
+      child['video_url'] = isVideo ? url : '';
       child['source_url'] = url;
-      child['mime_type'] = media['mime_type'] ?? '';
+      child['mime_type'] = mime;
       child['alt_text'] = media['alt_text'] ?? '';
     });
   }
