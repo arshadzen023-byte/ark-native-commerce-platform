@@ -624,31 +624,83 @@ class _StoreHomeState extends State<StoreHome> {
       return const SizedBox.shrink();
     }
     if (type == 'category_grid' || type.startsWith('category_')) {
-      final layout = (section['category_layout'] ?? section['layout_variant'] ?? 'grid').toString();
+      final layout = (section['category_layout'] ?? section['layout_variant'] ?? type).toString().toLowerCase();
+      final parentId = (section['category_id'] as num?)?.toInt() ?? 0;
+      var rows = storeCategories.where((category) {
+        if (parentId <= 0) return true;
+        final parent = (category['parent'] as num?)?.toInt() ?? 0;
+        return parent == parentId;
+      }).toList();
       final limit = (section['limit'] as num?)?.toInt() ?? 8;
-      final rows = storeCategories.take(limit.clamp(1, 40)).toList();
+      rows = rows.take(limit.clamp(1, 100)).toList();
       if (rows.isEmpty) return const SizedBox.shrink();
+      final cardRadius = (section['corner_radius'] as num?)?.toDouble() ?? 12;
+      final cardHeight = (section['height_px'] as num?)?.toDouble() ?? 150;
       final cards = rows.map((category) {
         final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
-        return SizedBox(
-          width: layout == 'list' || layout == 'list_tile' ? double.infinity : 112,
-          child: Card(
-            clipBehavior: Clip.antiAlias,
-            child: Column(children: [
-              if (image.isNotEmpty) SizedBox(height: 82, width: double.infinity, child: Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.category_outlined)))
-              else const SizedBox(height: 82, child: Center(child: Icon(Icons.category_outlined, size: 34))),
-              Padding(padding: const EdgeInsets.all(7), child: Text((category['name'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center)),
-            ]),
-          ),
+        final card = Card(
+          clipBehavior: Clip.antiAlias,
+          elevation: (section['card_depth'] as num?)?.toDouble() ?? 1,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(cardRadius)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Expanded(
+              child: image.isNotEmpty
+                  ? Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.category_outlined)))
+                  : const Center(child: Icon(Icons.category_outlined, size: 34)),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(7),
+              child: Text((category['name'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+            ),
+          ]),
         );
+        return SizedBox(width: 128, height: cardHeight, child: card);
       }).toList();
+      final horizontal = section['horizontal'] != false && !layout.contains('list');
       return Container(
         color: background == 'transparent' ? null : _safeColor(background),
-        padding: EdgeInsets.fromLTRB(12, padding, 12, (section['padding_bottom'] as num?)?.toDouble() ?? 12),
+        padding: EdgeInsets.fromLTRB(
+          (section['padding_left'] as num?)?.toDouble() ?? 12,
+          padding,
+          (section['padding_right'] as num?)?.toDouble() ?? 12,
+          (section['padding_bottom'] as num?)?.toDouble() ?? 12,
+        ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (showTitle) Padding(padding: const EdgeInsets.only(left: 4, bottom: 8), child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor)))),
-          if (layout == 'list' || layout == 'list_tile') Column(children: rows.map((c) => ListTile(leading: const Icon(Icons.category_outlined), title: Text((c['name'] ?? '').toString()))).toList())
-          else SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: cards.map((card) => SizedBox(width: 120, child: card)).toList())),
+          if (showTitle) Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
+          ),
+          if (layout.contains('list_tile'))
+            Column(children: rows.map((category) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: category['image'] is Map && ((category['image'] as Map)['src'] ?? '').toString().isNotEmpty
+                  ? SizedBox(width: 52, height: 52, child: Image.network((category['image'] as Map)['src'].toString(), fit: BoxFit.cover))
+                  : const Icon(Icons.category_outlined),
+              title: Text((category['name'] ?? '').toString()),
+            )).toList())
+          else if (layout.contains('list'))
+            Column(children: cards.map((card) => SizedBox(width: double.infinity, height: cardHeight, child: card)).toList())
+          else if (layout.contains('slider') || layout.contains('scroll'))
+            SizedBox(
+              height: cardHeight,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: cards,
+              ),
+            )
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: cards.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: ((section['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
+                crossAxisSpacing: (section['item_gap'] as num?)?.toDouble() ?? 8,
+                mainAxisSpacing: (section['item_gap'] as num?)?.toDouble() ?? 8,
+                childAspectRatio: (section['card_aspect_ratio'] as num?)?.toDouble() ?? .9,
+              ),
+              itemBuilder: (_, index) => cards[index],
+            ),
         ]),
       );
     }
