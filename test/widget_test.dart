@@ -78,12 +78,18 @@ void main() {
     await tester.tap(find.text('Font Family'));
     await tester.pumpAndSettle();
     expect(find.text('Search Font'), findsOneWidget);
-    await tester.pageBack();
+    // Select a font to close the picker, then explicitly finish Text Style.
+    await tester.tap(find.text('ABeeZee').first);
     await tester.pumpAndSettle();
-    await tester.pageBack();
+    final doneStyle = find.text('DONE');
+    await tester.ensureVisible(doneStyle);
+    await tester.tap(doneStyle);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Style'));
+    final styleTab = find.text('Style');
+    await tester.ensureVisible(styleTab);
+    await tester.pumpAndSettle();
+    await tester.tap(styleTab);
     await tester.pumpAndSettle();
     expect(find.text('Control'), findsOneWidget);
     expect(find.text('Autoplay'), findsOneWidget);
@@ -92,7 +98,10 @@ void main() {
     expect(find.text('Dot'), findsOneWidget);
     expect(find.text('Arrow'), findsOneWidget);
 
-    await tester.tap(find.text('Settings'));
+    final settingsTab = find.text('Settings');
+    await tester.ensureVisible(settingsTab);
+    await tester.pumpAndSettle();
+    await tester.tap(settingsTab);
     await tester.pumpAndSettle();
     expect(find.text('Component Status'), findsOneWidget);
     expect(find.text('Layout'), findsOneWidget);
