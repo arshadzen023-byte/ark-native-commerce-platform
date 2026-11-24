@@ -1300,7 +1300,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                                 trailing: IconButton(
                                   icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
                                   onPressed: () {
-                                    final updated = (item.properties['children'] as List).asMap().entries.where((entry) => entry.key != entry.key).map((entry) => entry.value).toList();
+                                    final updated = (item.properties['children'] as List).asMap().entries.where((candidate) => candidate.key != entry.key).map((candidate) => candidate.value).toList();
                                     _change('children', updated);
                                   },
                                 ),
