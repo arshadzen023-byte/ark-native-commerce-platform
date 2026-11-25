@@ -605,7 +605,8 @@ class _StoreHomeState extends State<StoreHome> {
         final height = ((settings['height_px'] ?? config['height_px'] ?? config['height'] ?? 180) as num).toDouble();
         final intervalMs = ((settings['interval_ms'] ?? config['interval_ms'] ?? (((config['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
         final layout = (config['designer_component_type'] ?? config['type'] ?? '').toString();
-        final bannerStyle = layout == 'banner_grid' || layout == 'banner_list' || layout == 'banner_scroll';
+        final bannerGrid = layout == 'banner_grid';
+        final bannerStyle = layout == 'banner_list' || layout == 'banner_scroll';
         return Align(
           alignment: Alignment.center,
           child: SizedBox(
@@ -622,7 +623,31 @@ class _StoreHomeState extends State<StoreHome> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
             ),
-            bannerStyle
+            bannerGrid
+                ? SizedBox(
+                    height: height,
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: slides.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
+                        crossAxisSpacing: crossAxisGap,
+                        mainAxisSpacing: mainAxisGap,
+                        childAspectRatio: ((config['card_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3),
+                      ),
+                      itemBuilder: (_, index) {
+                        final url = (slides[index]['image_url'] ?? slides[index]['source_url'] ?? '').toString();
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
+                          child: url.isEmpty
+                              ? const ColoredBox(color: Color(0xFFEDEAF2), child: Icon(Icons.image_outlined))
+                              : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                        );
+                      },
+                    ),
+                  )
+                : bannerStyle
                 ? SizedBox(
                     height: height,
                     child: ListView(
@@ -650,8 +675,8 @@ class _StoreHomeState extends State<StoreHome> {
                     autoplay: config['autoplay'] != false,
                     interval: Duration(milliseconds: intervalMs.clamp(1000, 30000)),
                     pauseOnInteraction: config['pause_on_interaction'] != false,
-                    showDots: config['show_dots'] == true,
-                    showArrows: config['show_arrows'] == true,
+                    showDots: config['control'] != false && config['show_dots'] == true,
+                    showArrows: config['control'] != false && config['show_arrows'] == true,
                     fade: config['transition'] == 'fade',
                     viewFraction: ((config['card_width'] ?? config['view_fraction'] ?? 1) as num).toDouble(),
                   ),
@@ -796,7 +821,7 @@ class _StoreHomeState extends State<StoreHome> {
             padding: const EdgeInsets.only(left: 4, bottom: 8),
             child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
           ),
-          if (layout.contains('carousel') || layout.contains('slider'))
+          if (layout.contains('carousel') || layout.contains('slider') || layout.contains('scroll'))
             SizedBox(
               height: cardHeight,
               child: ListView.separated(
