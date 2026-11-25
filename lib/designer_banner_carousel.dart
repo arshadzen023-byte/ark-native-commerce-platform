@@ -142,12 +142,14 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
         );
       },
     );
-    return GestureDetector(
-      onTapDown: (_) => _touchPause(true),
-      onTapUp: (_) => _touchPause(false),
-      onTapCancel: () => _touchPause(false),
-      onPanDown: (_) => _touchPause(true),
-      onPanEnd: (_) => _touchPause(false),
+    // Pointer listeners do not enter Flutter's gesture arena. The previous
+    // GestureDetector consumed tap gestures before the parent Designer card's
+    // InkWell could open the component property editor.
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _touchPause(true),
+      onPointerUp: (_) => _touchPause(false),
+      onPointerCancel: (_) => _touchPause(false),
       child: SizedBox(
         height: widget.height,
         child: Stack(children: [
