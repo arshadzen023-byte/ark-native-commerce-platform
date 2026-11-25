@@ -524,17 +524,28 @@ class _StoreHomeState extends State<StoreHome> {
       } catch (_) {}
     }
     try {
+      final configUri = Uri.parse('$storeUrl/wp-json/ark-designer/v1/config')
+          .replace(queryParameters: {
+        '_glowhit_refresh': DateTime.now().microsecondsSinceEpoch.toString(),
+      });
       final response = await http.get(
-        Uri.parse('$storeUrl/wp-json/ark-designer/v1/config'),
-        headers: const {'Accept': 'application/json'},
+        configUri,
+        headers: const {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache',
+        },
       ).timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded is Map && decoded['pages'] is Map) {
           final value = Map<String, dynamic>.from(decoded);
-          await prefs.setString('glowhit_published_designer_config', jsonEncode(value));
-          _sliderFutures.clear();
-          if (mounted) setState(() => designerConfig = value);
+          final homePage = value['pages'] is Map ? (value['pages'] as Map)['home'] : null;
+          if (homePage is Map && homePage['sections'] is List) {
+            await prefs.setString('glowhit_published_designer_config', jsonEncode(value));
+            _sliderFutures.clear();
+            if (mounted) setState(() => designerConfig = value);
+          }
         }
       }
     } catch (_) {
