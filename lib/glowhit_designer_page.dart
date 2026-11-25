@@ -1130,7 +1130,10 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     value: key == 'enabled' ? item.enabled : item.properties[key] == true,
     onChanged: (value) {
       if (key == 'enabled') {
-        setState(() => item.enabled = value);
+        setState(() {
+          item.enabled = value;
+          item.properties['visible'] = value;
+        });
         widget.onChanged();
       } else {
         _change(key, value);
