@@ -403,8 +403,26 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         'fade': false, 'pause': true, 'dots': true, 'arrows': true,
         'view_fraction': .9,
         'children': <dynamic>[],
+        'section_background': '#FFFFFF',
+        'text_color': '#241D33',
+        'height_px': 180.0,
+        'width_pct': 100.0,
+        'max_width_px': 300.0,
+        'item_gap': 10.0,
+        'corner_radius': 16.0,
+        'columns': 2,
+        'card_aspect_ratio': 1.0,
+        'card_depth': 1.0,
+        'limit': 2,
+        'visible': true,
+        'show_arrows': true,
+        'show_dots': true,
+        'pause_on_interaction': true,
       },
     );
+    item.properties['designer_component_type'] = '${type.toLowerCase()}_${selectedLayout.toLowerCase().replaceFirst('${type.toLowerCase()} ', '').replaceAll(' ', '_')}';
+    item.properties['layout_variant'] = item.properties['designer_component_type'];
+    if (type == 'Category') item.properties['category_layout'] = item.properties['designer_component_type'];
     setState(() { currentComponents.add(item); selectedId = item.id; });
     await _persist();
   }
