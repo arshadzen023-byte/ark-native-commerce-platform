@@ -812,11 +812,15 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final title = (properties['show_title'] == false) ? '' : component.title;
     return Opacity(
       opacity: component.enabled ? 1 : .38,
-      child: Align(
-        alignment: Alignment.center,
-        child: SizedBox(
-          width: ((MediaQuery.of(context).size.width - 24) * widthFactor).toDouble(),
-          child: Container(
+      child: LayoutBuilder(builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.of(context).size.width - 24;
+        return Align(
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: availableWidth * widthFactor,
+            child: Container(
             margin: margin,
             padding: padding,
             decoration: BoxDecoration(
@@ -849,9 +853,10 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               ),
               content,
             ]),
+            ),
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 
