@@ -939,7 +939,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
               if (title.isNotEmpty) Padding(
                 padding: EdgeInsets.only(bottom: ((properties['title_bottom_spacing'] as num?)?.toDouble() ?? 8)),
-                child: Text(title,
+                child: GestureDetector(onTap: isBanner && isSlider ? onEdit : null, child: Text(title,
                     maxLines: ((properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4).toInt(),
                     overflow: TextOverflow.ellipsis,
                     textAlign: (properties['title_text_align'] ?? 'left') == 'center' ? TextAlign.center : (properties['title_text_align'] ?? 'left') == 'right' ? TextAlign.right : TextAlign.left,
@@ -953,7 +953,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                       letterSpacing: (properties['letter_spacing'] as num?)?.toDouble() ?? 0,
                       wordSpacing: (properties['word_spacing'] as num?)?.toDouble() ?? 0,
                     ),
-                  ),
+                  )),
                 ),
               content,
             ]),
