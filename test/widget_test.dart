@@ -109,6 +109,27 @@ void main() {
     expect(find.text('Banner Slider'), findsOneWidget);
   });
 
+  test('Publish rejects a server document that drops submitted Home components', () {
+    final submitted = [
+      {'id': 'banner-new', 'type': 'banner_grid'},
+    ];
+    final serverPublished = <String, dynamic>{
+      'pages': {
+        'home': {
+          'sections': <dynamic>[],
+        },
+      },
+    };
+    final pages = Map<String, dynamic>.from(serverPublished['pages'] as Map);
+    final home = pages['home'] as Map;
+    final publishedSections = home['sections'] as List;
+    final publishedIds = publishedSections.whereType<Map>()
+        .map((section) => (section['id'] ?? '').toString()).toSet();
+    final submittedIds = submitted.map((section) => (section['id'] ?? '').toString()).toSet();
+    expect(publishedIds.containsAll(submittedIds), isFalse);
+    expect(publishedSections, isEmpty);
+  });
+
   test('Published Home sync treats a valid empty server Home as authoritative', () {
     final response = <String, dynamic>{
       'version': 12,
