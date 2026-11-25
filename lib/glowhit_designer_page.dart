@@ -406,10 +406,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           final publishedHomeSections = publishedHome['sections'] is List
               ? List<dynamic>.from(publishedHome['sections'] as List)
               : <dynamic>[];
-          final restoredHomeSections = restoreLegacyHomeSections(
-            draftHomeSections,
-            publishedHomeSections,
-          );
+          final restoredHomeSections = remote['native_editor_snapshot'] == true
+              ? draftHomeSections
+              : restoreLegacyHomeSections(draftHomeSections, publishedHomeSections);
           if (restoredHomeSections.length > draftHomeSections.length) {
             effectivePages['home'] = <String, dynamic>{
               ...publishedHome,
