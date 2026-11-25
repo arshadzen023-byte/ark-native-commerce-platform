@@ -18,6 +18,48 @@ const _designerField = Color(0xFFF1EFF5);
 const _designerMuted = Color(0xFF77717F);
 const _designerBorder = Color(0xFFE4E0EA);
 
+/// Restores published Home components when a legacy native draft contains
+/// only a banner. The edited banner replaces the matching live banner, while
+/// category and product sections remain visible in Designer.
+List<Map<String, dynamic>> restoreLegacyHomeSections(
+  List<dynamic> draftSections,
+  List<dynamic> publishedSections,
+) {
+  final draft = draftSections.whereType<Map>()
+      .map((value) => Map<String, dynamic>.from(value)).toList();
+  final published = publishedSections.whereType<Map>()
+      .map((value) => Map<String, dynamic>.from(value)).toList();
+  final bannerOnlyDraft = draft.isNotEmpty &&
+      draft.length <= 2 &&
+      draft.every((section) {
+        final type = (section['designer_component_type'] ??
+            section['type'] ?? '').toString().toLowerCase();
+        return type.startsWith('banner') || type == 'ark_live_slider';
+      });
+  if (!bannerOnlyDraft || published.length <= draft.length) return draft;
+
+  final merged = published;
+  for (final edited in draft) {
+    final id = (edited['id'] ?? '').toString();
+    var index = id.isEmpty ? -1 : merged.indexWhere(
+      (section) => (section['id'] ?? '').toString() == id,
+    );
+    if (index < 0) {
+      index = merged.indexWhere((section) {
+        final type = (section['designer_component_type'] ??
+            section['type'] ?? '').toString().toLowerCase();
+        return type.startsWith('banner') || type == 'ark_live_slider';
+      });
+    }
+    if (index >= 0) {
+      merged[index] = edited;
+    } else {
+      merged.insert(0, edited);
+    }
+  }
+  return merged;
+}
+
 class DesignerComponent {
   DesignerComponent({
     required this.id,
@@ -48,7 +90,12 @@ class DesignerComponent {
     final values = Map<String, dynamic>.from(properties);
     final prefix = type.toLowerCase();
     final derivedType = '${prefix}_${layout.toLowerCase().replaceFirst('${prefix} ', '').replaceAll(' ', '_')}';
-    final componentType = (values['designer_component_type'] ?? values['type'] ?? derivedType).toString();
+    final legacyType = type.toLowerCase() == 'other'
+        ? (values['original_section_type'] ?? '').toString()
+        : '';
+    final componentType = (legacyType.isNotEmpty
+        ? legacyType
+        : (values['designer_component_type'] ?? values['type'] ?? derivedType).toString());
     final width = (values['width'] as num?)?.toDouble() ?? 1.0;
     return <String, dynamic>{
       ...values,
@@ -218,6 +265,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     }
 
     final properties = Map<String, dynamic>.from(normalized);
+    if (type == 'Other') properties['original_section_type'] = rawType;
     properties['background_color'] = normalized['section_background'] ?? normalized['background_color'] ?? '#FFFFFF';
     properties['title_color'] = normalized['text_color'] ?? normalized['title_color'] ?? '#241D33';
     properties['height'] = normalized['height_px'] ?? normalized['height'] ?? 180;
@@ -290,9 +338,36 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         final remote = await ArkCustomerApi(widget.token).request('designer/config');
         if (remote is Map && remote['pages'] is Map) {
           final remotePages = Map<String, dynamic>.from(remote['pages'] as Map);
+          final publishedPages = remote['published_pages'] is Map
+              ? Map<String, dynamic>.from(remote['published_pages'] as Map)
+              : <String, dynamic>{};
+          final effectivePages = Map<String, dynamic>.from(remotePages);
+          final draftHome = remotePages['home'] is Map
+              ? Map<String, dynamic>.from(remotePages['home'] as Map)
+              : <String, dynamic>{};
+          final publishedHome = publishedPages['home'] is Map
+              ? Map<String, dynamic>.from(publishedPages['home'] as Map)
+              : <String, dynamic>{};
+          final draftHomeSections = draftHome['sections'] is List
+              ? List<dynamic>.from(draftHome['sections'] as List)
+              : <dynamic>[];
+          final publishedHomeSections = publishedHome['sections'] is List
+              ? List<dynamic>.from(publishedHome['sections'] as List)
+              : <dynamic>[];
+          final restoredHomeSections = restoreLegacyHomeSections(
+            draftHomeSections,
+            publishedHomeSections,
+          );
+          if (restoredHomeSections.length > draftHomeSections.length) {
+            effectivePages['home'] = <String, dynamic>{
+              ...publishedHome,
+              ...draftHome,
+              'sections': restoredHomeSections,
+            };
+          }
           for (final page in _pages) {
             final pageKey = _wordpressPageKey(page);
-            final pageConfig = remotePages[pageKey];
+            final pageConfig = effectivePages[pageKey];
             final sections = pageConfig is Map && pageConfig['sections'] is List
                 ? pageConfig['sections'] as List
                 : <dynamic>[];
@@ -590,12 +665,28 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         query: {'page': '1', 'per_page': '60'},
       );
       if (!mounted) return null;
-      if (response is! Map || response['items'] is! List) {
-        throw const FormatException('WordPress returned an invalid Media Library response.');
+      final rawItems = response is Map
+          ? (response['items'] ?? response['media'] ?? response['data'])
+          : response;
+      if (rawItems is! List) {
+        final message = response is Map
+            ? (response['message'] ?? response['code'] ?? 'WordPress returned an invalid Media Library response.')
+            : 'WordPress returned an invalid Media Library response.';
+        throw FormatException(message.toString());
       }
-      final rows = (response['items'] as List)
+      final rows = rawItems
           .whereType<Map>()
-          .map((entry) => Map<String, dynamic>.from(entry))
+          .map((entry) {
+            final item = Map<String, dynamic>.from(entry);
+            final guid = item['guid'] is Map ? (item['guid'] as Map)['rendered'] : null;
+            item['source_url'] = (item['source_url'] ?? item['url'] ?? guid ?? '').toString();
+            item['thumbnail_url'] = (item['thumbnail_url'] ?? item['media_details'] is Map
+                ? item['thumbnail_url']
+                : item['source_url']).toString();
+            item['mime_type'] = (item['mime_type'] ?? item['mime'] ?? 'image/jpeg').toString();
+            item['alt_text'] = (item['alt_text'] ?? item['alt'] ?? '').toString();
+            return item;
+          })
           .where((entry) => (entry['mime_type'] ?? '').toString().startsWith('image/'))
           .where((entry) => (entry['source_url'] ?? '').toString().trim().isNotEmpty)
           .toList();
@@ -968,9 +1059,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             : MediaQuery.of(context).size.width - 24;
         return Align(
           alignment: Alignment.center,
-          child: SizedBox(
-            width: availableWidth * widthFactor,
-            child: Container(
+          child: Container(
+            width: ((availableWidth - margin.horizontal) * widthFactor)
+                .clamp(0, availableWidth).toDouble(),
             margin: margin,
             padding: padding,
             decoration: BoxDecoration(
@@ -1003,7 +1094,6 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                 ),
               content,
             ]),
-            ),
           ),
         );
         }),
