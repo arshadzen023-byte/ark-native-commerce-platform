@@ -1633,19 +1633,21 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           ),
           body: Column(children: [
             Expanded(
-              flex: 5,
-              child: Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _designerPreviewBackground,
-                  border: Border.all(color: _designerBorder),
-                  borderRadius: BorderRadius.circular(12),
+              flex: 4,
+              child: ColoredBox(
+                color: _designerPreviewBackground,
+                child: ClipRect(
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.center,
+                      child: widget.visualBuilder(),
+                    ),
+                  ),
                 ),
-                child: widget.visualBuilder(),
               ),
             ),
+            const Divider(height: 1),
             const TabBar(
               isScrollable: true,
               tabAlignment: TabAlignment.start,
@@ -1663,7 +1665,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
               ],
             ),
             Expanded(
-              flex: 4,
+              flex: 6,
               child: TabBarView(children: [
                 _openColorPanel(),
                 _titlePanel(),
