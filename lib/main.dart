@@ -655,16 +655,18 @@ class _StoreHomeState extends State<StoreHome> {
         final bannerGridHeight = bannerGridRowExtent * bannerGridRows + mainAxisGap * (bannerGridRows - 1);
         return Align(
           alignment: Alignment.center,
-          child: SizedBox(
-            width: ((MediaQuery.of(context).size.width - 24) * widthFactor).toDouble(),
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: sectionMargin.left + paddingLeft,
-                right: sectionMargin.right + paddingRight,
-                top: sectionMargin.top + padding,
-                bottom: sectionMargin.bottom + ((config['padding_bottom'] as num?)?.toDouble() ?? 12),
-              ),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child: Container(
+            width: ((MediaQuery.of(context).size.width - sectionMargin.horizontal) * widthFactor)
+                .clamp(0, MediaQuery.of(context).size.width).toDouble(),
+            margin: sectionMargin,
+            color: background == 'transparent' ? null : _safeColor(background),
+            padding: EdgeInsets.fromLTRB(
+              paddingLeft,
+              padding,
+              paddingRight,
+              (config['padding_bottom'] as num?)?.toDouble() ?? 12,
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (showTitle) Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
@@ -735,7 +737,6 @@ class _StoreHomeState extends State<StoreHome> {
                     onSlideTap: _openDesignerChildLink,
                   ),
               ]),
-            ),
           ),
         );
       }
@@ -865,7 +866,7 @@ class _StoreHomeState extends State<StoreHome> {
         child: productCard(product),
       )).toList();
       return Container(
-        width: (MediaQuery.of(context).size.width * widthFactor - margin.horizontal).clamp(0, MediaQuery.of(context).size.width).toDouble(),
+        width: ((MediaQuery.of(context).size.width - margin.horizontal) * widthFactor).clamp(0, MediaQuery.of(context).size.width).toDouble(),
         margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
         padding: EdgeInsets.fromLTRB(
