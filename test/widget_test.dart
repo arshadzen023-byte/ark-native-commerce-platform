@@ -104,6 +104,92 @@ void main() {
     expect((section['children'] as List).first['link_value'], 'page:categories');
   });
 
+  test('Category and Product layout variants serialize to WordPress-supported component types', () {
+    final categorySlider = DesignerComponent(
+      id: 'category-slider-test',
+      type: 'Category',
+      title: 'Shop categories',
+      layout: 'Category Slider',
+      properties: {
+        'designer_component_type': 'category_slider',
+        'category_layout': 'category_slider',
+        'layout_variant': 'category_slider',
+        'parent_category_id': 12,
+        'cross_axis_count': 3,
+        'main_axis_spacing': 14,
+        'cross_axis_spacing': 9,
+      },
+    ).toPublishedSection();
+
+    expect(categorySlider['type'], 'category_grid');
+    expect(categorySlider['designer_component_type'], 'category_slider');
+    expect(categorySlider['layout_variant'], 'slider');
+    expect(categorySlider['category_layout'], 'slider');
+    expect(categorySlider['category_id'], 12);
+    expect(categorySlider['main_axis_spacing'], 14);
+    expect(categorySlider['cross_axis_spacing'], 9);
+
+    final productSlider = DesignerComponent(
+      id: 'product-slider-test',
+      type: 'Product',
+      title: 'Best products',
+      layout: 'Product Slider',
+      properties: {
+        'designer_component_type': 'product_slider',
+        'layout_variant': 'product_slider',
+        'source': 'best_selling',
+        'source_id': 0,
+      },
+    ).toPublishedSection();
+
+    expect(productSlider['type'], 'product_carousel');
+    expect(productSlider['designer_component_type'], 'product_slider');
+    expect(productSlider['layout_variant'], 'slider');
+    expect(productSlider['source'], 'best_selling');
+
+    final productList = DesignerComponent(
+      id: 'product-list-test',
+      type: 'Product',
+      title: 'Latest products',
+      layout: 'Product List',
+      properties: {'source': 'new_arrival'},
+    ).toPublishedSection();
+
+    expect(productList['type'], 'product_list');
+    expect(productList['layout_variant'], 'list');
+    expect(productList['source'], 'latest');
+  });
+
+  test('Show all categories and Product Tag selection keep their published filters', () {
+    final allCategories = DesignerComponent(
+      id: 'all-categories-test',
+      type: 'Category',
+      title: 'All categories',
+      layout: 'Category Grid',
+      properties: {
+        'show_all_categories': true,
+        'parent_category_id': 35,
+        'fixed_grid_view_count': 8,
+      },
+    ).toPublishedSection();
+    expect(allCategories['category_id'], 0);
+    expect(allCategories['limit'], 100);
+
+    final taggedProducts = DesignerComponent(
+      id: 'tag-products-test',
+      type: 'Product',
+      title: 'Summer collection',
+      layout: 'Product Grid',
+      properties: {
+        'source': 'tag',
+        'source_id': 77,
+      },
+    ).toPublishedSection();
+    expect(taggedProducts['source'], 'tag');
+    expect(taggedProducts['tag_id'], 77);
+    expect(taggedProducts['source_id'], 77);
+  });
+
   testWidgets('Tapping the live banner image opens its property editor', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const MaterialApp(
