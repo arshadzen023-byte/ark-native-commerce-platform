@@ -15,6 +15,7 @@ class ArkDesignerBannerCarousel extends StatefulWidget {
     this.showArrows = true,
     this.fade = false,
     this.viewFraction = 1,
+    this.onTap,
   });
 
   final List<Map<String, dynamic>> slides;
@@ -27,6 +28,7 @@ class ArkDesignerBannerCarousel extends StatefulWidget {
   final bool showArrows;
   final bool fade;
   final double viewFraction;
+  final VoidCallback? onTap;
 
   @override
   State<ArkDesignerBannerCarousel> createState() => _ArkDesignerBannerCarouselState();
@@ -37,6 +39,8 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
   Timer? _timer;
   int _index = 0;
   bool _interactionPaused = false;
+  Offset? _pointerStart;
+  int? _activePointer;
 
   @override
   void initState() {
@@ -147,9 +151,27 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
     // InkWell could open the component property editor.
     return Listener(
       behavior: HitTestBehavior.translucent,
-      onPointerDown: (_) => _touchPause(true),
-      onPointerUp: (_) => _touchPause(false),
-      onPointerCancel: (_) => _touchPause(false),
+      onPointerDown: (event) {
+        _activePointer = event.pointer;
+        _pointerStart = event.position;
+        _touchPause(true);
+      },
+      onPointerUp: (event) {
+        final start = _pointerStart;
+        final isTap = _activePointer == event.pointer &&
+            start != null && (event.position - start).distance < 12;
+        _activePointer = null;
+        _pointerStart = null;
+        _touchPause(false);
+        if (isTap) widget.onTap?.call();
+      },
+      onPointerCancel: (event) {
+        if (_activePointer == event.pointer) {
+          _activePointer = null;
+          _pointerStart = null;
+        }
+        _touchPause(false);
+      },
       child: SizedBox(
         height: widget.height,
         child: Stack(children: [
