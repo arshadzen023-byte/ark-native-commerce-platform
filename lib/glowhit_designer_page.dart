@@ -79,7 +79,15 @@ class DesignerComponent {
           ((((values['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000).round()),
       'category_id': values['parent_category_id'] ?? values['category_id'] ?? 0,
       'tag_id': values['tag_id'] ?? (values['source'] == 'tag' ? values['source_id'] ?? 0 : 0),
-      'children': values['children'] is List ? values['children'] : <dynamic>[],
+      'children': values['children'] is List
+          ? (values['children'] as List).whereType<Map>().where((child) {
+              final kind = (child['type'] ?? 'image').toString().toLowerCase();
+              return kind == 'image' || kind == 'video';
+            }).map((child) => <String, dynamic>{
+              ...Map<String, dynamic>.from(child),
+              'title': (child['title'] ?? '').toString().trim(),
+            }).toList()
+          : <dynamic>[],
     };
   }
 
@@ -576,85 +584,123 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   }
 
   Future<Map<String, dynamic>?> _chooseMedia() async {
-    final response = await ArkCustomerApi(widget.token).request(
-      'designer/media',
-      query: {'page': '1', 'per_page': '60', 'media_type': 'all'},
-    );
-    final rows = response is Map && response['items'] is List
-        ? (response['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).where((item) {
-            final mime = (item['mime_type'] ?? '').toString();
-            return mime.startsWith('image/') || mime.startsWith('video/');
-          }).toList()
-        : <Map<String, dynamic>>[];
-    if (!mounted) return null;
-    return showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.of(ctx).size.height * .78,
-          child: Column(children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Row(children: [
-                Icon(Icons.perm_media_outlined, color: _designerPurple),
-                SizedBox(width: 10),
-                Text('WordPress Media Library', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-              ]),
-            ),
-            Expanded(
-              child: rows.isEmpty
-                  ? const Center(child: Text('No images or videos found in WordPress Media Library.'))
-                  : GridView.builder(
-                      padding: const EdgeInsets.all(12),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10,
-                      ),
-                      itemCount: rows.length,
-                      itemBuilder: (_, index) {
-                        final item = rows[index];
-                        final mime = (item['mime_type'] ?? '').toString();
-                        final isVideo = mime.startsWith('video/');
-                        final source = (item['source_url'] ?? '').toString();
-                        final preview = (item['thumbnail_url'] ?? '').toString();
-                        return InkWell(
-                          onTap: () => Navigator.pop(ctx, item),
-                          child: Card(
-                            clipBehavior: Clip.antiAlias,
-                            child: Column(children: [
-                              Expanded(
-                                child: isVideo
-                                    ? Stack(alignment: Alignment.center, children: [
-                                        if (preview.isNotEmpty)
-                                          Image.network(preview, width: double.infinity, height: double.infinity, fit: BoxFit.cover)
-                                        else
-                                          const Center(child: Icon(Icons.video_library_outlined, size: 34)),
-                                        const CircleAvatar(radius: 15, child: Icon(Icons.play_arrow_rounded, size: 20)),
-                                      ])
-                                    : source.isEmpty
-                                        ? const Icon(Icons.image_not_supported_outlined)
-                                        : Image.network(preview.isEmpty ? source : preview, width: double.infinity, fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(5),
-                                child: Row(children: [
-                                  Icon(isVideo ? Icons.videocam_outlined : Icons.image_outlined, size: 13),
-                                  const SizedBox(width: 3),
-                                  Expanded(child: Text((item['title'] ?? (isVideo ? 'Video' : 'Image')).toString(), maxLines: 1, overflow: TextOverflow.ellipsis)),
+    try {
+      final response = await ArkCustomerApi(widget.token).request(
+        'designer/media',
+        query: {'page': '1', 'per_page': '60'},
+      );
+      if (!mounted) return null;
+      if (response is! Map || response['items'] is! List) {
+        throw const FormatException('WordPress returned an invalid Media Library response.');
+      }
+      final rows = (response['items'] as List)
+          .whereType<Map>()
+          .map((entry) => Map<String, dynamic>.from(entry))
+          .where((entry) => (entry['mime_type'] ?? '').toString().startsWith('image/'))
+          .where((entry) => (entry['source_url'] ?? '').toString().trim().isNotEmpty)
+          .toList();
+      if (rows.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No images found in the WordPress Media Library.')),
+        );
+        return null;
+      }
+
+      final searchController = TextEditingController();
+      final selected = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (ctx) => StatefulBuilder(builder: (ctx, refresh) {
+          final query = searchController.text.trim().toLowerCase();
+          final filtered = rows.where((entry) {
+            final title = (entry['title'] ?? '').toString().toLowerCase();
+            final url = (entry['source_url'] ?? '').toString().toLowerCase();
+            return query.isEmpty || title.contains(query) || url.contains(query);
+          }).toList();
+          return SafeArea(
+            child: SizedBox(
+              height: MediaQuery.of(ctx).size.height * .82,
+              child: Column(children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Row(children: [
+                    Icon(Icons.perm_media_outlined, color: _designerPurple),
+                    SizedBox(width: 10),
+                    Text('WordPress Media Library', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                  ]),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+                  child: TextField(
+                    controller: searchController,
+                    onChanged: (_) => refresh(() {}),
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      hintText: 'Search images',
+                      filled: true,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? const Center(child: Text('No matching images found.'))
+                      : GridView.builder(
+                          key: const ValueKey('designer-media-library-grid'),
+                          padding: const EdgeInsets.all(12),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10,
+                          ),
+                          itemCount: filtered.length,
+                          itemBuilder: (_, index) {
+                            final entry = filtered[index];
+                            final source = (entry['source_url'] ?? '').toString();
+                            final preview = (entry['thumbnail_url'] ?? '').toString();
+                            return InkWell(
+                              onTap: () => Navigator.pop(ctx, entry),
+                              child: Card(
+                                clipBehavior: Clip.antiAlias,
+                                child: Column(children: [
+                                  Expanded(
+                                    child: Image.network(
+                                      preview.isEmpty ? source : preview,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const ColoredBox(
+                                        color: _designerField,
+                                        child: Center(child: Icon(Icons.broken_image_outlined)),
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(5),
+                                    child: Text(
+                                      (entry['title'] ?? 'Image').toString(),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ]),
                               ),
-                            ]),
-                          ),
-                        );
-                      },
-                    ),
+                            );
+                          },
+                        ),
+                ),
+              ]),
             ),
-          ]),
-        ),
-      ),
-    );
+          );
+        }),
+      );
+      searchController.dispose();
+      return selected;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not load WordPress Media Library: $error')),
+        );
+      }
+      return null;
+    }
   }
 
 
@@ -1182,6 +1228,7 @@ class _DesignerComponentEditor extends StatefulWidget {
 class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
   final _title = TextEditingController();
   final _description = TextEditingController();
+  bool _addingChild = false;
   DesignerComponent get item => widget.component;
 
   @override
@@ -1274,140 +1321,152 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
   );
 
   Widget _childrenPanel() {
-    final children = item.properties['children'] is List
-        ? List<dynamic>.from(item.properties['children'] as List)
-        : <dynamic>[];
+    final children = (item.properties['children'] is List
+            ? List<dynamic>.from(item.properties['children'] as List)
+            : <dynamic>[])
+        .where((value) {
+          if (value is! Map) return false;
+          final type = (value['type'] ?? 'image').toString().toLowerCase();
+          return type == 'image' || type == 'video';
+        })
+        .toList();
+
     return _section('Children', [
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            OutlinedButton.icon(
-              onPressed: () async {
-                final media = await widget.onChooseMedia();
-                if (media == null) return;
-                final source = (media['source_url'] ?? '').toString();
-                if (source.isEmpty) return;
-                final mime = (media['mime_type'] ?? '').toString();
-                final isVideo = mime.startsWith('video/');
-                children.add({
-                  'type': isVideo ? 'video' : 'image',
-                  'attachment_id': media['id'],
-                  'image_url': isVideo ? '' : source,
-                  'video_url': isVideo ? source : '',
-                  'source_url': source,
-                  'mime_type': mime,
-                  'title': '',
-                  'alt_text': (media['alt_text'] ?? '').toString(),
-                  'link_type': 'in_app', 'link_value': '', 'active': true,
-                });
-                _change('children', children);
-              },
-              icon: const Icon(Icons.photo_library_outlined),
-              label: const Text('Add image / video'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final controller = TextEditingController();
-                final value = await showDialog<String>(
-                  context: context,
-                  builder: (dialogContext) => AlertDialog(
-                    title: const Text('Add text child'),
-                    content: TextField(controller: controller, autofocus: true),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-                      FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Add')),
-                    ],
-                  ),
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          key: const ValueKey('designer-add-child-image'),
+          onPressed: _addingChild ? null : () async {
+            setState(() => _addingChild = true);
+            try {
+              final media = await widget.onChooseMedia();
+              if (!mounted || media == null) return;
+              final source = (media['source_url'] ?? '').toString().trim();
+              if (source.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('The selected media has no usable image URL.')),
                 );
-                controller.dispose();
-                if (value == null || value.isEmpty) return;
-                children.add({'type': 'text', 'title': value, 'text': value, 'active': true});
-                _change('children', children);
-              },
-              icon: const Icon(Icons.text_fields),
-              label: const Text('Add text'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final controller = TextEditingController();
-                final value = await showDialog<String>(
-                  context: context,
-                  builder: (dialogContext) => AlertDialog(
-                    title: const Text('Add link child'),
-                    content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: 'URL or ark:// route')),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-                      FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Add')),
-                    ],
-                  ),
+                return;
+              }
+              final updated = List<dynamic>.from(item.properties['children'] is List
+                  ? item.properties['children'] as List
+                  : const <dynamic>[]);
+              final mime = (media['mime_type'] ?? 'image/jpeg').toString();
+              updated.removeWhere((value) => value is! Map ||
+                  !['image', 'video'].contains((value['type'] ?? 'image').toString().toLowerCase()));
+              updated.add(<String, dynamic>{
+                'type': mime.startsWith('video/') ? 'video' : 'image',
+                'attachment_id': media['id'],
+                'image_url': mime.startsWith('video/') ? '' : source,
+                'video_url': mime.startsWith('video/') ? source : '',
+                'source_url': source,
+                'mime_type': mime,
+                'title': '',
+                'alt_text': (media['alt_text'] ?? '').toString(),
+                'active': true,
+              });
+              _change('children', updated);
+            } catch (error) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Could not open WordPress Media Library: $error')),
                 );
-                controller.dispose();
-                if (value == null || value.isEmpty) return;
-                children.add({
-                  'type': 'link', 'title': value,
-                  'link_type': value.startsWith('ark://') ? 'deep_link' : 'url',
-                  'link_value': value, 'active': true,
-                });
-                _change('children', children);
-              },
-              icon: const Icon(Icons.link),
-              label: const Text('Add link'),
-            ),
+              }
+            } finally {
+              if (mounted) setState(() => _addingChild = false);
+            }
+          },
+          icon: _addingChild
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.add_photo_alternate_outlined),
+          label: Text(_addingChild ? 'Opening Media Library…' : 'Add image from Media Library'),
+        ),
+      ),
+      const SizedBox(height: 12),
+      if (children.isEmpty)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+          decoration: BoxDecoration(
+            color: _designerField,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _designerBorder),
+          ),
+          child: const Column(children: [
+            Icon(Icons.photo_library_outlined, size: 34, color: _designerMuted),
+            SizedBox(height: 8),
+            Text('No images added yet', style: TextStyle(fontWeight: FontWeight.w700)),
+            SizedBox(height: 4),
+            Text('Add images from your WordPress Media Library.', textAlign: TextAlign.center,
+                style: TextStyle(color: _designerMuted, fontSize: 12)),
           ]),
-          const SizedBox(height: 10),
-          if (children.isEmpty)
-            const Padding(padding: EdgeInsets.all(12), child: Text('No children added yet.'))
-          else
-            ...children.asMap().entries.map((entry) {
-              final child = entry.value is Map
-                  ? Map<String, dynamic>.from(entry.value as Map)
-                  : <String, dynamic>{};
-              final type = (child['type'] ?? 'image').toString();
-              final src = (child['image_url'] ?? child['video_url'] ?? child['source_url'] ?? '').toString();
-              return Card(
-                color: _designerField,
-                child: ListTile(
-                  onTap: () => _editChild(entry.key),
-                  leading: SizedBox(
-                    width: 54, height: 54,
-                    child: src.isEmpty
-                        ? Icon(type == 'link' ? Icons.link : type == 'text' ? Icons.text_fields : Icons.image)
-                        : Image.network(src, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)),
-                  ),
-                  title: Text((child['title'] ?? '').toString().trim().isEmpty
-                      ? (type == 'link' ? 'Link' : type == 'text' ? 'Text' : 'Image / Video')
-                      : child['title'].toString()),
-                  subtitle: Text(type.toUpperCase()),
-                  trailing: IconButton(
-                    tooltip: 'Delete child',
-                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                    onPressed: () {
-                      final updated = List<dynamic>.from(item.properties['children'] as List)..removeAt(entry.key);
-                      _change('children', updated);
-                    },
-                  ),
+        )
+      else
+        ...children.asMap().entries.map((entry) {
+          final child = Map<String, dynamic>.from(entry.value as Map);
+          final type = (child['type'] ?? 'image').toString().toLowerCase();
+          final src = (child['image_url'] ?? child['video_url'] ?? child['source_url'] ?? '').toString();
+          final customTitle = (child['title'] ?? '').toString().trim();
+          return Card(
+            key: ValueKey('designer-child-${item.id}-${entry.key}'),
+            color: _designerField,
+            elevation: 0,
+            child: ListTile(
+              onTap: () => _editChild(entry.key),
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 58, height: 58,
+                  child: src.isEmpty
+                      ? const ColoredBox(color: _designerBorder, child: Icon(Icons.image_outlined))
+                      : Image.network(src, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const ColoredBox(color: _designerBorder,
+                              child: Icon(Icons.broken_image_outlined))),
                 ),
-              );
-            }),
-          if (children.length > 1) ...[
-            const SizedBox(height: 10),
-            const Text('Child Reorder', style: TextStyle(fontWeight: FontWeight.w800)),
-            ReorderableListView(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              onReorder: (oldIndex, newIndex) {
-                final updated = List<dynamic>.from(item.properties['children'] as List);
-                if (newIndex > oldIndex) newIndex--;
-                final moved = updated.removeAt(oldIndex);
-                updated.insert(newIndex, moved);
-                _change('children', updated);
-              },
-              children: children.asMap().entries.map((entry) => ListTile(
-                key: ValueKey('child-order-${item.id}-${entry.key}'),
-                leading: const Icon(Icons.drag_handle),
-                title: Text((entry.value is Map ? (entry.value as Map)['title'] : 'Child')?.toString() ?? 'Child'),
-              )).toList(),
+              ),
+              title: Text(customTitle.isEmpty ? 'Image ${entry.key + 1}' : customTitle,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Text(type == 'video' ? 'VIDEO' : 'IMAGE'),
+              trailing: IconButton(
+                tooltip: 'Delete image',
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                onPressed: () {
+                  final updated = List<dynamic>.from(item.properties['children'] as List? ?? const <dynamic>[]);
+                  final matching = updated.where((value) => value is Map &&
+                      ['image', 'video'].contains((value['type'] ?? 'image').toString().toLowerCase())).toList();
+                  if (entry.key < matching.length) {
+                    final target = matching[entry.key];
+                    updated.remove(target);
+                    _change('children', updated);
+                  }
+                },
+              ),
             ),
-          ],
-        ]);
+          );
+        }),
+      if (children.length > 1) ...[
+        const SizedBox(height: 10),
+        const Text('Reorder images', style: TextStyle(fontWeight: FontWeight.w800)),
+        ReorderableListView(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          onReorder: (oldIndex, newIndex) {
+            final updated = children.map((value) => Map<String, dynamic>.from(value as Map)).toList();
+            if (newIndex > oldIndex) newIndex--;
+            final moved = updated.removeAt(oldIndex);
+            updated.insert(newIndex, moved);
+            _change('children', updated);
+          },
+          children: children.asMap().entries.map((entry) => ListTile(
+            key: ValueKey('child-order-${item.id}-${entry.key}'),
+            leading: const Icon(Icons.drag_handle),
+            title: Text((entry.value is Map && (entry.value as Map)['title']?.toString().trim().isNotEmpty == true)
+                ? (entry.value as Map)['title'].toString()
+                : 'Image ${entry.key + 1}'),
+          )).toList(),
+        ),
+      ],
+    ]);
   }
 
   Widget _titlePanel() => ListView(
@@ -1954,165 +2013,122 @@ class _DesignerChildEditPage extends StatefulWidget {
 class _DesignerChildEditPageState extends State<_DesignerChildEditPage> {
   late Map<String, dynamic> child;
   late final TextEditingController title;
-  late final TextEditingController link;
-  static const destinations = <String>[
-    'Category', 'Categories', 'Brands', 'All Brands', 'Product Tag',
-    'WordPress Post', 'WordPress Page', 'Page (WebView)', 'Product',
-    'Firebase Chat', 'Firebase Chat Room', 'Cart', 'Post Category Notification',
-    'Product Category Notification', 'App Page', 'Menu Group', 'Login',
-    'WishList', 'Orders', 'Subscriptions', 'Bookings', 'Table Booking',
-    'Address', 'Wallet'
-  ];
+  bool selectingImage = false;
 
   @override
   void initState() {
     super.initState();
     child = Map<String, dynamic>.from(widget.child);
     title = TextEditingController(text: (child['title'] ?? '').toString());
-    link = TextEditingController(text: (child['link_value'] ?? '').toString());
   }
 
   @override
-  void dispose() { title.dispose(); link.dispose(); super.dispose(); }
+  void dispose() { title.dispose(); super.dispose(); }
 
   Future<void> _selectImage() async {
-    final media = await widget.onChooseMedia();
-    if (media == null) return;
-    final url = (media['source_url'] ?? '').toString();
-    if (url.isEmpty) return;
-    final mime = (media['mime_type'] ?? '').toString();
-    final isVideo = mime.startsWith('video/');
-    setState(() {
-      child['type'] = isVideo ? 'video' : 'image';
-      child['attachment_id'] = media['id'];
-      child['image_url'] = isVideo ? '' : url;
-      child['video_url'] = isVideo ? url : '';
-      child['source_url'] = url;
-      child['mime_type'] = mime;
-      child['alt_text'] = media['alt_text'] ?? '';
-      child['title'] = '';
-      title.clear();
-    });
-  }
-
-  Future<void> _selectLink() async {
-    final searchController = TextEditingController();
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: _designerSurface,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, refresh) {
-          final query = searchController.text.trim().toLowerCase();
-          final filtered = destinations.where((name) => name.toLowerCase().contains(query)).toList();
-          return SafeArea(
-            child: SizedBox(
-              height: MediaQuery.of(ctx).size.height * .84,
-              child: Column(children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-                  child: TextField(
-                    controller: searchController,
-                    onChanged: (_) => refresh(() {}),
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      hintText: 'Search Links',
-                      filled: true,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (_, index) => ListTile(
-                      leading: Icon(
-                        child['link_value'] == 'ark://${filtered[index].toLowerCase().replaceAll(' ', '-')}'
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_unchecked,
-                        color: _designerPurple,
-                      ),
-                      title: Text(filtered[index]),
-                      onTap: () => Navigator.pop(ctx, filtered[index]),
-                    ),
-                  ),
-                ),
-              ]),
-            ),
-          );
-        },
-      ),
-    );
-    searchController.dispose();
-    if (choice == null) return;
-    final slug = choice.toLowerCase().replaceAll(' ', '-');
-    setState(() {
-      child['type'] = 'link';
-      child['link_type'] = choice == 'Page (WebView)' ? 'webview' : 'deep_link';
-      child['link_value'] = choice == 'Page (WebView)' ? 'webview' : 'ark://$slug';
-      link.text = (child['link_value'] ?? '').toString();
-    });
+    if (selectingImage) return;
+    setState(() => selectingImage = true);
+    try {
+      final media = await widget.onChooseMedia();
+      if (!mounted || media == null) return;
+      final url = (media['source_url'] ?? '').toString().trim();
+      if (url.isEmpty) return;
+      setState(() {
+        child['type'] = 'image';
+        child['attachment_id'] = media['id'];
+        child['image_url'] = url;
+        child['video_url'] = '';
+        child['source_url'] = url;
+        child['mime_type'] = media['mime_type'] ?? 'image/jpeg';
+        child['alt_text'] = media['alt_text'] ?? '';
+        // Media Library titles are metadata only. The user may enter a title
+        // manually, but selecting/replacing an image always clears it.
+        child['title'] = '';
+        title.clear();
+        child.remove('link_type');
+        child.remove('link_value');
+      });
+    } finally {
+      if (mounted) setState(() => selectingImage = false);
+    }
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _designerBackground,
-    appBar: AppBar(
-      title: const Text('Child'),
-      backgroundColor: _designerSurface,
-      foregroundColor: _designerText,
-      actions: [
-        IconButton(
-          tooltip: 'Delete child',
-          icon: const Icon(Icons.delete_outline),
-          onPressed: () => Navigator.pop(context, <String, dynamic>{'_delete': true}),
-        ),
-        TextButton(onPressed: () {
-          child['title'] = title.text;
-          child['link_value'] = link.text;
-          Navigator.pop(context, child);
-        }, child: const Text('SAVE')),
-      ],
-    ),
-    body: ListView(padding: const EdgeInsets.all(16), children: [
-      Card(color: _designerSurface, child: Column(children: [
-        ListTile(
-          leading: const Icon(Icons.image_outlined),
-          title: const Text('Image'),
-          subtitle: Text((child['image_url'] ?? 'Select an image').toString()),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: _selectImage,
-        ),
-        const Divider(height: 1),
-        ListTile(
-          leading: const Icon(Icons.link),
-          title: const Text('Link'),
-          subtitle: Text((child['link_value'] ?? 'Navigate to respective page on click').toString()),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: _selectLink,
-        ),
-        const Divider(height: 1),
-        ListTile(
-          leading: const Icon(Icons.upload_file),
-          title: const Text('Upload Image'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: _selectImage,
-        ),
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: TextField(controller: title, decoration: const InputDecoration(labelText: 'Title')),
-        ),
-      ])),
-      const SizedBox(height: 12),
-      SwitchListTile(
-        tileColor: _designerSurface,
-        title: const Text('Status'),
-        value: child['active'] != false,
-        onChanged: (v) => setState(() => child['active'] = v),
+  Widget build(BuildContext context) {
+    final imageUrl = (child['image_url'] ?? child['source_url'] ?? '').toString();
+    return Scaffold(
+      backgroundColor: _designerBackground,
+      appBar: AppBar(
+        title: const Text('Child'),
+        backgroundColor: _designerSurface,
+        foregroundColor: _designerText,
+        actions: [
+          IconButton(
+            tooltip: 'Delete child',
+            icon: const Icon(Icons.delete_outline),
+            onPressed: () => Navigator.pop(context, <String, dynamic>{'_delete': true}),
+          ),
+          TextButton(onPressed: () {
+            child['title'] = title.text.trim();
+            child.remove('link_type');
+            child.remove('link_value');
+            Navigator.pop(context, child);
+          }, child: const Text('SAVE')),
+        ],
       ),
-    ]),
-  );
+      body: ListView(padding: const EdgeInsets.all(16), children: [
+        Card(
+          color: _designerSurface,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: _designerBorder),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: imageUrl.isEmpty
+                      ? const ColoredBox(color: _designerField,
+                          child: Center(child: Icon(Icons.image_outlined, size: 42, color: _designerMuted)))
+                      : Image.network(imageUrl, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const ColoredBox(color: _designerField,
+                              child: Center(child: Icon(Icons.broken_image_outlined, size: 42)))),
+                ),
+              ),
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: selectingImage ? null : _selectImage,
+                icon: selectingImage
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.photo_library_outlined),
+                label: Text(selectingImage ? 'Opening Media Library…' : 'Choose image'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: title,
+                decoration: const InputDecoration(
+                  labelText: 'Title (optional)',
+                  hintText: 'Leave blank to show no title',
+                ),
+                onChanged: (value) => child['title'] = value,
+              ),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SwitchListTile(
+          tileColor: _designerSurface,
+          title: const Text('Status'),
+          value: child['active'] != false,
+          onChanged: (value) => setState(() => child['active'] = value),
+        ),
+      ]),
+    );
+  }
 }
 
 class _DesignerReorderPage extends StatelessWidget {
