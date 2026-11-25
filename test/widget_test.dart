@@ -40,13 +40,15 @@ void main() {
       [
         {'id': 'home-search', 'type': 'search', 'title': 'Search products'},
         {'id': 'hero-existing', 'type': 'ark_live_slider', 'designer_component_type': 'banner_slider', 'title': 'Old hero'},
+        {'id': 'existing-campaign', 'type': 'ark_live_slider', 'designer_component_type': 'banner_scroll', 'title': 'Existing campaign'},
         {'id': 'home-cats', 'type': 'category_grid', 'title': 'Shop categories'},
         {'id': 'home-products', 'type': 'product_grid', 'title': 'Products'},
       ],
     );
 
-    expect(merged, hasLength(5));
+    expect(merged, hasLength(6));
     expect(merged.firstWhere((section) => section['id'] == 'hero-existing')['title'], 'Edited hero');
+    expect(merged.firstWhere((section) => section['id'] == 'existing-campaign')['title'], 'Existing campaign');
     expect(merged.firstWhere((section) => section['id'] == 'new-banner')['title'], 'New banner');
     expect(merged.any((section) => section['id'] == 'home-cats'), isTrue);
     expect(merged.any((section) => section['id'] == 'home-products'), isTrue);
