@@ -527,6 +527,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       }
       publishedConfig['schema_version'] = 3;
       publishedConfig['updated_at'] = now;
+      // Marks a complete native snapshot so an intentional deletion/reorder is
+      // not later mistaken for a legacy partial draft and merged back.
+      publishedConfig['native_editor_snapshot'] = true;
       publishedConfig['pages'] = configPages;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, localJson);
