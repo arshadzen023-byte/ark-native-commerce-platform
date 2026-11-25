@@ -39,48 +39,34 @@ List<Map<String, dynamic>> restoreLegacyHomeSections(
   if (!bannerOnlyDraft || published.length <= draft.length) return draft;
 
   final merged = List<Map<String, dynamic>>.from(published);
-  final claimedPublishedIndexes = <int>{};
   for (final edited in draft) {
     final id = (edited['id'] ?? '').toString();
     var index = id.isEmpty ? -1 : merged.indexWhere(
       (section) => (section['id'] ?? '').toString() == id,
     );
 
-    // An ID match always means edit/replace. An unmatched ID is a new
-    // component unless there is an unclaimed legacy component of the same
-    // type that this old, partial draft is clearly editing.
-    if (index < 0 && id.isNotEmpty) {
+    // A non-matching component ID normally means this is a new component.
+    // Only an old one-component draft with exactly one same-type published
+    // candidate is safe to interpret as a legacy edit.
+    if (index < 0 && draft.length == 1) {
       final editedType = (edited['designer_component_type'] ??
           edited['type'] ?? '').toString().toLowerCase();
-      index = merged.indexWhere((section) {
-        final existingType = (section['designer_component_type'] ??
-            section['type'] ?? '').toString().toLowerCase();
-        final sameComponentFamily = editedType.startsWith('banner')
-            ? (existingType.startsWith('banner') || existingType == 'ark_live_slider')
-            : editedType == existingType;
-        final candidateIndex = merged.indexOf(section);
-        return sameComponentFamily && !claimedPublishedIndexes.contains(candidateIndex);
-      });
-    } else if (index < 0 && id.isEmpty) {
-      final editedType = (edited['designer_component_type'] ??
-          edited['type'] ?? '').toString().toLowerCase();
-      index = merged.indexWhere((section) {
-        final existingType = (section['designer_component_type'] ??
-            section['type'] ?? '').toString().toLowerCase();
-        final sameComponentFamily = editedType.startsWith('banner')
-            ? (existingType.startsWith('banner') || existingType == 'ark_live_slider')
-            : editedType == existingType;
-        final candidateIndex = merged.indexOf(section);
-        return sameComponentFamily && !claimedPublishedIndexes.contains(candidateIndex);
-      });
+      final candidates = merged.asMap().entries.where((entry) {
+        final existingType = (entry.value['designer_component_type'] ??
+            entry.value['type'] ?? '').toString().toLowerCase();
+        if (editedType.startsWith('banner')) {
+          return existingType.startsWith('banner') || existingType == 'ark_live_slider';
+        }
+        return editedType == existingType;
+      }).toList();
+      if (candidates.length == 1) index = candidates.single.key;
     }
 
     if (index >= 0) {
       merged[index] = edited;
-      claimedPublishedIndexes.add(index);
     } else {
-      // Preserve the original order and append the new component instead of
-      // overwriting the first published banner.
+      // Never overwrite another existing component merely because the types
+      // match. New IDs are appended and preserve all other published sections.
       merged.add(edited);
     }
   }
