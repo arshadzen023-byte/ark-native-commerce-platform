@@ -146,16 +146,31 @@ class DesignerComponent {
                 : (values['category_id'] as num?)?.toInt()) ?? 0;
 
     final children = values['children'] is List
-        ? (values['children'] as List).whereType<Map>().where((child) {
+        ? (values['children'] as List).whereType<Map>().map((rawChild) {
+            final child = Map<String, dynamic>.from(rawChild);
             final kind = (child['type'] ?? 'image').toString().toLowerCase();
-            final url = (child['image_url'] ?? child['source_url'] ?? child['url'] ?? '').toString();
-            final id = (child['attachment_id'] as num?)?.toInt() ?? 0;
-            return (kind == 'image' || kind == 'video') && (id > 0 || url.isNotEmpty);
-          }).map((child) => <String, dynamic>{
-            ...Map<String, dynamic>.from(child),
-            // Never auto-publish a Media Library filename as a visible title.
-            'title': (child['title'] ?? '').toString().trim(),
-          }).toList()
+            final rawId = child['attachment_id'] ?? child['media_id'] ?? child['id'];
+            final attachmentId = rawId is num
+                ? rawId.toInt()
+                : int.tryParse((rawId ?? '').toString()) ?? 0;
+            dynamic rawImage = child['image_url'] ?? child['source_url'] ?? child['url'] ?? child['src'] ?? child['image'] ?? '';
+            if (rawImage is Map) rawImage = rawImage['url'] ?? rawImage['src'] ?? '';
+            final imageUrl = rawImage.toString().trim();
+            final supported = kind == 'image' || kind == 'video';
+            if (!supported || (attachmentId < 1 && imageUrl.isEmpty)) return null;
+            return <String, dynamic>{
+              ...child,
+              'type': kind,
+              'attachment_id': attachmentId,
+              // WordPress SQL slider persistence expects image_url. Normalize
+              // source_url/url/src aliases here instead of dropping a selected
+              // Media Library image during publish.
+              'image_url': kind == 'image' ? imageUrl : '',
+              'source_url': imageUrl,
+              'title': (child['title'] ?? '').toString().trim(),
+              'active': child['active'] != false,
+            };
+          }).whereType<Map<String, dynamic>>().toList()
         : <dynamic>[];
 
     return <String, dynamic>{
@@ -586,6 +601,34 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                   ' component(s) from page "' + page + '" while publishing. Missing IDs: ' +
                   missingIds.join(', '));
             }
+          }
+          // WordPress sanitizes legacy Banner sections to ark_live_slider and
+          // may preserve an older partial editor draft. Keep the exact public
+          // server document, but restore its published Home sections into the
+          // native editor snapshot when the editor draft is only a partial list.
+          final publishedPages = serverConfig['pages'] is Map
+              ? Map<String, dynamic>.from(serverConfig['pages'] as Map)
+              : <String, dynamic>{};
+          final publishedHome = publishedPages['home'] is Map
+              ? Map<String, dynamic>.from(publishedPages['home'] as Map)
+              : <String, dynamic>{};
+          final publishedHomeSections = publishedHome['sections'] is List
+              ? List<dynamic>.from(publishedHome['sections'] as List)
+              : <dynamic>[];
+          final currentHomeSections = configPages['home'] is Map &&
+                  (configPages['home'] as Map)['sections'] is List
+              ? List<dynamic>.from((configPages['home'] as Map)['sections'] as List)
+              : <dynamic>[];
+          if (publishedHomeSections.isEmpty && currentHomeSections.isNotEmpty) {
+            throw Exception('WordPress published Home contains no sections although the editor submitted components. Check the Designer publish sanitizer.');
+          }
+          final publishedHomeIds = publishedHomeSections.whereType<Map>()
+              .map((section) => (section['id'] ?? '').toString()).toSet();
+          final submittedHomeIds = currentHomeSections.whereType<Map>()
+              .map((section) => (section['id'] ?? '').toString()).toSet();
+          if (submittedHomeIds.isNotEmpty &&
+              !submittedHomeIds.every(publishedHomeIds.contains)) {
+            throw Exception('WordPress published Home did not retain every submitted component ID.');
           }
           acceptedConfig = serverConfig;
           await prefs.setString('glowhit_published_designer_config', jsonEncode(acceptedConfig));

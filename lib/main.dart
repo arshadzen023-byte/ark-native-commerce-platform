@@ -524,9 +524,15 @@ class _StoreHomeState extends State<StoreHome> {
     }
     if (!mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GlowHitDesignerPage(token: token)));
+    // The Designer may have published while Shopping stayed alive. Always
+    // re-fetch the public config when returning instead of relying on memory.
     await _loadDesignerConfig();
+    if (mounted && tab == 0) setState(() {});
   }
 
+  /// Loads the exact public Designer document used by Shopping Home.
+  /// Never retain a stale cache when the server responds with a valid but empty
+  /// published Home: empty is a real published state, not a reason to fall back.
   Future<void> _loadDesignerConfig() async {
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString('glowhit_published_designer_config');
@@ -534,9 +540,13 @@ class _StoreHomeState extends State<StoreHome> {
     if (cached != null) {
       try {
         final decoded = jsonDecode(cached);
-        if (decoded is Map && mounted) setState(() => designerConfig = Map<String, dynamic>.from(decoded));
+        if (decoded is Map) {
+          final value = Map<String, dynamic>.from(decoded);
+          if (mounted) setState(() => designerConfig = value);
+        }
       } catch (_) {}
     }
+
     try {
       final configUri = Uri.parse('$storeUrl/wp-json/ark-designer/v1/config')
           .replace(queryParameters: {
@@ -546,24 +556,47 @@ class _StoreHomeState extends State<StoreHome> {
         configUri,
         headers: const {
           'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
         },
-      ).timeout(const Duration(seconds: 15));
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map && decoded['pages'] is Map) {
-          final value = Map<String, dynamic>.from(decoded);
-          final homePage = value['pages'] is Map ? (value['pages'] as Map)['home'] : null;
-          if (homePage is Map && homePage['sections'] is List) {
-            await prefs.setString('glowhit_published_designer_config', jsonEncode(value));
-            _sliderFutures.clear();
-            if (mounted) setState(() => designerConfig = value);
-          }
-        }
+      ).timeout(const Duration(seconds: 20));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('Published Designer config returned HTTP ${response.statusCode}.');
       }
-    } catch (_) {
-      // The last published configuration remains available from local cache.
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map || decoded['pages'] is! Map) {
+        throw const FormatException('Published Designer config must contain a pages object.');
+      }
+
+      final value = Map<String, dynamic>.from(decoded);
+      final rawPages = Map<String, dynamic>.from(value['pages'] as Map);
+      final rawHome = rawPages['home'];
+      if (rawHome is! Map || rawHome['sections'] is! List) {
+        throw const FormatException('Published Home is missing its sections array.');
+      }
+      final home = Map<String, dynamic>.from(rawHome);
+      final sections = (home['sections'] as List)
+          .whereType<Map>()
+          .map((section) => Map<String, dynamic>.from(section))
+          .where((section) => section['visible'] != false)
+          .toList(growable: false);
+      home['sections'] = sections;
+      rawPages['home'] = home;
+      value['pages'] = rawPages;
+
+      // Cache only the same published shape that the public Home renderer reads.
+      await prefs.setString('glowhit_published_designer_config', jsonEncode(value));
+      _sliderFutures.clear();
+      if (mounted) setState(() => designerConfig = value);
+      debugPrint('[ARK Designer Sync] Published Home v${value['version'] ?? value['published_version'] ?? 'unknown'}: ${sections.length} visible sections');
+    } catch (e, stack) {
+      debugPrint('[ARK Designer Sync] Failed to fetch published Home: $e');
+      debugPrintStack(stackTrace: stack);
+      // Keep the last known-good cache only on network/server failure. A valid
+      // server response containing [] intentionally clears the Shopping Home.
+      if (cached == null && mounted) {
+        setState(() => error = 'Could not sync published Home: $e');
+      }
     } finally {
       if (mounted) setState(() => designerConfigLoading = false);
     }
@@ -957,7 +990,12 @@ class _StoreHomeState extends State<StoreHome> {
 
   Widget _designerCatalog() {
     final page = designerConfig['pages'] is Map ? (designerConfig['pages'] as Map)['home'] : null;
-    final sections = page is Map && page['sections'] is List ? page['sections'] as List : const <dynamic>[];
+    final sections = page is Map && page['sections'] is List
+        ? (page['sections'] as List).whereType<Map>()
+            .where((section) => section['visible'] != false)
+            .map((section) => Map<String, dynamic>.from(section)).toList()
+        : const <Map<String, dynamic>>[];
+    final sectionWidgets = sections.map(_designerSection).toList();
     return Column(children: [
       Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
       Expanded(child: RefreshIndicator(
@@ -970,7 +1008,7 @@ class _StoreHomeState extends State<StoreHome> {
                 padding: EdgeInsets.all(24),
                 child: Center(child: CircularProgressIndicator()),
               ),
-            ...sections.whereType<Map>().map((section) => _designerSection(Map<String, dynamic>.from(section))),
+            ...sectionWidgets,
           ],
         ),
       )),

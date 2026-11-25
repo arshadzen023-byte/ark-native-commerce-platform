@@ -109,6 +109,101 @@ void main() {
     expect(find.text('Banner Slider'), findsOneWidget);
   });
 
+  test('Publish rejects a server document that drops submitted Home components', () {
+    final submitted = [
+      {'id': 'banner-new', 'type': 'banner_grid'},
+    ];
+    final serverPublished = <String, dynamic>{
+      'pages': {
+        'home': {
+          'sections': <dynamic>[],
+        },
+      },
+    };
+    final pages = Map<String, dynamic>.from(serverPublished['pages'] as Map);
+    final home = pages['home'] as Map;
+    final publishedSections = home['sections'] as List;
+    final publishedIds = publishedSections.whereType<Map>()
+        .map((section) => (section['id'] ?? '').toString()).toSet();
+    final submittedIds = submitted.map((section) => (section['id'] ?? '').toString()).toSet();
+    expect(publishedIds.containsAll(submittedIds), isFalse);
+    expect(publishedSections, isEmpty);
+  });
+
+  test('Published Home sync treats a valid empty server Home as authoritative', () {
+    final response = <String, dynamic>{
+      'version': 12,
+      'pages': {
+        'home': {
+          'title': 'Home',
+          'sections': <dynamic>[],
+        },
+      },
+    };
+    final pages = Map<String, dynamic>.from(response['pages'] as Map);
+    final home = Map<String, dynamic>.from(pages['home'] as Map);
+    final sections = (home['sections'] as List)
+        .whereType<Map>()
+        .where((section) => section['visible'] != false)
+        .map((section) => Map<String, dynamic>.from(section))
+        .toList(growable: false);
+    home['sections'] = sections;
+    pages['home'] = home;
+
+    expect(pages['home']['sections'], isEmpty);
+    expect(response['version'], 12);
+  });
+
+  test('Published Home sync preserves all visible component IDs and JSON properties', () {
+    final response = <String, dynamic>{
+      'version': 13,
+      'pages': {
+        'home': {
+          'sections': [
+            {
+              'id': 'hero-live',
+              'type': 'ark_live_slider',
+              'designer_component_type': 'banner_grid',
+              'layout_variant': 'grid',
+              'visible': true,
+              'margin_top': 16,
+              'padding_bottom': 22,
+              'children': [
+                {'type': 'image', 'attachment_id': 77, 'image_url': 'https://example.com/banner.jpg', 'title': ''},
+              ],
+            },
+            {'id': 'hidden-block', 'type': 'banner_slider', 'visible': false},
+            {
+              'id': 'products-live',
+              'type': 'product_grid',
+              'designer_component_type': 'product_grid',
+              'layout_variant': 'grid',
+              'source': 'best_selling',
+              'height_px': 260,
+            },
+          ],
+        },
+      },
+    };
+
+    final pages = Map<String, dynamic>.from(response['pages'] as Map);
+    final home = Map<String, dynamic>.from(pages['home'] as Map);
+    final visible = (home['sections'] as List)
+        .whereType<Map>()
+        .where((section) => section['visible'] != false)
+        .map((section) => Map<String, dynamic>.from(section))
+        .toList(growable: false);
+    home['sections'] = visible;
+
+    expect(visible.map((section) => section['id']), ['hero-live', 'products-live']);
+    expect(visible.first['designer_component_type'], 'banner_grid');
+    expect(visible.first['margin_top'], 16);
+    expect(visible.first['padding_bottom'], 22);
+    expect(visible.first['children'].first['attachment_id'], 77);
+    expect(visible.last['source'], 'best_selling');
+    expect(visible.last['height_px'], 260);
+  });
+
   test('Published component JSON keeps the selected layout and every edited dimension', () {
     final component = DesignerComponent(
       id: 'banner-test',
@@ -140,6 +235,40 @@ void main() {
     expect((section['children'] as List).first['title'], '');
     expect((section['children'] as List).first['type'], 'image');
     expect((section['children'] as List).first['link_value'], 'page:categories');
+  });
+
+  test('Banner publish canonicalizes WordPress Media Library child image aliases', () {
+    final component = DesignerComponent(
+      id: 'banner-media-alias',
+      type: 'Banner',
+      title: 'Media Library banner',
+      layout: 'Banner Slider',
+      properties: {
+        'children': [
+          {
+            'type': 'image',
+            'media_id': '731',
+            'source_url': 'https://pluginstore.shop/wp-content/uploads/2026/11/banner.jpg',
+            'title': '',
+          },
+          {
+            'type': 'image',
+            'id': 732,
+            'url': 'https://pluginstore.shop/wp-content/uploads/2026/11/banner-2.jpg',
+            'active': true,
+          },
+        ],
+      },
+    );
+
+    final section = component.toPublishedSection();
+    final children = section['children'] as List;
+    expect(children, hasLength(2));
+    expect(children[0]['attachment_id'], 731);
+    expect(children[0]['image_url'], 'https://pluginstore.shop/wp-content/uploads/2026/11/banner.jpg');
+    expect(children[0]['source_url'], children[0]['image_url']);
+    expect(children[1]['attachment_id'], 732);
+    expect(children[1]['image_url'], 'https://pluginstore.shop/wp-content/uploads/2026/11/banner-2.jpg');
   });
 
   test('Category and Product layout variants serialize to WordPress-supported component types', () {
