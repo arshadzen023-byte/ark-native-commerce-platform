@@ -136,11 +136,16 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
               ),
           ]),
         );
+        final interactiveBody = GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: body,
+        );
         return Padding(
           padding: EdgeInsets.symmetric(horizontal: widget.viewFraction < 1 ? 5 : 8),
           child: widget.fade
-              ? AnimatedOpacity(opacity: index == _index ? 1 : .55, duration: const Duration(milliseconds: 240), child: body)
-              : body,
+              ? AnimatedOpacity(opacity: index == _index ? 1 : .55, duration: const Duration(milliseconds: 240), child: interactiveBody)
+              : interactiveBody,
         );
       },
     );
