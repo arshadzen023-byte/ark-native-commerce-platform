@@ -633,8 +633,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final isSlider = layout.contains('slider');
     final isScroll = layout.contains('scroll') || isSlider;
     final isList = layout.contains('list');
-    final productItems = previewProducts.take(((properties['fixed_grid_view_count'] as num?)?.toInt() ?? 8).clamp(1, 12)).toList();
-    final categoryItems = previewCategories.take(((properties['fixed_grid_view_count'] as num?)?.toInt() ?? 8).clamp(1, 12)).toList();
+    final productItems = previewProducts.take(((properties['fixed_grid_view_count'] as num?)?.toInt() ?? 8).clamp(1, 12).toInt()).toList();
+    final categoryItems = previewCategories.take(((properties['fixed_grid_view_count'] as num?)?.toInt() ?? 8).clamp(1, 12).toInt()).toList();
 
     Widget imageTile(Map<String, dynamic> child, {double? tileWidth}) {
       final url = (child['image_url'] ?? child['source_url'] ?? child['url'] ?? '').toString();
@@ -727,7 +727,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           height: height.clamp(90, 500).toDouble(),
           radius: radius,
           autoplay: properties['autoplay'] != false,
-          interval: Duration(milliseconds: (((properties['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000).round().clamp(1000, 30000)),
+          interval: Duration(milliseconds: (((properties['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000).round().clamp(1000, 30000).toInt()),
           pauseOnInteraction: properties['pause'] != false,
           showDots: properties['dots'] != false,
           showArrows: properties['arrows'] == true && properties['control'] != false,
@@ -790,7 +790,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         ));
       } else {
         final visibleCount = count.clamp(1, 8).toInt();
-        content = SizedBox(height: (cardHeight * ((visibleCount / columns.clamp(1, 4)).ceil()) + mainGap * 2).clamp(cardHeight, 1000).toDouble(), 
+        content = SizedBox(height: (cardHeight * ((visibleCount / columns.clamp(1, 4).toInt()).ceil()) + mainGap * 2).clamp(cardHeight, 1000).toDouble(), 
           child: GridView.builder(
             physics: const NeverScrollableScrollPhysics(),
             itemCount: visibleCount,
@@ -798,7 +798,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               crossAxisCount: columns.clamp(1, 4).toInt(),
               crossAxisSpacing: gap.toDouble(),
               mainAxisSpacing: mainGap.toDouble(),
-              childAspectRatio: ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? (isProduct ? .66 : .9)).clamp(.4, 2.5),
+              childAspectRatio: ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? (isProduct ? .66 : .9)).clamp(.4, 2.5).toDouble(),
             ),
             itemBuilder: (_, index) => tile(index),
           ));
@@ -832,7 +832,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               if (title.isNotEmpty) Padding(
                 padding: EdgeInsets.only(bottom: ((properties['title_bottom_spacing'] as num?)?.toDouble() ?? 8)),
                 child: Text(title,
-                  maxLines: ((properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4),
+                  maxLines: ((properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4).toInt(),
                   overflow: TextOverflow.ellipsis,
                   textAlign: (properties['title_text_align'] ?? 'left') == 'center' ? TextAlign.center : (properties['title_text_align'] ?? 'left') == 'right' ? TextAlign.right : TextAlign.left,
                   style: TextStyle(
@@ -856,6 +856,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   }
 
   Color _color(String input) {
+    if (input.toLowerCase() == 'transparent') return Colors.transparent;
     final value = input.replaceFirst('#', '');
     final parsed = int.tryParse(value, radix: 16);
     return Color(parsed == null ? 0xFFF0ECF8 : (value.length == 6 ? 0xFF000000 | parsed : parsed));
