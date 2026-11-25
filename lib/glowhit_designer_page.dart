@@ -38,23 +38,50 @@ List<Map<String, dynamic>> restoreLegacyHomeSections(
       });
   if (!bannerOnlyDraft || published.length <= draft.length) return draft;
 
-  final merged = published;
+  final merged = List<Map<String, dynamic>>.from(published);
+  final claimedPublishedIndexes = <int>{};
   for (final edited in draft) {
     final id = (edited['id'] ?? '').toString();
     var index = id.isEmpty ? -1 : merged.indexWhere(
       (section) => (section['id'] ?? '').toString() == id,
     );
-    if (index < 0) {
+
+    // An ID match always means edit/replace. An unmatched ID is a new
+    // component unless there is an unclaimed legacy component of the same
+    // type that this old, partial draft is clearly editing.
+    if (index < 0 && id.isNotEmpty) {
+      final editedType = (edited['designer_component_type'] ??
+          edited['type'] ?? '').toString().toLowerCase();
       index = merged.indexWhere((section) {
-        final type = (section['designer_component_type'] ??
+        final existingType = (section['designer_component_type'] ??
             section['type'] ?? '').toString().toLowerCase();
-        return type.startsWith('banner') || type == 'ark_live_slider';
+        final sameComponentFamily = editedType.startsWith('banner')
+            ? (existingType.startsWith('banner') || existingType == 'ark_live_slider')
+            : editedType == existingType;
+        final candidateIndex = merged.indexOf(section);
+        return sameComponentFamily && !claimedPublishedIndexes.contains(candidateIndex);
+      });
+    } else if (index < 0 && id.isEmpty) {
+      final editedType = (edited['designer_component_type'] ??
+          edited['type'] ?? '').toString().toLowerCase();
+      index = merged.indexWhere((section) {
+        final existingType = (section['designer_component_type'] ??
+            section['type'] ?? '').toString().toLowerCase();
+        final sameComponentFamily = editedType.startsWith('banner')
+            ? (existingType.startsWith('banner') || existingType == 'ark_live_slider')
+            : editedType == existingType;
+        final candidateIndex = merged.indexOf(section);
+        return sameComponentFamily && !claimedPublishedIndexes.contains(candidateIndex);
       });
     }
+
     if (index >= 0) {
       merged[index] = edited;
+      claimedPublishedIndexes.add(index);
     } else {
-      merged.insert(0, edited);
+      // Preserve the original order and append the new component instead of
+      // overwriting the first published banner.
+      merged.add(edited);
     }
   }
   return merged;
