@@ -560,31 +560,40 @@ class _StoreHomeState extends State<StoreHome> {
   }
 
   Widget _designerSection(Map<String, dynamic> section) {
-    if (section['visible'] == false) return const SizedBox.shrink();
-    final type = (section['type'] ?? section['designer_component_type'] ?? '').toString();
-    final title = (section['title'] ?? '').toString();
-    final showTitle = section['show_title'] != false && title.isNotEmpty;
-    final background = (section['section_background'] ?? 'transparent').toString();
-    final textColor = (section['text_color'] ?? '#202733').toString();
-    final padding = (section['padding_top'] as num?)?.toDouble() ?? 12.0;
-    final paddingLeft = (section['padding_left'] as num?)?.toDouble() ?? 12.0;
-    final paddingRight = (section['padding_right'] as num?)?.toDouble() ?? 12.0;
-    final mainAxisGap = (section['main_axis_spacing'] as num?)?.toDouble() ?? (section['item_gap'] as num?)?.toDouble() ?? 8.0;
-    final crossAxisGap = (section['cross_axis_spacing'] as num?)?.toDouble() ?? (section['item_gap'] as num?)?.toDouble() ?? 8.0;
-    final widthFactor = ((section['width'] as num?)?.toDouble() ??
-      (((section['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
+    final nested = config['properties'] is Map
+        ? Map<String, dynamic>.from(config['properties'] as Map)
+        : <String, dynamic>{};
+    // DesignerComponent JSON keeps editable values under "properties";
+    // legacy WordPress sections keep the same values at the root.
+    final config = <String, dynamic>{...section, ...nested};
+    final type = (nested['designer_component_type'] ?? nested['type'] ??
+      config['designer_component_type'] ?? config['type'] ?? '').toString().toLowerCase();
+    config['designer_component_type'] = type;
+    config['visible'] = nested['visible'] ?? config['visible'] ?? config['enabled'] ?? true;
+    if (config['visible'] == false) return const SizedBox.shrink();
+    final title = (config['title'] ?? '').toString();
+    final showTitle = config['show_title'] != false && title.isNotEmpty;
+    final background = (config['section_background'] ?? 'transparent').toString();
+    final textColor = (config['text_color'] ?? '#202733').toString();
+    final padding = (config['padding_top'] as num?)?.toDouble() ?? 12.0;
+    final paddingLeft = (config['padding_left'] as num?)?.toDouble() ?? 12.0;
+    final paddingRight = (config['padding_right'] as num?)?.toDouble() ?? 12.0;
+    final mainAxisGap = (config['main_axis_spacing'] as num?)?.toDouble() ?? (config['item_gap'] as num?)?.toDouble() ?? 8.0;
+    final crossAxisGap = (config['cross_axis_spacing'] as num?)?.toDouble() ?? (config['item_gap'] as num?)?.toDouble() ?? 8.0;
+    final widthFactor = ((config['width'] as num?)?.toDouble() ??
+      (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
     final margin = EdgeInsets.fromLTRB(
-      (section['margin_left'] as num?)?.toDouble() ?? 0,
-      (section['margin_top'] as num?)?.toDouble() ?? 0,
-      (section['margin_right'] as num?)?.toDouble() ?? 0,
-      (section['margin_bottom'] as num?)?.toDouble() ?? 0,
+      (config['margin_left'] as num?)?.toDouble() ?? 0,
+      (config['margin_top'] as num?)?.toDouble() ?? 0,
+      (config['margin_right'] as num?)?.toDouble() ?? 0,
+      (config['margin_bottom'] as num?)?.toDouble() ?? 0,
     );
 
-    if (type == 'ark_live_slider' || type.startsWith('banner_') || section['designer_component_type']?.toString().startsWith('banner_') == true) {
-      final key = (section['slider_key'] ?? '').toString();
-      final inlineChildren = section['slides'] is List
-          ? (section['slides'] as List)
-          : (section['children'] is List ? section['children'] as List : const <dynamic>[]);
+    if (type == 'ark_live_slider' || type.startsWith('banner_') || config['designer_component_type']?.toString().startsWith('banner_') == true) {
+      final key = (config['slider_key'] ?? '').toString();
+      final inlineChildren = config['slides'] is List
+          ? (config['slides'] as List)
+          : (config['children'] is List ? config['children'] as List : const <dynamic>[]);
       final sectionMargin = margin;
       final normalizedInline = inlineChildren.whereType<Map>().map((slide) {
         final item = Map<String, dynamic>.from(slide);
@@ -593,9 +602,9 @@ class _StoreHomeState extends State<StoreHome> {
       }).where((slide) => (slide['image_url'] ?? '').toString().isNotEmpty).toList();
 
       Widget renderCarousel(List<Map<String, dynamic>> slides, Map<String, dynamic> settings) {
-        final height = ((settings['height_px'] ?? section['height_px'] ?? section['height'] ?? 180) as num).toDouble();
-        final intervalMs = ((settings['interval_ms'] ?? section['interval_ms'] ?? (((section['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
-        final layout = (section['designer_component_type'] ?? section['type'] ?? '').toString();
+        final height = ((settings['height_px'] ?? config['height_px'] ?? config['height'] ?? 180) as num).toDouble();
+        final intervalMs = ((settings['interval_ms'] ?? config['interval_ms'] ?? (((config['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
+        final layout = (config['designer_component_type'] ?? config['type'] ?? '').toString();
         final bannerStyle = layout == 'banner_grid' || layout == 'banner_list' || layout == 'banner_scroll';
         return Align(
           alignment: Alignment.center,
@@ -606,7 +615,7 @@ class _StoreHomeState extends State<StoreHome> {
                 left: sectionMargin.left + paddingLeft,
                 right: sectionMargin.right + paddingRight,
                 top: sectionMargin.top + padding,
-                bottom: sectionMargin.bottom + ((section['padding_bottom'] as num?)?.toDouble() ?? 12),
+                bottom: sectionMargin.bottom + ((config['padding_bottom'] as num?)?.toDouble() ?? 12),
               ),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (showTitle) Padding(
@@ -617,16 +626,16 @@ class _StoreHomeState extends State<StoreHome> {
                 ? SizedBox(
                     height: height,
                     child: ListView(
-                      scrollDirection: section['horizontal'] == false || layout == 'banner_list' ? Axis.vertical : Axis.horizontal,
+                      scrollDirection: config['horizontal'] == false || layout == 'banner_list' ? Axis.vertical : Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       children: slides.map((slide) {
                         final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
                         return Padding(
                           padding: EdgeInsets.symmetric(horizontal: crossAxisGap / 2, vertical: mainAxisGap / 2),
                           child: SizedBox(
-                            width: (section['width_pct'] as num?)?.toDouble() == null ? 260 : MediaQuery.of(context).size.width * ((section['width_pct'] as num).toDouble() / 100),
+                            width: (config['width_pct'] as num?)?.toDouble() == null ? 260 : MediaQuery.of(context).size.width * ((config['width_pct'] as num).toDouble() / 100),
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular((section['corner_radius'] as num?)?.toDouble() ?? 16),
+                              borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
                               child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
                             ),
                           ),
@@ -637,14 +646,14 @@ class _StoreHomeState extends State<StoreHome> {
                 : ArkDesignerBannerCarousel(
                     slides: slides,
                     height: height,
-                    radius: (section['corner_radius'] as num?)?.toDouble() ?? 16,
-                    autoplay: section['autoplay'] != false,
+                    radius: (config['corner_radius'] as num?)?.toDouble() ?? 16,
+                    autoplay: config['autoplay'] != false,
                     interval: Duration(milliseconds: intervalMs.clamp(1000, 30000)),
-                    pauseOnInteraction: section['pause_on_interaction'] != false,
-                    showDots: section['show_dots'] == true,
-                    showArrows: section['show_arrows'] == true,
-                    fade: section['transition'] == 'fade',
-                    viewFraction: ((section['card_width'] ?? section['view_fraction'] ?? 1) as num).toDouble(),
+                    pauseOnInteraction: config['pause_on_interaction'] != false,
+                    showDots: config['show_dots'] == true,
+                    showArrows: config['show_arrows'] == true,
+                    fade: config['transition'] == 'fade',
+                    viewFraction: ((config['card_width'] ?? config['view_fraction'] ?? 1) as num).toDouble(),
                   ),
               ]),
             ),
@@ -662,7 +671,7 @@ class _StoreHomeState extends State<StoreHome> {
                 ? (payload['slides'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
                 : <Map<String, dynamic>>[];
             final settings = payload['settings'] is Map ? Map<String, dynamic>.from(payload['settings'] as Map) : <String, dynamic>{};
-            if (slides.isEmpty) return SizedBox(height: (section['height_px'] as num?)?.toDouble() ?? 180, child: const Center(child: CircularProgressIndicator()));
+            if (slides.isEmpty) return SizedBox(height: (config['height_px'] as num?)?.toDouble() ?? 180, child: const Center(child: CircularProgressIndicator()));
             return renderCarousel(slides, settings);
           },
         );
@@ -670,31 +679,31 @@ class _StoreHomeState extends State<StoreHome> {
       if (normalizedInline.isNotEmpty) {
         return renderCarousel(normalizedInline, section);
       }
-      if ((section['image_url'] ?? '').toString().isNotEmpty) {
+      if ((config['image_url'] ?? '').toString().isNotEmpty) {
         return renderCarousel([
-          {'image_url': section['image_url'], 'title': title},
+          {'image_url': config['image_url'], 'title': title},
         ], section);
       }
       return const SizedBox.shrink();
     }
     if (type == 'category_grid' || type.startsWith('category_')) {
-      final layout = (section['category_layout'] ?? section['layout_variant'] ?? type).toString().toLowerCase();
-      final parentId = (section['category_id'] as num?)?.toInt() ?? 0;
+      final layout = (config['category_layout'] ?? config['layout_variant'] ?? type).toString().toLowerCase();
+      final parentId = (config['category_id'] as num?)?.toInt() ?? 0;
       var rows = storeCategories.where((category) {
         if (parentId <= 0) return true;
         final parent = (category['parent'] as num?)?.toInt() ?? 0;
         return parent == parentId;
       }).toList();
-      final limit = (section['limit'] as num?)?.toInt() ?? 8;
+      final limit = (config['limit'] as num?)?.toInt() ?? 8;
       rows = rows.take(limit.clamp(1, 100)).toList();
       if (rows.isEmpty) return const SizedBox.shrink();
-      final cardRadius = (section['corner_radius'] as num?)?.toDouble() ?? 12;
-      final cardHeight = (section['height_px'] as num?)?.toDouble() ?? 150;
+      final cardRadius = (config['corner_radius'] as num?)?.toDouble() ?? 12;
+      final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 150;
       final cards = rows.map((category) {
         final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
         final card = Card(
           clipBehavior: Clip.antiAlias,
-          elevation: (section['card_depth'] as num?)?.toDouble() ?? 1,
+          elevation: (config['card_depth'] as num?)?.toDouble() ?? 1,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(cardRadius)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Expanded(
@@ -715,10 +724,10 @@ class _StoreHomeState extends State<StoreHome> {
         margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
         padding: EdgeInsets.fromLTRB(
-          (section['padding_left'] as num?)?.toDouble() ?? 12,
+          (config['padding_left'] as num?)?.toDouble() ?? 12,
           padding,
-          (section['padding_right'] as num?)?.toDouble() ?? 12,
-          (section['padding_bottom'] as num?)?.toDouble() ?? 12,
+          (config['padding_right'] as num?)?.toDouble() ?? 12,
+          (config['padding_bottom'] as num?)?.toDouble() ?? 12,
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (showTitle) Padding(
@@ -751,10 +760,10 @@ class _StoreHomeState extends State<StoreHome> {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: cards.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: ((section['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
+                crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
                 crossAxisSpacing: crossAxisGap,
                 mainAxisSpacing: mainAxisGap,
-                childAspectRatio: (section['card_aspect_ratio'] as num?)?.toDouble() ?? .9,
+                childAspectRatio: (config['card_aspect_ratio'] as num?)?.toDouble() ?? .9,
               ),
               itemBuilder: (_, index) => cards[index],
             ),
@@ -763,11 +772,11 @@ class _StoreHomeState extends State<StoreHome> {
     }
 
     if (type == 'product_grid' || type == 'product_carousel' || type.startsWith('product_')) {
-      final rows = _designerProducts(section);
+      final rows = _designerProducts(config);
       if (rows.isEmpty) return const SizedBox.shrink();
-      final layout = (section['layout_variant'] ?? section['designer_component_type'] ?? type).toString().toLowerCase();
-      final cardWidth = (section['max_width_px'] as num?)?.toDouble() ?? 174;
-      final cardHeight = (section['height_px'] as num?)?.toDouble() ?? 260;
+      final layout = (config['layout_variant'] ?? config['designer_component_type'] ?? type).toString().toLowerCase();
+      final cardWidth = (config['max_width_px'] as num?)?.toDouble() ?? 174;
+      final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 260;
       final cards = rows.map((product) => SizedBox(
         width: cardWidth,
         child: productCard(product),
@@ -776,10 +785,10 @@ class _StoreHomeState extends State<StoreHome> {
         margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
         padding: EdgeInsets.fromLTRB(
-          (section['padding_left'] as num?)?.toDouble() ?? 12,
+          (config['padding_left'] as num?)?.toDouble() ?? 12,
           padding,
-          (section['padding_right'] as num?)?.toDouble() ?? 12,
-          (section['padding_bottom'] as num?)?.toDouble() ?? 12,
+          (config['padding_right'] as num?)?.toDouble() ?? 12,
+          (config['padding_bottom'] as num?)?.toDouble() ?? 12,
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (showTitle) Padding(
@@ -808,8 +817,8 @@ class _StoreHomeState extends State<StoreHome> {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: rows.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: ((section['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
-                childAspectRatio: (section['card_aspect_ratio'] as num?)?.toDouble() ?? .66,
+                crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
+                childAspectRatio: (config['card_aspect_ratio'] as num?)?.toDouble() ?? .66,
                 crossAxisSpacing: crossAxisGap,
                 mainAxisSpacing: mainAxisGap,
               ),
