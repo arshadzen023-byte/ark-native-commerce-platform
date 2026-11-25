@@ -1070,7 +1070,38 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
   void dispose() { _title.dispose(); _description.dispose(); super.dispose(); }
 
   void _change(String key, dynamic value) {
-    setState(() => item.properties[key] = value);
+    setState(() {
+      item.properties[key] = value;
+      // Keep the native Designer model and the published Shopping renderer in sync.
+      const aliases = <String, String>{
+        'background_color': 'section_background',
+        'title_color': 'text_color',
+        'height': 'height_px',
+        'max_cross_axis_extent': 'max_width_px',
+        'border_radius': 'corner_radius',
+        'cross_axis_count': 'columns',
+        'cross_aspect_ratio': 'card_aspect_ratio',
+        'elevation': 'card_depth',
+        'fixed_grid_view_count': 'limit',
+        'arrows': 'show_arrows',
+        'dots': 'show_dots',
+        'pause': 'pause_on_interaction',
+      };
+      final alias = aliases[key];
+      if (alias != null) item.properties[alias] = value;
+      if (key == 'width') item.properties['width_pct'] = ((value as num).toDouble() * 100);
+      if (key == 'autoplay_seconds') item.properties['interval_ms'] = ((value as num).toDouble() * 1000).round();
+      if (key == 'fade') item.properties['transition'] = value == true ? 'fade' : 'slide';
+      if (key == 'view_fraction') item.properties['card_width'] = value;
+      if (key == 'enabled') item.enabled = value == true;
+      if (key == 'main_axis_spacing' || key == 'cross_axis_spacing') {
+        item.properties['item_gap'] = value;
+      }
+      if (key == 'parent_category_id') item.properties['category_id'] = value;
+      if (key == 'source_id' && item.properties['source'] == 'category') {
+        item.properties['category_id'] = value;
+      }
+    });
     widget.onChanged();
   }
 
@@ -1296,7 +1327,19 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           initialValue: layouts.contains(item.layout) ? item.layout : layouts.first,
           decoration: const InputDecoration(labelText: 'Layout'),
           items: layouts.map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(),
-          onChanged: (value) { if (value != null) setState(() => item.layout = value); widget.onChanged(); },
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() {
+              item.layout = value;
+              final prefix = item.type.toLowerCase();
+              final suffix = value.toLowerCase().replaceFirst('${prefix} ', '').replaceAll(' ', '_');
+              item.properties['designer_component_type'] = '${prefix}_${suffix}';
+              item.properties['layout_variant'] = item.properties['designer_component_type'];
+              if (item.type == 'Banner') item.properties['type'] = item.properties['designer_component_type'];
+              if (item.type == 'Category') item.properties['category_layout'] = item.properties['designer_component_type'];
+            });
+            widget.onChanged();
+          },
         ),
         if (item.type == 'Category') ...[
           _switch('Show All Categories', 'show_all_categories'),
@@ -1504,7 +1547,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                 ListView(padding: const EdgeInsets.all(14), children: [
                   _section('Dimension', [
                     _slider('Height', 'height', min: 40, max: 500),
-                    _slider('Width', 'width', min: 0, max: 500),
+                    _slider('Width', 'width', min: .25, max: 1),
                     _slider('Max Cross Axis Extent', 'max_cross_axis_extent', min: 80, max: 600),
                     _slider('Main Axis Spacing', 'main_axis_spacing', max: 60),
                     _slider('Cross Axis Spacing', 'cross_axis_spacing', max: 60),
