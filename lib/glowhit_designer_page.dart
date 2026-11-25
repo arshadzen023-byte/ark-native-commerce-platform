@@ -621,9 +621,12 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         'pause_on_interaction': true,
       },
     );
-    item.properties['designer_component_type'] = '${type.toLowerCase()}_${selectedLayout.toLowerCase().replaceFirst('${type.toLowerCase()} ', '').replaceAll(' ', '_')}';
-    item.properties['layout_variant'] = item.properties['designer_component_type'];
-    if (type == 'Category') item.properties['category_layout'] = item.properties['designer_component_type'];
+    final variant = selectedLayout.toLowerCase()
+        .replaceFirst('${type.toLowerCase()} ', '')
+        .replaceAll(' ', '_');
+    item.properties['designer_component_type'] = '${type.toLowerCase()}_${variant}';
+    item.properties['layout_variant'] = variant;
+    if (type == 'Category') item.properties['category_layout'] = variant;
     setState(() { currentComponents.add(item); selectedId = item.id; });
     await _persist();
   }
@@ -1681,9 +1684,9 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
               final prefix = item.type.toLowerCase();
               final suffix = value.toLowerCase().replaceFirst('${prefix} ', '').replaceAll(' ', '_');
               item.properties['designer_component_type'] = '${prefix}_${suffix}';
-              item.properties['layout_variant'] = item.properties['designer_component_type'];
+              item.properties['layout_variant'] = suffix;
               if (item.type == 'Banner') item.properties['type'] = item.properties['designer_component_type'];
-              if (item.type == 'Category') item.properties['category_layout'] = item.properties['designer_component_type'];
+              if (item.type == 'Category') item.properties['category_layout'] = suffix;
             });
             widget.onChanged();
           },
