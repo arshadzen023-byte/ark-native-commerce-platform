@@ -1555,7 +1555,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
   }
 
   Future<void> _showComponentJson() async {
-    final json = const JsonEncoder.withIndent('  ').convert(item.toJson());
+    final json = const JsonEncoder.withIndent('  ').convert(item.toPublishedSection());
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1573,7 +1573,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                   icon: const Icon(Icons.copy_rounded),
                   onPressed: () {
                     // Clipboard is supplied by Flutter services without a plugin.
-                    Clipboard.setData(ClipboardData(text: const JsonEncoder.withIndent('  ').convert(item.toJson())));
+                    Clipboard.setData(ClipboardData(text: const JsonEncoder.withIndent('  ').convert(item.toPublishedSection())));
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Component JSON copied')));
                   },
                 ),
