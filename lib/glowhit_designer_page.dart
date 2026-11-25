@@ -954,7 +954,6 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                     ),
                   ),
                 ),
-              ),
               content,
             ]),
             ),
