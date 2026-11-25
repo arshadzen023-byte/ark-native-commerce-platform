@@ -108,6 +108,7 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
   Widget build(BuildContext context) {
     if (widget.slides.isEmpty) return SizedBox(height: widget.height);
     final viewport = PageView.builder(
+      key: const ValueKey('ark-designer-banner-preview-page-view'),
       controller: _controller,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: widget.slides.length,
