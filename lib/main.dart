@@ -597,14 +597,18 @@ class _StoreHomeState extends State<StoreHome> {
         final intervalMs = ((settings['interval_ms'] ?? section['interval_ms'] ?? (((section['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
         final layout = (section['designer_component_type'] ?? section['type'] ?? '').toString();
         final bannerStyle = layout == 'banner_grid' || layout == 'banner_list' || layout == 'banner_scroll';
-        return Padding(
-          padding: EdgeInsets.only(
-            left: sectionMargin.left + paddingLeft,
-            right: sectionMargin.right + paddingRight,
-            top: sectionMargin.top + padding,
-            bottom: sectionMargin.bottom + ((section['padding_bottom'] as num?)?.toDouble() ?? 12),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        return Align(
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: (MediaQuery.of(context).size.width - sectionMargin.horizontal) * widthFactor,
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: paddingLeft,
+                right: paddingRight,
+                top: sectionMargin.top + padding,
+                bottom: sectionMargin.bottom + ((section['padding_bottom'] as num?)?.toDouble() ?? 12),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (showTitle) Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
@@ -642,7 +646,9 @@ class _StoreHomeState extends State<StoreHome> {
                     fade: section['transition'] == 'fade',
                     viewFraction: ((section['card_width'] ?? section['view_fraction'] ?? 1) as num).toDouble(),
                   ),
-          ]),
+              ]),
+            ),
+          ),
         );
       }
 
