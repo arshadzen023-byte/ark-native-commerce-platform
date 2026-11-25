@@ -237,6 +237,40 @@ void main() {
     expect((section['children'] as List).first['link_value'], 'page:categories');
   });
 
+  test('Banner publish canonicalizes WordPress Media Library child image aliases', () {
+    final component = DesignerComponent(
+      id: 'banner-media-alias',
+      type: 'Banner',
+      title: 'Media Library banner',
+      layout: 'Banner Slider',
+      properties: {
+        'children': [
+          {
+            'type': 'image',
+            'media_id': '731',
+            'source_url': 'https://pluginstore.shop/wp-content/uploads/2026/11/banner.jpg',
+            'title': '',
+          },
+          {
+            'type': 'image',
+            'id': 732,
+            'url': 'https://pluginstore.shop/wp-content/uploads/2026/11/banner-2.jpg',
+            'active': true,
+          },
+        ],
+      },
+    );
+
+    final section = component.toPublishedSection();
+    final children = section['children'] as List;
+    expect(children, hasLength(2));
+    expect(children[0]['attachment_id'], 731);
+    expect(children[0]['image_url'], 'https://pluginstore.shop/wp-content/uploads/2026/11/banner.jpg');
+    expect(children[0]['source_url'], children[0]['image_url']);
+    expect(children[1]['attachment_id'], 732);
+    expect(children[1]['image_url'], 'https://pluginstore.shop/wp-content/uploads/2026/11/banner-2.jpg');
+  });
+
   test('Category and Product layout variants serialize to WordPress-supported component types', () {
     final categorySlider = DesignerComponent(
       id: 'category-slider-test',
