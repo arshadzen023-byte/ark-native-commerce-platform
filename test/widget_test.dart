@@ -12,6 +12,21 @@ void main() {
     expect(storeUrl, 'https://pluginstore.shop');
   });
 
+  test('Legacy ARK Live Slider preserves its Banner Grid/List layout variant', () {
+    expect(normalizeDesignerBannerLayoutType({
+      'type': 'ark_live_slider',
+      'layout_variant': 'grid',
+    }), 'banner_grid');
+    expect(normalizeDesignerBannerLayoutType({
+      'designer_component_type': 'ark_live_slider',
+      'layout_variant': 'list',
+    }), 'banner_list');
+    expect(normalizeDesignerBannerLayoutType({
+      'type': 'ark_live_slider',
+      'layout_variant': 'slider',
+    }), 'banner_slider');
+  });
+
   test('Legacy banner-only draft restores the published Home product and category sections', () {
     final merged = restoreLegacyHomeSections(
       [
