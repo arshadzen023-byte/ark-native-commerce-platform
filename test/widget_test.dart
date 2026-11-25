@@ -77,7 +77,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('ark-designer-banner-preview-page-view')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('ark-designer-banner-preview-page-view')));
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
 
     expect(find.text('Banner Layout'), findsOneWidget);
     expect(find.text('Color'), findsOneWidget);
