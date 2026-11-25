@@ -55,6 +55,20 @@ Future<http.Response> request(Uri uri, {String method = 'GET', Map<String, Strin
   throw Exception('Cannot resolve ${uri.host}. ${diagnosis}. Check phone Private DNS / network DNS and hosting DNS. ${dnsError?.message ?? ''}');
 }
 
+/// Resolves legacy Banner layout metadata after WordPress normalizes
+/// Banner Grid/List/Scroll/Slider sections to the shared ARK Live Slider type.
+/// Older published JSON may contain only type=ark_live_slider + layout_variant.
+String normalizeDesignerBannerLayoutType(Map<String, dynamic> config) {
+  final rawType = (config['designer_component_type'] ?? config['type'] ?? '')
+      .toString().toLowerCase();
+  final variant = (config['layout_variant'] ?? '').toString().toLowerCase();
+  if ((rawType == 'ark_live_slider' || rawType == 'banner_slider') &&
+      const ['grid', 'list', 'scroll', 'slider'].contains(variant)) {
+    return 'banner_$variant';
+  }
+  return rawType;
+}
+
 class StoreApi {
   static Uri products({String order = 'date', String search = '', bool sale = false, int page = 1}) {
     final params = <String, String>{
@@ -618,8 +632,11 @@ class _StoreHomeState extends State<StoreHome> {
     // DesignerComponent JSON keeps editable values under "properties";
     // legacy WordPress sections keep the same values at the root.
     final config = <String, dynamic>{...section, ...nested};
-    final type = (nested['designer_component_type'] ?? nested['type'] ??
-      config['designer_component_type'] ?? config['type'] ?? '').toString().toLowerCase();
+    final type = normalizeDesignerBannerLayoutType({
+      ...config,
+      'designer_component_type': nested['designer_component_type'] ??
+          nested['type'] ?? config['designer_component_type'] ?? config['type'] ?? '',
+    });
     config['designer_component_type'] = type;
     config['visible'] = nested['visible'] ?? config['visible'] ?? config['enabled'] ?? true;
     if (config['visible'] == false) return const SizedBox.shrink();
@@ -651,7 +668,8 @@ class _StoreHomeState extends State<StoreHome> {
         final item = Map<String, dynamic>.from(slide);
         item['image_url'] = item['image_url'] ?? item['source_url'] ?? item['url'] ?? '';
         return item;
-      }).where((slide) => (slide['image_url'] ?? '').toString().isNotEmpty).toList();
+      }).where((slide) => slide['active'] != false &&
+          (slide['image_url'] ?? '').toString().trim().isNotEmpty).toList();
 
       Widget renderCarousel(List<Map<String, dynamic>> slides, Map<String, dynamic> settings) {
         final height = ((settings['height_px'] ?? config['height_px'] ?? config['height'] ?? 180) as num).toDouble();
