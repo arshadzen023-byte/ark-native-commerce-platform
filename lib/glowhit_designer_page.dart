@@ -720,7 +720,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
 
     Widget content;
     if (isBanner) {
-      final slides = imageChildren.isEmpty ? <Map<String, dynamic>>[{'image_url': '', 'title': component.title}] : imageChildren;
+      final slides = imageChildren.isEmpty ? <Map<String, dynamic>>[{'image_url': '', 'title': ''}] : imageChildren;
       if (isSlider) {
         content = SizedBox(height: height.clamp(90, 500).toDouble(), child: ArkDesignerBannerCarousel(
           slides: slides,
