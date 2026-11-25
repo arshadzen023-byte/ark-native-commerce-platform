@@ -109,6 +109,80 @@ void main() {
     expect(find.text('Banner Slider'), findsOneWidget);
   });
 
+  test('Published Home sync treats a valid empty server Home as authoritative', () {
+    final response = <String, dynamic>{
+      'version': 12,
+      'pages': {
+        'home': {
+          'title': 'Home',
+          'sections': <dynamic>[],
+        },
+      },
+    };
+    final pages = Map<String, dynamic>.from(response['pages'] as Map);
+    final home = Map<String, dynamic>.from(pages['home'] as Map);
+    final sections = (home['sections'] as List)
+        .whereType<Map>()
+        .where((section) => section['visible'] != false)
+        .map((section) => Map<String, dynamic>.from(section))
+        .toList(growable: false);
+    home['sections'] = sections;
+    pages['home'] = home;
+
+    expect(pages['home']['sections'], isEmpty);
+    expect(response['version'], 12);
+  });
+
+  test('Published Home sync preserves all visible component IDs and JSON properties', () {
+    final response = <String, dynamic>{
+      'version': 13,
+      'pages': {
+        'home': {
+          'sections': [
+            {
+              'id': 'hero-live',
+              'type': 'ark_live_slider',
+              'designer_component_type': 'banner_grid',
+              'layout_variant': 'grid',
+              'visible': true,
+              'margin_top': 16,
+              'padding_bottom': 22,
+              'children': [
+                {'type': 'image', 'attachment_id': 77, 'image_url': 'https://example.com/banner.jpg', 'title': ''},
+              ],
+            },
+            {'id': 'hidden-block', 'type': 'banner_slider', 'visible': false},
+            {
+              'id': 'products-live',
+              'type': 'product_grid',
+              'designer_component_type': 'product_grid',
+              'layout_variant': 'grid',
+              'source': 'best_selling',
+              'height_px': 260,
+            },
+          ],
+        },
+      },
+    };
+
+    final pages = Map<String, dynamic>.from(response['pages'] as Map);
+    final home = Map<String, dynamic>.from(pages['home'] as Map);
+    final visible = (home['sections'] as List)
+        .whereType<Map>()
+        .where((section) => section['visible'] != false)
+        .map((section) => Map<String, dynamic>.from(section))
+        .toList(growable: false);
+    home['sections'] = visible;
+
+    expect(visible.map((section) => section['id']), ['hero-live', 'products-live']);
+    expect(visible.first['designer_component_type'], 'banner_grid');
+    expect(visible.first['margin_top'], 16);
+    expect(visible.first['padding_bottom'], 22);
+    expect(visible.first['children'].first['attachment_id'], 77);
+    expect(visible.last['source'], 'best_selling');
+    expect(visible.last['height_px'], 260);
+  });
+
   test('Published component JSON keeps the selected layout and every edited dimension', () {
     final component = DesignerComponent(
       id: 'banner-test',
