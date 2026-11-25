@@ -75,8 +75,8 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.byType(PageView), findsWidgets);
-    await tester.tap(find.byType(PageView).first);
+    expect(find.byKey(const ValueKey('ark-designer-banner-preview-page-view')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('ark-designer-banner-preview-page-view')));
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.text('Banner Layout'), findsOneWidget);
