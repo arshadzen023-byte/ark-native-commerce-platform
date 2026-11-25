@@ -166,6 +166,7 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
             final step = delta.dx < 0 ? 1 : -1;
             _goTo((_index + step + widget.slides.length) % widget.slides.length);
           } else if (delta.distance < 12) {
+            debugPrint('ARK_DESIGNER_BANNER_TAP onTap=${widget.onTap != null} delta=${delta.distance}');
             widget.onTap?.call();
           }
         }
