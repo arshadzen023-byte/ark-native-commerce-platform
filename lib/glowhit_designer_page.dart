@@ -813,19 +813,22 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     if (isBanner) {
       final slides = imageChildren.isEmpty ? <Map<String, dynamic>>[{'image_url': '', 'title': ''}] : imageChildren;
       if (isSlider) {
-        content = SizedBox(height: height.clamp(90, 500).toDouble(), child: ArkDesignerBannerCarousel(
-          slides: slides,
-          height: height.clamp(90, 500).toDouble(),
-          radius: radius,
-          autoplay: properties['autoplay'] != false,
-          interval: Duration(milliseconds: (((properties['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000).round().clamp(1000, 30000).toInt()),
-          pauseOnInteraction: properties['pause'] != false,
-          showDots: properties['dots'] != false && properties['control'] != false,
-          showArrows: properties['arrows'] == true && properties['control'] != false,
-          fade: properties['fade'] == true,
-          viewFraction: ((properties['view_fraction'] as num?)?.toDouble() ?? .9).clamp(.4, 1).toDouble(),
+        content = GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: onEdit,
-        ));
+          child: SizedBox(height: height.clamp(90, 500).toDouble(), child: ArkDesignerBannerCarousel(
+            slides: slides,
+            height: height.clamp(90, 500).toDouble(),
+            radius: radius,
+            autoplay: properties['autoplay'] != false,
+            interval: Duration(milliseconds: (((properties['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000).round().clamp(1000, 30000).toInt()),
+            pauseOnInteraction: properties['pause'] != false,
+            showDots: properties['dots'] != false && properties['control'] != false,
+            showArrows: properties['arrows'] == true && properties['control'] != false,
+            fade: properties['fade'] == true,
+            viewFraction: ((properties['view_fraction'] as num?)?.toDouble() ?? .9).clamp(.4, 1).toDouble(),
+          )),
+        );
       } else if (isScroll) {
         content = SizedBox(height: height.clamp(90, 500).toDouble(), child: ListView.separated(
           scrollDirection: Axis.horizontal,
