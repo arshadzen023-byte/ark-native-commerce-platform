@@ -16,6 +16,7 @@ class ArkDesignerBannerCarousel extends StatefulWidget {
     this.fade = false,
     this.viewFraction = 1,
     this.onTap,
+    this.onSlideTap,
   });
 
   final List<Map<String, dynamic>> slides;
@@ -29,6 +30,7 @@ class ArkDesignerBannerCarousel extends StatefulWidget {
   final bool fade;
   final double viewFraction;
   final VoidCallback? onTap;
+  final ValueChanged<Map<String, dynamic>>? onSlideTap;
 
   @override
   State<ArkDesignerBannerCarousel> createState() => _ArkDesignerBannerCarouselState();
@@ -173,7 +175,13 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
             final arrowControlTap = widget.showArrows &&
                 (start.dx < 56 || start.dx > width - 56);
             final dotControlTap = widget.showDots && start.dy > widget.height - 36;
-            if (!arrowControlTap && !dotControlTap) widget.onTap?.call();
+            if (!arrowControlTap && !dotControlTap) {
+              if (_index >= 0 && _index < widget.slides.length && widget.onSlideTap != null) {
+                widget.onSlideTap!(widget.slides[_index]);
+              } else {
+                widget.onTap?.call();
+              }
+            }
           }
         }
         _activePointer = null;
