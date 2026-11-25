@@ -6,10 +6,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
 import 'customer_account_page.dart';
+import 'designer_banner_carousel.dart';
 
 // Match the dark, purple-accented native Designer reference supplied by the user.
 const _designerPurple = Color(0xFF7650B8);
 const _designerBackground = Color(0xFFF7F7FA);
+const _designerPreviewBackground = Color(0xFF101014);
 const _designerSurface = Color(0xFFFFFFFF);
 const _designerText = Color(0xFF24212B);
 const _designerField = Color(0xFFF1EFF5);
@@ -99,6 +101,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   bool loading = true;
   bool saving = false;
   bool publishing = false;
+  List<Map<String, dynamic>> previewProducts = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> previewCategories = <Map<String, dynamic>>[];
   String? error;
   Map<String, List<DesignerComponent>> pages = {};
   Map<String, dynamic> templates = {};
@@ -283,6 +287,27 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     }
     if (pages[selectedPage]?.isNotEmpty == true) selectedId = pages[selectedPage]!.first.id;
     if (mounted) setState(() => loading = false);
+    if (widget.loadRemoteConfig) {
+      _loadPreviewCatalog();
+    }
+  }
+
+  Future<void> _loadPreviewCatalog() async {
+    try {
+      final responses = await Future.wait([
+        http.get(Uri.parse('https://pluginstore.shop/wp-json/wc/store/v1/products?per_page=12')).timeout(const Duration(seconds: 8)),
+        http.get(Uri.parse('https://pluginstore.shop/wp-json/wc/store/v1/products/categories?per_page=40&hide_empty=true')).timeout(const Duration(seconds: 8)),
+      ]);
+      final products = responses[0].statusCode == 200 ? jsonDecode(responses[0].body) : const [];
+      final categories = responses[1].statusCode == 200 ? jsonDecode(responses[1].body) : const [];
+      if (!mounted) return;
+      setState(() {
+        if (products is List) previewProducts = products.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        if (categories is List) previewCategories = categories.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      });
+    } catch (_) {
+      // Keep the last loaded local/remote component data visible if the store is offline.
+    }
   }
 
   List<DesignerComponent> get currentComponents => pages[selectedPage] ?? <DesignerComponent>[];
@@ -551,132 +576,264 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
 
 
   Widget _componentVisual(DesignerComponent component, {bool compact = false}) {
-    final bg = _color(component.properties['background_color']?.toString() ?? '#F0ECF8');
-    final titleColor = _color(component.properties['title_color']?.toString() ?? '#241D33');
-    final children = component.properties['children'] is List ? component.properties['children'] as List : const <dynamic>[];
-    final activeChildren = children.where((child) => child is Map && child['active'] != false).whereType<Map>().toList();
-    final firstChild = activeChildren.isNotEmpty ? Map<String, dynamic>.from(activeChildren.first) : <String, dynamic>{};
-    final previewImage = (component.properties['image_url'] ?? component.properties['background_image_url'] ?? firstChild['image_url'] ?? firstChild['source_url'] ?? firstChild['url'] ?? '').toString();
-    final height = compact ? 92.0 : ((component.properties['height'] as num?)?.toDouble() ?? 160.0).clamp(90.0, 320.0);
-    final columns = ((component.properties['cross_axis_count'] as num?)?.toInt() ?? 2).clamp(1, 4);
-    final radius = (component.properties['border_radius'] as num?)?.toDouble() ?? 16;
-    final childImages = activeChildren.where((child) =>
-      (child['type'] ?? 'image') == 'image' &&
-      ((child['image_url'] ?? child['source_url'] ?? '').toString().isNotEmpty)).toList();
-    return Container(
-      height: height,
-      width: double.infinity,
-      margin: EdgeInsets.fromLTRB(
-        (component.properties['margin_left'] as num?)?.toDouble() ?? 0,
-        (component.properties['margin_top'] as num?)?.toDouble() ?? 0,
-        (component.properties['margin_right'] as num?)?.toDouble() ?? 0,
-        (component.properties['margin_bottom'] as num?)?.toDouble() ?? 0,
-      ),
-      padding: EdgeInsets.fromLTRB(
-        (component.properties['padding_left'] as num?)?.toDouble() ?? 12,
-        (component.properties['padding_top'] as num?)?.toDouble() ?? 12,
-        (component.properties['padding_right'] as num?)?.toDouble() ?? 12,
-        (component.properties['padding_bottom'] as num?)?.toDouble() ?? 12,
-      ),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: [
-          if (((component.properties['elevation'] as num?)?.toDouble() ?? 0) > 0)
-            BoxShadow(color: Colors.black.withValues(alpha: .07), blurRadius: 12, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (component.properties['show_title'] != false && component.title.isNotEmpty)
-          Container(
-            padding: EdgeInsets.all((component.properties['title_background_padding'] as num?)?.toDouble() ?? 0),
-            color: _color((component.properties['title_background_color'] ?? '#00000000').toString()),
-            child: Text(
-              component.title,
-            maxLines: ((component.properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4),
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: titleColor,
-              fontSize: compact ? 12 : ((component.properties['title_font_size'] as num?)?.toDouble() ?? 18),
-              fontWeight: (component.properties['title_font_weight'] ?? 'bold') == 'normal'
-                  ? FontWeight.normal
-                  : (component.properties['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
-              fontFamily: (component.properties['font_family'] ?? 'Roboto').toString(),
-              fontStyle: component.properties['italic'] == true ? FontStyle.italic : FontStyle.normal,
-              letterSpacing: (component.properties['letter_spacing'] as num?)?.toDouble() ?? 0,
-              wordSpacing: (component.properties['word_spacing'] as num?)?.toDouble() ?? 0,
-              ),
-            ),
-          ),
-        if (!compact && (component.properties['description'] ?? '').toString().isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(component.properties['description'].toString(), maxLines: 2, overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: titleColor.withValues(alpha: .7), fontSize: 12)),
-        ],
-        const SizedBox(height: 8),
-        Expanded(
-          child: component.type == 'Category' || component.type == 'Product'
-              ? GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: childImages.isEmpty ? columns : childImages.length.clamp(1, 8),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: columns,
-                    crossAxisSpacing: 6,
-                    mainAxisSpacing: 6,
-                    childAspectRatio: ((component.properties['cross_aspect_ratio'] as num?)?.toDouble() ?? 1).clamp(.5, 2),
-                  ),
-                  itemBuilder: (_, index) {
-                    final image = childImages.isEmpty ? '' : (childImages[index]['image_url'] ?? childImages[index]['source_url']).toString();
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(radius.clamp(0, 24)),
-                      child: image.isEmpty
-                          ? Container(color: titleColor.withValues(alpha: .08),
-                              child: Icon(component.type == 'Category' ? Icons.category_outlined : Icons.shopping_bag_outlined,
-                                color: titleColor.withValues(alpha: .5)))
-                          : Image.network(image, fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(color: titleColor.withValues(alpha: .08),
-                                child: const Icon(Icons.broken_image_outlined))),
-                    );
-                  },
-                )
-              : childImages.isNotEmpty
-                  ? Row(children: childImages.take(component.layout == 'Banner Grid' ? 2 : 1).map((child) {
-                      final image = (child['image_url'] ?? child['source_url']).toString();
-                      return Expanded(child: Padding(
-                        padding: const EdgeInsets.only(right: 5),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(radius.clamp(0, 24)),
-                          child: Image.network(image, fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
-                        ),
-                      ));
-                    }).toList())
-                  : previewImage.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(radius.clamp(0, 24)),
-                          child: Image.network(previewImage, width: double.infinity, fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(color: titleColor.withValues(alpha: .08),
-                              child: const Icon(Icons.broken_image_outlined))),
-                        )
-                      : Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(color: titleColor.withValues(alpha: .06),
-                            borderRadius: BorderRadius.circular(radius.clamp(0, 24))),
-                          child: Center(child: _componentIcon(component.type, size: compact ? 26 : 36)),
-                        ),
+    final properties = component.properties;
+    final bg = _color((properties['background_color'] ?? properties['section_background'] ?? '#FFFFFF').toString());
+    final titleColor = _color((properties['title_color'] ?? properties['text_color'] ?? '#24212B').toString());
+    final rawChildren = properties['children'] is List ? properties['children'] as List : const <dynamic>[];
+    final activeChildren = rawChildren.where((child) => child is Map && child['active'] != false).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    final imageChildren = activeChildren.where((child) {
+      final kind = (child['type'] ?? 'image').toString();
+      final url = (child['image_url'] ?? child['source_url'] ?? child['url'] ?? '').toString();
+      return (kind == 'image' || kind == 'video') && url.isNotEmpty;
+    }).toList();
+    final fallbackImage = (properties['image_url'] ?? properties['background_image_url'] ?? '').toString();
+    if (imageChildren.isEmpty && fallbackImage.isNotEmpty) {
+      imageChildren.add({'image_url': fallbackImage, 'title': component.title, 'active': true});
+    }
+    final height = ((properties['height'] ?? properties['height_px']) as num?)?.toDouble() ?? 180;
+    final columns = ((properties['cross_axis_count'] ?? properties['columns']) as num?)?.toInt() ?? 2;
+    final gap = ((properties['cross_axis_spacing'] ?? properties['item_gap']) as num?)?.toDouble() ?? 8;
+    final mainGap = ((properties['main_axis_spacing'] ?? properties['item_gap']) as num?)?.toDouble() ?? gap;
+    final radius = ((properties['border_radius'] ?? properties['corner_radius']) as num?)?.toDouble() ?? 14;
+    final widthFactor = ((properties['width'] as num?)?.toDouble() ?? 1).clamp(.25, 1.0);
+    final margin = EdgeInsets.fromLTRB(
+      ((properties['margin_left'] as num?)?.toDouble() ?? 0),
+      ((properties['margin_top'] as num?)?.toDouble() ?? 0),
+      ((properties['margin_right'] as num?)?.toDouble() ?? 0),
+      ((properties['margin_bottom'] as num?)?.toDouble() ?? 0),
+    );
+    final padding = EdgeInsets.fromLTRB(
+      ((properties['padding_left'] as num?)?.toDouble() ?? 12),
+      ((properties['padding_top'] as num?)?.toDouble() ?? 12),
+      ((properties['padding_right'] as num?)?.toDouble() ?? 12),
+      ((properties['padding_bottom'] as num?)?.toDouble() ?? 12),
+    );
+    final isBanner = component.type == 'Banner';
+    final isProduct = component.type == 'Product';
+    final isCategory = component.type == 'Category';
+    final layout = component.layout.toLowerCase();
+    final isSlider = layout.contains('slider');
+    final isScroll = layout.contains('scroll') || isSlider;
+    final isList = layout.contains('list');
+    final productItems = previewProducts.take(((properties['fixed_grid_view_count'] as num?)?.toInt() ?? 8).clamp(1, 12)).toList();
+    final categoryItems = previewCategories.take(((properties['fixed_grid_view_count'] as num?)?.toInt() ?? 8).clamp(1, 12)).toList();
+
+    Widget imageTile(Map<String, dynamic> child, {double? tileWidth}) {
+      final url = (child['image_url'] ?? child['source_url'] ?? child['url'] ?? '').toString();
+      final image = url.isEmpty
+          ? Container(color: titleColor.withValues(alpha: .08), child: const Icon(Icons.image_outlined))
+          : Image.network(url, width: double.infinity, height: double.infinity, fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(color: titleColor.withValues(alpha: .08), child: const Icon(Icons.broken_image_outlined)));
+      return SizedBox(
+        width: tileWidth,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(radius.clamp(0, 32)),
+          child: Stack(fit: StackFit.expand, children: [
+            image,
+            if ((child['title'] ?? '').toString().isNotEmpty)
+              Align(alignment: Alignment.bottomCenter, child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                color: Colors.black.withValues(alpha: .52),
+                child: Text(child['title'].toString(), maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+              )),
+          ]),
         ),
-        if (!compact && component.type == 'Banner' && component.layout == 'Banner Slider' &&
-            component.properties['dots'] == true && activeChildren.length > 1)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Row(mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(activeChildren.length, (index) => Container(
-                width: 6, height: 6, margin: const EdgeInsets.symmetric(horizontal: 3),
-                decoration: BoxDecoration(color: index == 0 ? _designerPurple : titleColor.withValues(alpha: .25),
-                  shape: BoxShape.circle),
-              ))),
+      );
+    }
+
+    Widget productTile(Map<String, dynamic> product, {double? tileWidth}) {
+      final images = product['images'] is List ? product['images'] as List : const [];
+      final first = images.isNotEmpty && images.first is Map ? Map<String, dynamic>.from(images.first as Map) : <String, dynamic>{};
+      final imageUrl = (first['thumbnail'] ?? first['src'] ?? '').toString();
+      final name = (product['name'] ?? 'Product').toString();
+      final prices = product['prices'] is Map ? Map<String, dynamic>.from(product['prices'] as Map) : <String, dynamic>{};
+      final minor = (prices['currency_minor_unit'] as num?)?.toInt() ?? 2;
+      final raw = double.tryParse((prices['price'] ?? '').toString()) ?? 0;
+      final divisor = minor == 0 ? 1 : (minor == 1 ? 10 : 100);
+      final amount = prices.isEmpty ? (product['price_html'] ?? '').toString().replaceAll(RegExp(r'<[^>]*>'), '') :
+        '${prices['currency_symbol'] ?? '₹'}${(raw / divisor).toStringAsFixed(minor)}';
+      return SizedBox(
+        width: tileWidth,
+        child: Card(
+          margin: EdgeInsets.zero,
+          color: _designerSurface,
+          clipBehavior: Clip.antiAlias,
+          elevation: ((properties['elevation'] as num?)?.toDouble() ?? 1).clamp(0, 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius.clamp(0, 28))),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: SizedBox(width: double.infinity,
+              child: imageUrl.isEmpty
+                ? Container(color: _designerField, child: const Icon(Icons.shopping_bag_outlined, size: 34))
+                : Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Container(color: _designerField, child: const Icon(Icons.broken_image_outlined))))),
+            Padding(padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+              child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Color(0xFF24212B), fontSize: 12, fontWeight: FontWeight.w600))),
+            Padding(padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
+              child: Text(amount, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: _designerPurple, fontSize: 13, fontWeight: FontWeight.w800))),
+          ]),
+        ),
+      );
+    }
+
+    Widget categoryTile(Map<String, dynamic> category, {double? tileWidth}) {
+      final image = category['image'] is Map ? Map<String, dynamic>.from(category['image'] as Map) : <String, dynamic>{};
+      final url = (image['src'] ?? '').toString();
+      return SizedBox(
+        width: tileWidth,
+        child: Card(
+          margin: EdgeInsets.zero,
+          color: _designerSurface,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius.clamp(0, 28))),
+          child: Column(children: [
+            Expanded(child: SizedBox(width: double.infinity, child: url.isEmpty
+              ? const Icon(Icons.category_outlined, size: 32)
+              : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.category_outlined)))),
+            Padding(padding: const EdgeInsets.all(7), child: Text((category['name'] ?? 'Category').toString(),
+              maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+          ]),
+        ),
+      );
+    }
+
+    Widget content;
+    if (isBanner) {
+      final slides = imageChildren.isEmpty ? <Map<String, dynamic>>[{'image_url': '', 'title': component.title}] : imageChildren;
+      if (isSlider) {
+        content = SizedBox(height: height.clamp(90, 500), child: ArkDesignerBannerCarousel(
+          slides: slides,
+          height: height.clamp(90, 500),
+          radius: radius,
+          autoplay: properties['autoplay'] != false,
+          interval: Duration(milliseconds: (((properties['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000).round().clamp(1000, 30000)),
+          pauseOnInteraction: properties['pause'] != false,
+          showDots: properties['dots'] != false,
+          showArrows: properties['arrows'] == true && properties['control'] != false,
+          fade: properties['fade'] == true,
+          viewFraction: ((properties['view_fraction'] as num?)?.toDouble() ?? .9).clamp(.4, 1),
+        ));
+      } else if (isScroll) {
+        content = SizedBox(height: height.clamp(90, 500), child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: slides.length,
+          separatorBuilder: (_, __) => SizedBox(width: gap),
+          itemBuilder: (_, index) => imageTile(slides[index], tileWidth: (MediaQuery.of(context).size.width - 48) * .78),
+        ));
+      } else if (isList) {
+        content = SizedBox(height: (height.clamp(90, 500) * slides.length).clamp(90, 720), child: ListView.separated(
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: slides.length,
+          separatorBuilder: (_, __) => SizedBox(height: mainGap),
+          itemBuilder: (_, index) => SizedBox(height: height.clamp(90, 500), child: imageTile(slides[index])),
+        ));
+      } else {
+        final shown = slides.take(8).toList();
+        content = GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: shown.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns.clamp(1, 4),
+            crossAxisSpacing: gap,
+            mainAxisSpacing: mainGap,
+            childAspectRatio: ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3),
           ),
-      ]),
+          itemBuilder: (_, index) => imageTile(shown[index]),
+        );
+      }
+    } else if (isProduct || isCategory) {
+      final count = isProduct ? productItems.length : categoryItems.length;
+      final cardHeight = height.clamp(120, 440);
+      final cardWidth = ((properties['max_cross_axis_extent'] as num?)?.toDouble() ?? 180).clamp(110, 360);
+      Widget tile(int index, {double? width}) => isProduct
+          ? productTile(productItems[index], tileWidth: width)
+          : categoryTile(categoryItems[index], tileWidth: width);
+      if (count == 0) {
+        content = SizedBox(height: cardHeight, child: Center(child: Text(
+          isProduct ? 'Loading live products…' : 'Loading live categories…',
+          style: TextStyle(color: titleColor.withValues(alpha: .7), fontSize: 12))));
+      } else if (isScroll) {
+        content = SizedBox(height: cardHeight, child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: count,
+          separatorBuilder: (_, __) => SizedBox(width: gap),
+          itemBuilder: (_, index) => tile(index, width: cardWidth),
+        ));
+      } else if (isList) {
+        content = SizedBox(height: (cardHeight * count).clamp(cardHeight, 900), child: ListView.separated(
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: count,
+          separatorBuilder: (_, __) => SizedBox(height: mainGap),
+          itemBuilder: (_, index) => SizedBox(height: cardHeight, child: tile(index)),
+        ));
+      } else {
+        final visibleCount = count.clamp(1, 8);
+        content = SizedBox(height: (cardHeight * ((visibleCount / columns.clamp(1, 4)).ceil()) + mainGap * 2).clamp(cardHeight, 1000),
+          child: GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: visibleCount,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns.clamp(1, 4),
+              crossAxisSpacing: gap,
+              mainAxisSpacing: mainGap,
+              childAspectRatio: ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? (isProduct ? .66 : .9)).clamp(.4, 2.5),
+            ),
+            itemBuilder: (_, index) => tile(index),
+          ));
+      }
+    } else {
+      content = SizedBox(height: height.clamp(90, 500), child: imageChildren.isNotEmpty
+        ? imageTile(imageChildren.first)
+        : Center(child: _componentIcon(component.type, size: 34)));
+    }
+
+    final title = (properties['show_title'] == false) ? '' : component.title;
+    return Opacity(
+      opacity: component.enabled ? 1 : .38,
+      child: Align(
+        alignment: Alignment.center,
+        child: SizedBox(
+          width: (MediaQuery.of(context).size.width - 24) * widthFactor,
+          child: Container(
+            margin: margin,
+            padding: padding,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(radius.clamp(0, 36)),
+              boxShadow: [
+                if (((properties['elevation'] as num?)?.toDouble() ?? 0) > 0)
+                  BoxShadow(color: Colors.black.withValues(alpha: .12), blurRadius: ((properties['elevation'] as num?)?.toDouble() ?? 1) * 2,
+                    offset: const Offset(0, 3)),
+              ],
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+              if (title.isNotEmpty) Padding(
+                padding: EdgeInsets.only(bottom: ((properties['title_bottom_spacing'] as num?)?.toDouble() ?? 8)),
+                child: Text(title,
+                  maxLines: ((properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4),
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: (properties['title_text_align'] ?? 'left') == 'center' ? TextAlign.center : (properties['title_text_align'] ?? 'left') == 'right' ? TextAlign.right : TextAlign.left,
+                  style: TextStyle(
+                    color: titleColor,
+                    fontSize: compact ? 12 : ((properties['title_font_size'] as num?)?.toDouble() ?? 18),
+                    fontWeight: (properties['title_font_weight'] ?? 'bold') == 'normal' ? FontWeight.normal
+                      : (properties['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
+                    fontFamily: (properties['font_family'] ?? 'Roboto').toString(),
+                    fontStyle: properties['italic'] == true ? FontStyle.italic : FontStyle.normal,
+                    letterSpacing: (properties['letter_spacing'] as num?)?.toDouble() ?? 0,
+                    wordSpacing: (properties['word_spacing'] as num?)?.toDouble() ?? 0,
+                  ),
+                ),
+              ),
+              content,
+            ]),
+          ),
+        ),
+      ),
     );
   }
 
@@ -835,45 +992,14 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           child: currentComponents.isEmpty
               ? const Center(child: Text('No components on this page. Tap Add component.'))
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
                   itemCount: currentComponents.length,
                   itemBuilder: (context, index) {
                     final component = currentComponents[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => _editComponent(component),
-                        child: Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: _designerSurface,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: _designerBorder),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              IgnorePointer(
-                                child: _componentVisual(component),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-                                child: Row(children: [
-                                  Text(
-                                    component.layout,
-                                    style: const TextStyle(color: _designerPurple, fontWeight: FontWeight.w700),
-                                  ),
-                                  const Spacer(),
-                                  const Icon(Icons.tune_rounded, size: 17, color: _designerMuted),
-                                ]),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                    return InkWell(
+                      key: ValueKey('designer-live-${component.id}'),
+                      onTap: () => _editComponent(component),
+                      child: _componentVisual(component),
                     );
                   },
                 ),
@@ -1335,7 +1461,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                 margin: const EdgeInsets.fromLTRB(10, 10, 10, 8),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: _designerSurface,
+                  color: _designerPreviewBackground,
                   border: Border.all(color: _designerBorder),
                   borderRadius: BorderRadius.circular(12),
                 ),
