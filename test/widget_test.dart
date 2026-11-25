@@ -55,6 +55,8 @@ void main() {
         'border_radius': 16,
         'children': [
           {'type': 'image', 'image_url': 'https://example.com/hero.jpg', 'title': ''},
+          {'type': 'text', 'text': 'Legacy text child', 'title': 'Legacy text'},
+          {'type': 'link', 'link_value': 'ark://cart', 'title': 'Legacy link'},
         ],
       },
     );
@@ -65,7 +67,9 @@ void main() {
     expect(section['width_pct'], 85);
     expect(section['margin_top'], 18);
     expect(section['padding_bottom'], 22);
+    expect((section['children'] as List), hasLength(1));
     expect((section['children'] as List).first['title'], '');
+    expect((section['children'] as List).first['type'], 'image');
   });
 
   testWidgets('Tapping the live banner image opens its property editor', (tester) async {
@@ -150,9 +154,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Component Status'), findsOneWidget);
     expect(find.text('Layout'), findsOneWidget);
-    expect(find.text('Add image / video'), findsOneWidget);
-    expect(find.text('Add text'), findsOneWidget);
-    expect(find.text('Add link'), findsOneWidget);
+    expect(find.text('Add image from Media Library'), findsOneWidget);
+    expect(find.text('Add text'), findsNothing);
+    expect(find.text('Add link'), findsNothing);
 
     await tester.tap(find.byTooltip('View live component JSON'));
     await tester.pumpAndSettle();
