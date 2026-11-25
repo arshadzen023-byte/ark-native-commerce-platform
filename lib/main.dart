@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'designer_banner_carousel.dart';
 import 'product_details_page.dart';
 import 'customer_account_page.dart';
 import 'checkout_page.dart';
@@ -54,9 +55,30 @@ Future<http.Response> request(Uri uri, {String method = 'GET', Map<String, Strin
   throw Exception('Cannot resolve ${uri.host}. ${diagnosis}. Check phone Private DNS / network DNS and hosting DNS. ${dnsError?.message ?? ''}');
 }
 
+/// Resolves legacy Banner layout metadata after WordPress normalizes
+/// Banner Grid/List/Scroll/Slider sections to the shared ARK Live Slider type.
+/// Older published JSON may contain only type=ark_live_slider + layout_variant.
+String normalizeDesignerBannerLayoutType(Map<String, dynamic> config) {
+  final rawType = (config['designer_component_type'] ?? config['type'] ?? '')
+      .toString().toLowerCase();
+  final variant = (config['layout_variant'] ?? '').toString().toLowerCase();
+  if ((rawType == 'ark_live_slider' || rawType == 'banner_slider') &&
+      const ['grid', 'list', 'scroll', 'slider'].contains(variant)) {
+    return 'banner_$variant';
+  }
+  return rawType;
+}
+
 class StoreApi {
-  static Uri products({String order = 'date', String search = '', bool sale = false}) {
-    final params = <String, String>{'page':'1','per_page':'40','orderby':order,'order':'desc','catalog_visibility':'visible'};
+  static Uri products({String order = 'date', String search = '', bool sale = false, int page = 1}) {
+    final params = <String, String>{
+      'page': page.toString(),
+      'per_page': '40',
+      'orderby': order,
+      'order': 'desc',
+      'catalog_visibility': 'visible',
+      '_fields': 'id,name,slug,permalink,images,prices,on_sale,is_featured,average_rating,review_count,categories,tags,stock_status,date_created,total_sales',
+    };
     if (search.trim().isNotEmpty) params['search'] = search.trim();
     if (sale) params['on_sale'] = 'true';
     return Uri.parse(storeUrl).resolve('wp-json/wc/store/v1/products').replace(queryParameters: params);
@@ -176,6 +198,7 @@ class _StoreHomeState extends State<StoreHome> {
   List<Map<String, dynamic>> wishlist = [];
   List<Map<String, dynamic>> storeCategories = [];
   Map<String, dynamic> designerConfig = {};
+  bool designerConfigLoading = false;
   final Map<String, Future<Map<String, dynamic>>> _sliderFutures = {};
   final WooStoreApi woo = WooStoreApi();
   Map<String, dynamic> liveCart = {};
@@ -283,6 +306,47 @@ class _StoreHomeState extends State<StoreHome> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
+
+  Future<void> _openDesignerChildLink(Map<String, dynamic> child) async {
+    final linkType = (child['link_type'] ?? 'in_app').toString();
+    final value = (child['link_value'] ?? child['link'] ?? '').toString().trim();
+    if (value.isEmpty) return;
+    if (linkType == 'chrome') {
+      final uri = Uri.tryParse(value);
+      if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
+    if (value.startsWith('page:')) {
+      final page = value.substring(5).toLowerCase();
+      final nextTab = switch (page) {
+        'home' => 0,
+        'categories' => 1,
+        'wishlist' => 2,
+        'cart' => 3,
+        'account' || 'orders' => 4,
+        _ => -1,
+      };
+      if (nextTab >= 0 && mounted) setState(() => tab = nextTab);
+      if (page == 'orders' && customerToken != null && mounted) {
+        await Navigator.push(context, MaterialPageRoute(
+          builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders'),
+        ));
+      }
+      return;
+    }
+    if (value.startsWith('product:')) {
+      await _handleNotificationLink('ark://product/' + value.substring(8));
+      return;
+    }
+    if (value.startsWith('category:')) {
+      if (mounted) setState(() => tab = 1);
+      return;
+    }
+    await _handleNotificationLink(value);
+  }
+
   @override void dispose() { searchController.dispose(); super.dispose(); }
 
   Future<void> load({String order = 'date', bool sale = false}) async {
@@ -442,11 +506,18 @@ class _StoreHomeState extends State<StoreHome> {
       return;
     }
     try {
-      await ArkCustomerApi(token).request('designer/config');
+      final response = await ArkCustomerApi(token).request('designer/config');
+      if (response is Map && (response['pages'] is Map)) {
+        // The bridge returns the existing ARK Designer WordPress config.
+        // The editor reads this route itself; this call is a preflight only.
+      }
     } catch (e) {
+      final message = e.toString();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('ARK Designer requires a WordPress administrator account. $e'),
+          content: Text(message.contains('No route was found')
+              ? 'ARK Designer API route is missing. Update and activate ARK App Designer + ARK Native API Bridge.'
+              : 'ARK Designer access failed. Sign in with a WordPress administrator account. $e'),
         ));
       }
       return;
@@ -459,6 +530,7 @@ class _StoreHomeState extends State<StoreHome> {
   Future<void> _loadDesignerConfig() async {
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString('glowhit_published_designer_config');
+    if (mounted) setState(() => designerConfigLoading = true);
     if (cached != null) {
       try {
         final decoded = jsonDecode(cached);
@@ -466,20 +538,34 @@ class _StoreHomeState extends State<StoreHome> {
       } catch (_) {}
     }
     try {
+      final configUri = Uri.parse('$storeUrl/wp-json/ark-designer/v1/config')
+          .replace(queryParameters: {
+        '_glowhit_refresh': DateTime.now().microsecondsSinceEpoch.toString(),
+      });
       final response = await http.get(
-        Uri.parse('$storeUrl/wp-json/ark-designer/v1/config'),
-        headers: const {'Accept': 'application/json'},
+        configUri,
+        headers: const {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache',
+        },
       ).timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return;
-      final decoded = jsonDecode(response.body);
-      if (decoded is Map && decoded['pages'] is Map) {
-        final value = Map<String, dynamic>.from(decoded);
-        await prefs.setString('glowhit_published_designer_config', jsonEncode(value));
-        _sliderFutures.clear();
-        if (mounted) setState(() => designerConfig = value);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['pages'] is Map) {
+          final value = Map<String, dynamic>.from(decoded);
+          final homePage = value['pages'] is Map ? (value['pages'] as Map)['home'] : null;
+          if (homePage is Map && homePage['sections'] is List) {
+            await prefs.setString('glowhit_published_designer_config', jsonEncode(value));
+            _sliderFutures.clear();
+            if (mounted) setState(() => designerConfig = value);
+          }
+        }
       }
     } catch (_) {
       // The last published configuration remains available from local cache.
+    } finally {
+      if (mounted) setState(() => designerConfigLoading = false);
     }
   }
 
@@ -511,124 +597,349 @@ class _StoreHomeState extends State<StoreHome> {
   List<Map<String, dynamic>> _designerProducts(Map<String, dynamic> section) {
     final source = (section['source'] ?? 'latest').toString();
     final categoryId = (section['category_id'] as num?)?.toInt() ?? 0;
+    final tagId = (section['tag_id'] as num?)?.toInt() ?? 0;
     var rows = products.where((p) {
-      if (source == 'sale') return p['on_sale'] == true;
+      if (source == 'sale' || source == 'on_sale') return p['on_sale'] == true;
       if (source == 'featured') return p['is_featured'] == true;
       if (source == 'wishlist') return wishlist.any((w) => w['id'] == p['id']);
+      if (source == 'best_selling') return (p['total_sales'] as num?) != null;
+      if (source == 'new_arrival' || source == 'latest') return true;
       if (source == 'category' && categoryId > 0) {
         final ids = p['categories'] is List ? (p['categories'] as List).whereType<Map>().map((c) => (c['id'] as num?)?.toInt()).toList() : <int?>[];
         return ids.contains(categoryId);
+      }
+      if (source == 'tag' && tagId > 0) {
+        final ids = p['tags'] is List ? (p['tags'] as List).whereType<Map>().map((tag) => (tag['id'] as num?)?.toInt()).toList() : <int?>[];
+        return ids.contains(tagId);
       }
       return true;
     }).toList();
     if (source == 'top_rated') {
       rows.sort((a, b) => ((b['average_rating'] as num?) ?? 0).compareTo((a['average_rating'] as num?) ?? 0));
+    } else if (source == 'best_selling') {
+      rows.sort((a, b) => ((b['total_sales'] as num?) ?? 0).compareTo((a['total_sales'] as num?) ?? 0));
+    } else if (source == 'new_arrival' || source == 'latest') {
+      rows.sort((a, b) => (b['date_created'] ?? '').toString().compareTo((a['date_created'] ?? '').toString()));
     }
     final limit = (section['limit'] as num?)?.toInt() ?? 8;
     return rows.take(limit.clamp(1, 40)).toList();
   }
 
   Widget _designerSection(Map<String, dynamic> section) {
-    if (section['visible'] == false) return const SizedBox.shrink();
-    final type = (section['type'] ?? section['designer_component_type'] ?? '').toString();
-    final title = (section['title'] ?? '').toString();
-    final showTitle = section['show_title'] != false && title.isNotEmpty;
-    final background = (section['section_background'] ?? 'transparent').toString();
-    final textColor = (section['text_color'] ?? '#202733').toString();
-    final padding = (section['padding_top'] as num?)?.toDouble() ?? 12.0;
+    final nested = section['properties'] is Map
+        ? Map<String, dynamic>.from(section['properties'] as Map)
+        : <String, dynamic>{};
+    // DesignerComponent JSON keeps editable values under "properties";
+    // legacy WordPress sections keep the same values at the root.
+    final config = <String, dynamic>{...section, ...nested};
+    final type = normalizeDesignerBannerLayoutType({
+      ...config,
+      'designer_component_type': nested['designer_component_type'] ??
+          nested['type'] ?? config['designer_component_type'] ?? config['type'] ?? '',
+    });
+    config['designer_component_type'] = type;
+    config['visible'] = nested['visible'] ?? config['visible'] ?? config['enabled'] ?? true;
+    if (config['visible'] == false) return const SizedBox.shrink();
+    final title = (config['title'] ?? '').toString();
+    final showTitle = config['show_title'] != false && title.isNotEmpty;
+    final background = (config['section_background'] ?? 'transparent').toString();
+    final textColor = (config['text_color'] ?? '#202733').toString();
+    final padding = (config['padding_top'] as num?)?.toDouble() ?? 12.0;
+    final paddingLeft = (config['padding_left'] as num?)?.toDouble() ?? 12.0;
+    final paddingRight = (config['padding_right'] as num?)?.toDouble() ?? 12.0;
+    final mainAxisGap = (config['main_axis_spacing'] as num?)?.toDouble() ?? (config['item_gap'] as num?)?.toDouble() ?? 8.0;
+    final crossAxisGap = (config['cross_axis_spacing'] as num?)?.toDouble() ?? (config['item_gap'] as num?)?.toDouble() ?? 8.0;
+    final widthFactor = ((config['width'] as num?)?.toDouble() ??
+      (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
+    final margin = EdgeInsets.fromLTRB(
+      (config['margin_left'] as num?)?.toDouble() ?? 0,
+      (config['margin_top'] as num?)?.toDouble() ?? 0,
+      (config['margin_right'] as num?)?.toDouble() ?? 0,
+      (config['margin_bottom'] as num?)?.toDouble() ?? 0,
+    );
 
-    if (type == 'ark_live_slider' || type.startsWith('banner_') || section['designer_component_type']?.toString().startsWith('banner_') == true) {
-      final key = (section['slider_key'] ?? '').toString();
-      if (key.isEmpty) return const SizedBox.shrink();
-      final future = _sliderFutures.putIfAbsent(key, () => _loadDesignerSlider(key));
-      return FutureBuilder<Map<String, dynamic>>(
-        future: future,
-        builder: (context, snapshot) {
-          final slides = snapshot.data?['slides'] is List ? snapshot.data!['slides'] as List : const <dynamic>[];
-          final height = ((snapshot.data?['settings'] is Map ? (snapshot.data!['settings'] as Map)['height_px'] : section['height_px']) as num?)?.toDouble() ?? 180;
-          if (slides.isEmpty) return SizedBox(height: height, child: const Center(child: CircularProgressIndicator()));
-          return Padding(
-            padding: EdgeInsets.only(top: padding, bottom: (section['padding_bottom'] as num?)?.toDouble() ?? 12),
+    if (type == 'ark_live_slider' || type.startsWith('banner_') || config['designer_component_type']?.toString().startsWith('banner_') == true) {
+      final key = (config['slider_key'] ?? '').toString();
+      final inlineChildren = config['slides'] is List
+          ? (config['slides'] as List)
+          : (config['children'] is List ? config['children'] as List : const <dynamic>[]);
+      final sectionMargin = margin;
+      final normalizedInline = inlineChildren.whereType<Map>().map((slide) {
+        final item = Map<String, dynamic>.from(slide);
+        item['image_url'] = item['image_url'] ?? item['source_url'] ?? item['url'] ?? '';
+        return item;
+      }).where((slide) => slide['active'] != false &&
+          (slide['image_url'] ?? '').toString().trim().isNotEmpty).toList();
+
+      Widget renderCarousel(List<Map<String, dynamic>> slides, Map<String, dynamic> settings) {
+        final height = ((settings['height_px'] ?? config['height_px'] ?? config['height'] ?? 180) as num).toDouble();
+        final intervalMs = ((settings['interval_ms'] ?? config['interval_ms'] ?? (((config['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
+        final layout = (config['designer_component_type'] ?? config['type'] ?? '').toString();
+        final bannerGrid = layout == 'banner_grid';
+        final bannerStyle = layout == 'banner_list' || layout == 'banner_scroll';
+        final bannerGridColumns = ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4);
+        final bannerGridAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3.0);
+        final bannerGridRowExtent = (height * (1.2 / bannerGridAspect)).clamp(60, 500).toDouble();
+        final bannerGridRows = (slides.length / bannerGridColumns).ceil().clamp(1, 10);
+        final bannerGridHeight = bannerGridRowExtent * bannerGridRows + mainAxisGap * (bannerGridRows - 1);
+        return Align(
+          alignment: Alignment.center,
+          child: Container(
+            width: ((MediaQuery.of(context).size.width - sectionMargin.horizontal) * widthFactor)
+                .clamp(0, MediaQuery.of(context).size.width).toDouble(),
+            margin: sectionMargin,
+            color: background == 'transparent' ? null : _safeColor(background),
+            padding: EdgeInsets.fromLTRB(
+              paddingLeft,
+              padding,
+              paddingRight,
+              (config['padding_bottom'] as num?)?.toDouble() ?? 12,
+            ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              if (showTitle) Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor)))),
-              SizedBox(
-                height: height,
-                child: PageView.builder(
-                  itemCount: slides.length,
-                  itemBuilder: (_, index) {
-                    final slide = slides[index] is Map ? Map<String, dynamic>.from(slides[index] as Map) : <String, dynamic>{};
-                    final image = (slide['image_url'] ?? '').toString();
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular((section['corner_radius'] as num?)?.toDouble() ?? 16),
-                        child: Stack(fit: StackFit.expand, children: [
-                          image.isEmpty ? Container(color: const Color(0xFFECE8F3)) : Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
-                          if ((slide['title'] ?? '').toString().isNotEmpty)
-                            Align(alignment: Alignment.bottomLeft, child: Container(width: double.infinity, padding: const EdgeInsets.all(12), color: Colors.black.withValues(alpha: .35), child: Text(slide['title'].toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
-                        ]),
+            if (showTitle) Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
+            ),
+            bannerGrid
+                ? SizedBox(
+                    height: bannerGridHeight,
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: slides.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: bannerGridColumns,
+                        crossAxisSpacing: crossAxisGap,
+                        mainAxisSpacing: mainAxisGap,
+                        mainAxisExtent: bannerGridRowExtent,
                       ),
-                    );
-                  },
-                ),
-              ),
-            ]),
-          );
-        },
-      );
-    }
-
-    if (type == 'category_grid' || type.startsWith('category_')) {
-      final layout = (section['category_layout'] ?? section['layout_variant'] ?? 'grid').toString();
-      final limit = (section['limit'] as num?)?.toInt() ?? 8;
-      final rows = storeCategories.take(limit.clamp(1, 40)).toList();
-      if (rows.isEmpty) return const SizedBox.shrink();
-      final cards = rows.map((category) {
-        final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
-        return SizedBox(
-          width: layout == 'list' || layout == 'list_tile' ? double.infinity : 112,
-          child: Card(
-            clipBehavior: Clip.antiAlias,
-            child: Column(children: [
-              if (image.isNotEmpty) SizedBox(height: 82, width: double.infinity, child: Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.category_outlined)))
-              else const SizedBox(height: 82, child: Center(child: Icon(Icons.category_outlined, size: 34))),
-              Padding(padding: const EdgeInsets.all(7), child: Text((category['name'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center)),
-            ]),
+                      itemBuilder: (_, index) {
+                        final slide = slides[index];
+                        final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
+                        return InkWell(
+                          onTap: () => _openDesignerChildLink(slide),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
+                            child: url.isEmpty
+                                ? const ColoredBox(color: Color(0xFFEDEAF2), child: Icon(Icons.image_outlined))
+                                : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                : bannerStyle
+                ? SizedBox(
+                    height: height,
+                    child: ListView(
+                      scrollDirection: config['horizontal'] == false || layout == 'banner_list' ? Axis.vertical : Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      children: slides.map((slide) {
+                        final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
+                        return Padding(
+                          padding: EdgeInsets.symmetric(horizontal: crossAxisGap / 2, vertical: mainAxisGap / 2),
+                          child: InkWell(
+                            onTap: () => _openDesignerChildLink(slide),
+                            child: SizedBox(
+                              width: (config['width_pct'] as num?)?.toDouble() == null ? 260 : MediaQuery.of(context).size.width * ((config['width_pct'] as num).toDouble() / 100),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
+                                child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  )
+                : ArkDesignerBannerCarousel(
+                    slides: slides,
+                    height: height,
+                    radius: (config['corner_radius'] as num?)?.toDouble() ?? 16,
+                    autoplay: config['autoplay'] != false,
+                    interval: Duration(milliseconds: intervalMs.clamp(1000, 30000)),
+                    pauseOnInteraction: config['pause_on_interaction'] != false,
+                    showDots: config['control'] != false && config['show_dots'] == true,
+                    showArrows: config['control'] != false && config['show_arrows'] == true,
+                    fade: config['transition'] == 'fade',
+                    viewFraction: ((config['card_width'] ?? config['view_fraction'] ?? 1) as num).toDouble(),
+                    onSlideTap: _openDesignerChildLink,
+                  ),
+              ]),
           ),
         );
+      }
+
+      // Inline Designer children are the newest published source of truth.
+      // SQL slider data remains a fallback for older sections that have no
+      // inline children yet.
+      if (normalizedInline.isNotEmpty) {
+        return renderCarousel(normalizedInline, section);
+      }
+      if (key.isNotEmpty) {
+        final future = _sliderFutures.putIfAbsent(key, () => _loadDesignerSlider(key));
+        return FutureBuilder<Map<String, dynamic>>(
+          future: future,
+          builder: (context, snapshot) {
+            final payload = snapshot.data ?? <String, dynamic>{};
+            final slides = payload['slides'] is List
+                ? (payload['slides'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+                : <Map<String, dynamic>>[];
+            final settings = payload['settings'] is Map ? Map<String, dynamic>.from(payload['settings'] as Map) : <String, dynamic>{};
+            if (slides.isEmpty) return SizedBox(height: (config['height_px'] as num?)?.toDouble() ?? 180, child: const Center(child: CircularProgressIndicator()));
+            return renderCarousel(slides, settings);
+          },
+        );
+      }
+      if ((config['image_url'] ?? '').toString().isNotEmpty) {
+        return renderCarousel([
+          {'image_url': config['image_url'], 'title': title},
+        ], section);
+      }
+      return const SizedBox.shrink();
+    }
+    if (type == 'category_grid' || type.startsWith('category_')) {
+      final layout = (config['category_layout'] ?? config['layout_variant'] ?? type).toString().toLowerCase();
+      final parentId = (config['category_id'] as num?)?.toInt() ?? 0;
+      var rows = storeCategories.where((category) {
+        if (parentId <= 0) return true;
+        final parent = (category['parent'] as num?)?.toInt() ?? 0;
+        return parent == parentId;
+      }).toList();
+      final limit = (config['limit'] as num?)?.toInt() ?? 8;
+      rows = rows.take(limit.clamp(1, 100)).toList();
+      if (rows.isEmpty) return const SizedBox.shrink();
+      final cardRadius = (config['corner_radius'] as num?)?.toDouble() ?? 12;
+      final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 150;
+      final categoryCardWidth = ((config['max_width_px'] as num?)?.toDouble() ?? 180)
+          .clamp(88, MediaQuery.of(context).size.width).toDouble();
+      final categoryAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .9).clamp(.4, 2.5);
+      final categoryRowExtent = (cardHeight * (.9 / categoryAspect)).clamp(80, 500).toDouble();
+      final cards = rows.map((category) {
+        final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
+        final card = Card(
+          clipBehavior: Clip.antiAlias,
+          elevation: (config['card_depth'] as num?)?.toDouble() ?? 1,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(cardRadius)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Expanded(
+              child: image.isNotEmpty
+                  ? Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.category_outlined)))
+                  : const Center(child: Icon(Icons.category_outlined, size: 34)),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(7),
+              child: Text((category['name'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+            ),
+          ]),
+        );
+        return SizedBox(width: categoryCardWidth, height: cardHeight, child: card);
       }).toList();
       return Container(
+        width: ((MediaQuery.of(context).size.width - margin.horizontal) * widthFactor).toDouble(),
+        margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
-        padding: EdgeInsets.fromLTRB(12, padding, 12, (section['padding_bottom'] as num?)?.toDouble() ?? 12),
+        padding: EdgeInsets.fromLTRB(
+          (config['padding_left'] as num?)?.toDouble() ?? 12,
+          padding,
+          (config['padding_right'] as num?)?.toDouble() ?? 12,
+          (config['padding_bottom'] as num?)?.toDouble() ?? 12,
+        ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (showTitle) Padding(padding: const EdgeInsets.only(left: 4, bottom: 8), child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor)))),
-          if (layout == 'list' || layout == 'list_tile') Column(children: rows.map((c) => ListTile(leading: const Icon(Icons.category_outlined), title: Text((c['name'] ?? '').toString()))).toList())
-          else SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: cards.map((card) => SizedBox(width: 120, child: card)).toList())),
+          if (showTitle) Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
+          ),
+          if (layout.contains('list_tile'))
+            Column(children: rows.map((category) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: category['image'] is Map && ((category['image'] as Map)['src'] ?? '').toString().isNotEmpty
+                  ? SizedBox(width: 52, height: 52, child: Image.network((category['image'] as Map)['src'].toString(), fit: BoxFit.cover))
+                  : const Icon(Icons.category_outlined),
+              title: Text((category['name'] ?? '').toString()),
+            )).toList())
+          else if (layout.contains('list'))
+            Column(children: cards.map((card) => SizedBox(width: double.infinity, height: cardHeight, child: card)).toList())
+          else if (layout.contains('slider') || layout.contains('scroll'))
+            SizedBox(
+              height: cardHeight,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: cards.length,
+                separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
+                itemBuilder: (_, index) => cards[index],
+              ),
+            )
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: cards.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
+                crossAxisSpacing: crossAxisGap,
+                mainAxisSpacing: mainAxisGap,
+                mainAxisExtent: categoryRowExtent,
+              ),
+              itemBuilder: (_, index) => cards[index],
+            ),
         ]),
       );
     }
 
     if (type == 'product_grid' || type == 'product_carousel' || type.startsWith('product_')) {
-      final rows = _designerProducts(section);
+      final rows = _designerProducts(config);
       if (rows.isEmpty) return const SizedBox.shrink();
-      final layout = (section['layout_variant'] ?? section['designer_component_type'] ?? type).toString();
+      final layout = (config['layout_variant'] ?? config['designer_component_type'] ?? type).toString().toLowerCase();
+      final cardWidth = (config['max_width_px'] as num?)?.toDouble() ?? 174;
+      final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 260;
+      final productAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .66).clamp(.4, 2.5);
+      final productRowExtent = (cardHeight * (.66 / productAspect)).clamp(120, 600).toDouble();
+      final cards = rows.map((product) => SizedBox(
+        width: cardWidth,
+        child: productCard(product),
+      )).toList();
       return Container(
+        width: ((MediaQuery.of(context).size.width - margin.horizontal) * widthFactor).clamp(0, MediaQuery.of(context).size.width).toDouble(),
+        margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
-        padding: EdgeInsets.fromLTRB(12, padding, 12, (section['padding_bottom'] as num?)?.toDouble() ?? 12),
+        padding: EdgeInsets.fromLTRB(
+          paddingLeft,
+          padding,
+          paddingRight,
+          (config['padding_bottom'] as num?)?.toDouble() ?? 12,
+        ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (showTitle) Padding(padding: const EdgeInsets.only(left: 4, bottom: 8), child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor)))),
-          if (layout.contains('carousel') || layout.contains('slider'))
-            SizedBox(height: 260, child: ListView(scrollDirection: Axis.horizontal, children: rows.map((p) => SizedBox(width: 174, child: productCard(p))).toList()))
+          if (showTitle) Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
+          ),
+          if (layout.contains('carousel') || layout.contains('slider') || layout.contains('scroll'))
+            SizedBox(
+              height: cardHeight,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: cards.length,
+                separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
+                itemBuilder: (_, index) => cards[index],
+              ),
+            )
+          else if (layout.contains('list'))
+            Column(children: rows.map((product) => SizedBox(
+              width: double.infinity,
+              height: cardHeight,
+              child: productCard(product),
+            )).toList())
           else
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: rows.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: ((section['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
-                childAspectRatio: (section['card_aspect_ratio'] as num?)?.toDouble() ?? .66,
-                crossAxisSpacing: (section['item_gap'] as num?)?.toDouble() ?? 8,
-                mainAxisSpacing: (section['item_gap'] as num?)?.toDouble() ?? 8,
+                crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
+                mainAxisExtent: productRowExtent,
+                crossAxisSpacing: crossAxisGap,
+                mainAxisSpacing: mainAxisGap,
               ),
               itemBuilder: (_, index) => productCard(rows[index]),
             ),
@@ -649,9 +960,19 @@ class _StoreHomeState extends State<StoreHome> {
     final sections = page is Map && page['sections'] is List ? page['sections'] as List : const <dynamic>[];
     return Column(children: [
       Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
-      Expanded(child: ListView(
-        padding: const EdgeInsets.only(bottom: 20),
-        children: sections.whereType<Map>().map((s) => _designerSection(Map<String, dynamic>.from(s))).toList(),
+      Expanded(child: RefreshIndicator(
+        onRefresh: _loadDesignerConfig,
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 20),
+          children: [
+            if (designerConfigLoading && sections.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ...sections.whereType<Map>().map((section) => _designerSection(Map<String, dynamic>.from(section))),
+          ],
+        ),
       )),
     ]);
   }
@@ -681,6 +1002,7 @@ class _StoreHomeState extends State<StoreHome> {
     else page = account();
     return Scaffold(appBar: AppBar(title: Text(titles[tab]), actions: [
       if (tab == 0) IconButton(tooltip: 'ARK Designer', onPressed: _openDesigner, icon: const Icon(Icons.design_services_rounded)),
+      if (tab == 0) IconButton(tooltip: 'Sync published layout', onPressed: _loadDesignerConfig, icon: const Icon(Icons.sync_rounded)),
       if (tab == 0) IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
       IconButton(
         tooltip: 'Notifications',

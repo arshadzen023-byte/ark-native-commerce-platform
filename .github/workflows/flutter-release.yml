@@ -127,12 +127,23 @@ jobs:
         run: |
           set -euo pipefail
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           NDK_PACKAGE="ndk;28.2.13676358"
-          if [[ ! -x "$SDKMANAGER" ]]; then
-            echo "::error::Android sdkmanager not found at $SDKMANAGER"
+          SDKMANAGER=""
+          for candidate in \
+            "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            "$SDK_ROOT"/cmdline-tools/*/bin/sdkmanager \
+            "$SDK_ROOT/tools/bin/sdkmanager"; do
+            if [[ -x "$candidate" ]]; then SDKMANAGER="$candidate"; break; fi
+          done
+          if [[ -z "$SDKMANAGER" ]] && command -v sdkmanager >/dev/null 2>&1; then
+            SDKMANAGER="$(command -v sdkmanager)"
+          fi
+          if [[ -z "$SDKMANAGER" ]]; then
+            echo "::error::Android sdkmanager not found under SDK root $SDK_ROOT"
+            find /usr/local/lib/android /opt/android-sdk /usr/lib/android-sdk -type f -name sdkmanager -perm -u+x -print 2>/dev/null | head -20 || true
             exit 1
           fi
+          echo "Using Android sdkmanager: $SDKMANAGER"
           set +o pipefail
           yes | "$SDKMANAGER" --licenses >/dev/null
           set -o pipefail
