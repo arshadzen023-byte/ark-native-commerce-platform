@@ -680,9 +680,17 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             final item = Map<String, dynamic>.from(entry);
             final guid = item['guid'] is Map ? (item['guid'] as Map)['rendered'] : null;
             item['source_url'] = (item['source_url'] ?? item['url'] ?? guid ?? '').toString();
-            item['thumbnail_url'] = (item['thumbnail_url'] ?? item['media_details'] is Map
-                ? item['thumbnail_url']
-                : item['source_url']).toString();
+            final mediaDetails = item['media_details'] is Map
+                ? Map<String, dynamic>.from(item['media_details'] as Map)
+                : <String, dynamic>{};
+            final mediaSizes = mediaDetails['sizes'] is Map
+                ? Map<String, dynamic>.from(mediaDetails['sizes'] as Map)
+                : <String, dynamic>{};
+            final thumbnailData = mediaSizes['thumbnail'] is Map
+                ? Map<String, dynamic>.from(mediaSizes['thumbnail'] as Map)
+                : <String, dynamic>{};
+            item['thumbnail_url'] = (item['thumbnail_url'] ??
+                thumbnailData['source_url'] ?? item['source_url']).toString();
             item['mime_type'] = (item['mime_type'] ?? item['mime'] ?? 'image/jpeg').toString();
             item['alt_text'] = (item['alt_text'] ?? item['alt'] ?? '').toString();
             return item;
