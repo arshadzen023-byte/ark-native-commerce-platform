@@ -537,18 +537,47 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           'config': publishedConfig,
           'status': publish ? 'published' : 'draft',
         });
-        if (response is Map) {
-          final status = (response['status'] ?? response['state'] ?? '').toString().toLowerCase();
-          if (publish && (response['success'] == false || status == 'draft' || status == 'failed')) {
-            throw Exception('WordPress returned a non-published configuration response.');
-          }
+        if (response is! Map || response['success'] != true) {
+          throw Exception('WordPress did not confirm the Designer save.');
         }
-        wordpressConfig = Map<String, dynamic>.from(publishedConfig);
-        // Drafts stay server-side and must never replace the Shopping app's
-        // published cache. Only a confirmed Publish changes the live Home page.
+
+        Map<String, dynamic> acceptedConfig = Map<String, dynamic>.from(publishedConfig);
         if (publish) {
-          await prefs.setString('glowhit_published_designer_config', jsonEncode(publishedConfig));
+          final serverValue = response['published_config'];
+          if (serverValue is! Map || serverValue['pages'] is! Map) {
+            throw Exception('WordPress did not return the server-published JSON. Update ARK Native API Bridge to 2.2.3.');
+          }
+          final serverConfig = Map<String, dynamic>.from(serverValue);
+          final serverPages = Map<String, dynamic>.from(serverConfig['pages'] as Map);
+
+          // Verify every component ID from the requested snapshot survived the
+          // WordPress sanitizer before the UI displays a Publish-success toast.
+          for (final page in _pages) {
+            final pageKey = _wordpressPageKey(page);
+            final requestedPage = configPages[pageKey];
+            final savedPage = serverPages[pageKey];
+            final requestedSections = requestedPage is Map && requestedPage['sections'] is List
+                ? requestedPage['sections'] as List
+                : const <dynamic>[];
+            final savedSections = savedPage is Map && savedPage['sections'] is List
+                ? savedPage['sections'] as List
+                : const <dynamic>[];
+            final savedIds = savedSections.whereType<Map>()
+                .map((section) => (section['id'] ?? '').toString()).toSet();
+            final missingIds = requestedSections.whereType<Map>()
+                .map((section) => (section['id'] ?? '').toString())
+                .where((id) => id.isNotEmpty && !savedIds.contains(id))
+                .toList();
+            if (missingIds.isNotEmpty) {
+              throw Exception('WordPress dropped ' + missingIds.length.toString() +
+                  ' component(s) from page "' + page + '" while publishing. Missing IDs: ' +
+                  missingIds.join(', '));
+            }
+          }
+          acceptedConfig = serverConfig;
+          await prefs.setString('glowhit_published_designer_config', jsonEncode(acceptedConfig));
         }
+        wordpressConfig = acceptedConfig;
         await prefs.setString('glowhit_designer_last_server_sync', DateTime.now().toUtc().toIso8601String());
       } catch (e) {
         // The device draft remains recoverable, but do not claim that the server saved it.
