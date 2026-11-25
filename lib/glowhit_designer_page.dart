@@ -303,7 +303,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     properties['children'] = normalized['children'] ?? normalized['slides'] ?? <dynamic>[];
 
     final sliderKey = (section['slider_key'] ?? '').toString();
-    if (sliderKey.isNotEmpty) {
+    final hasInlineChildren = properties['children'] is List &&
+        (properties['children'] as List).isNotEmpty;
+    if (sliderKey.isNotEmpty && !hasInlineChildren) {
       try {
         final uri = Uri.parse('https://pluginstore.shop/wp-json/ark-designer/v1/sliders/$sliderKey');
         final response = await http.get(uri).timeout(const Duration(seconds: 12));
