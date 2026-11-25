@@ -374,8 +374,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             final sections = pageConfig is Map && pageConfig['sections'] is List
                 ? pageConfig['sections'] as List
                 : <dynamic>[];
-            wordpressConfig = Map<String, dynamic>.from(remote);
-          pages[page] = <DesignerComponent>[];
+            wordpressConfig = Map<String, dynamic>.from(remote)
+              ..remove('published_pages');
+            pages[page] = <DesignerComponent>[];
             for (final section in sections) {
               if (section is Map) {
                 pages[page]!.add(await _fromWordPressSection(Map<String, dynamic>.from(section)));
