@@ -31,6 +31,27 @@ void main() {
     expect(merged.firstWhere((section) => section['type'] == 'ark_live_slider')['title'], 'Edited hero');
   });
 
+  test('A new banner in a legacy partial draft is appended without replacing the published hero', () {
+    final merged = restoreLegacyHomeSections(
+      [
+        {'id': 'hero-existing', 'type': 'ark_live_slider', 'designer_component_type': 'banner_slider', 'title': 'Edited hero'},
+        {'id': 'new-banner', 'type': 'banner_grid', 'designer_component_type': 'banner_grid', 'title': 'New banner'},
+      ],
+      [
+        {'id': 'home-search', 'type': 'search', 'title': 'Search products'},
+        {'id': 'hero-existing', 'type': 'ark_live_slider', 'designer_component_type': 'banner_slider', 'title': 'Old hero'},
+        {'id': 'home-cats', 'type': 'category_grid', 'title': 'Shop categories'},
+        {'id': 'home-products', 'type': 'product_grid', 'title': 'Products'},
+      ],
+    );
+
+    expect(merged, hasLength(5));
+    expect(merged.firstWhere((section) => section['id'] == 'hero-existing')['title'], 'Edited hero');
+    expect(merged.firstWhere((section) => section['id'] == 'new-banner')['title'], 'New banner');
+    expect(merged.any((section) => section['id'] == 'home-cats'), isTrue);
+    expect(merged.any((section) => section['id'] == 'home-products'), isTrue);
+  });
+
   test('Unrecognized published component type is preserved instead of becoming other_existing_section', () {
     final component = DesignerComponent(
       id: 'search-section',
