@@ -405,7 +405,11 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           }
         }
         wordpressConfig = Map<String, dynamic>.from(publishedConfig);
-        await prefs.setString('glowhit_published_designer_config', jsonEncode(publishedConfig));
+        // Drafts stay server-side and must never replace the Shopping app's
+        // published cache. Only a confirmed Publish changes the live Home page.
+        if (publish) {
+          await prefs.setString('glowhit_published_designer_config', jsonEncode(publishedConfig));
+        }
         await prefs.setString('glowhit_designer_last_server_sync', DateTime.now().toUtc().toIso8601String());
       } catch (e) {
         // The device draft remains recoverable, but do not claim that the server saved it.
