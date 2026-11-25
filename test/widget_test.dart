@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glowhit_shopping/glowhit_designer_page.dart';
+import 'package:glowhit_shopping/designer_banner_carousel.dart';
 import 'package:glowhit_shopping/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -84,7 +85,7 @@ void main() {
         'padding_bottom': 22,
         'border_radius': 16,
         'children': [
-          {'type': 'image', 'image_url': 'https://example.com/hero.jpg', 'title': ''},
+          {'type': 'image', 'image_url': 'https://example.com/hero.jpg', 'title': '', 'link_type': 'in_app', 'link_value': 'page:categories'},
           {'type': 'text', 'text': 'Legacy text child', 'title': 'Legacy text'},
           {'type': 'link', 'link_value': 'ark://cart', 'title': 'Legacy link'},
         ],
@@ -100,6 +101,7 @@ void main() {
     expect((section['children'] as List), hasLength(1));
     expect((section['children'] as List).first['title'], '');
     expect((section['children'] as List).first['type'], 'image');
+    expect((section['children'] as List).first['link_value'], 'page:categories');
   });
 
   testWidgets('Tapping the live banner image opens its property editor', (tester) async {
@@ -116,6 +118,27 @@ void main() {
     expect(find.text('Banner Layout'), findsOneWidget);
     expect(find.text('Color'), findsWidgets);
     expect(find.text('Dimension'), findsWidgets);
+  });
+
+  testWidgets('Published banner carousel reports the tapped image child', (tester) async {
+    Map<String, dynamic>? tapped;
+    await tester.pumpWidget(MaterialApp(
+      home: SizedBox(
+        width: 360,
+        height: 220,
+        child: ArkDesignerBannerCarousel(
+          slides: const [
+            {'image_url': '', 'link_type': 'in_app', 'link_value': 'page:categories'},
+          ],
+          height: 180,
+          autoplay: false,
+          onSlideTap: (slide) => tapped = slide,
+        ),
+      ),
+    ));
+    await tester.tap(find.byKey(const ValueKey('ark-designer-banner-preview-page-view')));
+    await tester.pumpAndSettle();
+    expect(tapped?['link_value'], 'page:categories');
   });
 
   testWidgets('Designer editor exposes seven live property tabs and child tools', (tester) async {
