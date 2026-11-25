@@ -89,34 +89,86 @@ class DesignerComponent {
   Map<String, dynamic> toPublishedSection() {
     final values = Map<String, dynamic>.from(properties);
     final prefix = type.toLowerCase();
-    final derivedType = '${prefix}_${layout.toLowerCase().replaceFirst('${prefix} ', '').replaceAll(' ', '_')}';
-    final legacyType = type.toLowerCase() == 'other'
-        ? (values['original_section_type'] ?? '').toString()
-        : '';
-    final componentType = (legacyType.isNotEmpty
-        ? legacyType
-        : (values['designer_component_type'] ?? values['type'] ?? derivedType).toString());
+    final variant = layout.toLowerCase()
+        .replaceFirst('$prefix ', '')
+        .replaceAll(' ', '_');
+    var designerType = (values['designer_component_type'] ?? '${prefix}_${variant}').toString();
+    var storedType = designerType;
+    var storedVariant = variant;
+
+    // Keep the native Designer selection aligned with the exact component
+    // names and layout keys accepted by ARK App Designer's publish sanitizer.
+    if (type == 'Banner') {
+      designerType = 'banner_${variant}';
+      storedType = designerType; // WordPress converts it to ark_live_slider.
+    } else if (type == 'Category') {
+      designerType = 'category_${variant}';
+      storedType = 'category_grid';
+      storedVariant = variant;
+    } else if (type == 'Product') {
+      designerType = 'product_${variant}';
+      storedType = switch (variant) {
+        'slider' => 'product_carousel',
+        'list' => 'product_list',
+        _ => 'product_grid',
+      };
+      storedVariant = variant;
+    } else {
+      storedType = (values['original_section_type'] ?? values['type'] ?? designerType).toString();
+    }
+
     final width = (values['width'] as num?)?.toDouble() ?? 1.0;
+    final showAllCategories = values['show_all_categories'] == true;
+    final rawSource = (values['source'] ?? 'latest').toString();
+    final publishedSource = switch (rawSource) {
+      'on_sale' => 'sale',
+      'new_arrival' => 'latest',
+      _ => rawSource,
+    };
+    final sourceId = (values['source_id'] as num?)?.toInt() ??
+        (type == 'Category'
+            ? (values['parent_category_id'] as num?)?.toInt()
+            : rawSource == 'tag'
+                ? (values['tag_id'] as num?)?.toInt()
+                : (values['category_id'] as num?)?.toInt()) ?? 0;
+
+    final children = values['children'] is List
+        ? (values['children'] as List).whereType<Map>().where((child) {
+            final kind = (child['type'] ?? 'image').toString().toLowerCase();
+            final url = (child['image_url'] ?? child['source_url'] ?? child['url'] ?? '').toString();
+            final id = (child['attachment_id'] as num?)?.toInt() ?? 0;
+            return (kind == 'image' || kind == 'video') && (id > 0 || url.isNotEmpty);
+          }).map((child) => <String, dynamic>{
+            ...Map<String, dynamic>.from(child),
+            // Never auto-publish a Media Library filename as a visible title.
+            'title': (child['title'] ?? '').toString().trim(),
+          }).toList()
+        : <dynamic>[];
+
     return <String, dynamic>{
       ...values,
       'id': id,
-      'type': componentType,
-      'designer_component_type': componentType,
-      'layout_variant': componentType,
+      'type': storedType,
+      'designer_component_type': designerType,
+      'layout_variant': storedVariant,
       'title': title.trim(),
       'visible': enabled && values['visible'] != false,
       'section_background': values['background_color'] ?? values['section_background'] ?? '#FFFFFF',
       'text_color': values['title_color'] ?? values['text_color'] ?? '#24212B',
       'height_px': values['height'] ?? values['height_px'] ?? 180,
       'width': width,
-      'width_pct': values['width_pct'] ?? (width * 100),
+      'width_pct': width * 100,
       'max_width_px': values['max_cross_axis_extent'] ?? values['max_width_px'] ?? 300,
+      'main_axis_spacing': values['main_axis_spacing'] ?? 10,
+      'cross_axis_spacing': values['cross_axis_spacing'] ?? 10,
       'item_gap': values['cross_axis_spacing'] ?? values['item_gap'] ?? 10,
       'corner_radius': values['border_radius'] ?? values['corner_radius'] ?? 16,
       'columns': values['cross_axis_count'] ?? values['columns'] ?? 2,
       'card_aspect_ratio': values['cross_aspect_ratio'] ?? values['card_aspect_ratio'] ?? 1,
       'card_depth': values['elevation'] ?? values['card_depth'] ?? 1,
-      'limit': values['fixed_grid_view_count'] ?? values['limit'] ?? 8,
+      'limit': type == 'Category' && showAllCategories
+          ? 100
+          : (values['fixed_grid_view_count'] ?? values['limit'] ?? 8),
       'show_arrows': values['control'] == false ? false : (values['arrows'] ?? values['show_arrows'] ?? false),
       'show_dots': values['control'] == false ? false : (values['dots'] ?? values['show_dots'] ?? true),
       'pause_on_interaction': values['pause'] ?? values['pause_on_interaction'] ?? true,
@@ -124,17 +176,14 @@ class DesignerComponent {
       'card_width': values['view_fraction'] ?? values['card_width'] ?? 1,
       'interval_ms': values['interval_ms'] ??
           ((((values['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000).round()),
-      'category_id': values['parent_category_id'] ?? values['category_id'] ?? 0,
-      'tag_id': values['tag_id'] ?? (values['source'] == 'tag' ? values['source_id'] ?? 0 : 0),
-      'children': values['children'] is List
-          ? (values['children'] as List).whereType<Map>().where((child) {
-              final kind = (child['type'] ?? 'image').toString().toLowerCase();
-              return kind == 'image' || kind == 'video';
-            }).map((child) => <String, dynamic>{
-              ...Map<String, dynamic>.from(child),
-              'title': (child['title'] ?? '').toString().trim(),
-            }).toList()
-          : <dynamic>[],
+      'category_id': type == 'Category'
+          ? (showAllCategories ? 0 : (values['parent_category_id'] ?? values['category_id'] ?? 0))
+          : (publishedSource == 'category' ? sourceId : (values['category_id'] ?? 0)),
+      'category_layout': type == 'Category' ? storedVariant : (values['category_layout'] ?? ''),
+      'tag_id': publishedSource == 'tag' ? sourceId : (values['tag_id'] ?? 0),
+      'source': publishedSource,
+      'source_id': sourceId,
+      'children': children,
     };
   }
 
