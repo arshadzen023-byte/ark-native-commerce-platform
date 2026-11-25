@@ -600,11 +600,11 @@ class _StoreHomeState extends State<StoreHome> {
         return Align(
           alignment: Alignment.center,
           child: SizedBox(
-            width: (MediaQuery.of(context).size.width - sectionMargin.horizontal) * widthFactor,
+            width: (MediaQuery.of(context).size.width - 24) * widthFactor,
             child: Padding(
               padding: EdgeInsets.only(
-                left: paddingLeft,
-                right: paddingRight,
+                left: sectionMargin.left + paddingLeft,
+                right: sectionMargin.right + paddingRight,
                 top: sectionMargin.top + padding,
                 bottom: sectionMargin.bottom + ((section['padding_bottom'] as num?)?.toDouble() ?? 12),
               ),
@@ -738,9 +738,11 @@ class _StoreHomeState extends State<StoreHome> {
           else if (layout.contains('slider') || layout.contains('scroll'))
             SizedBox(
               height: cardHeight,
-              child: ListView(
+              child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                children: cards,
+                itemCount: cards.length,
+                separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
+                itemBuilder: (_, index) => cards[index],
               ),
             )
           else
@@ -787,9 +789,11 @@ class _StoreHomeState extends State<StoreHome> {
           if (layout.contains('carousel') || layout.contains('slider'))
             SizedBox(
               height: cardHeight,
-              child: ListView(
+              child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                children: cards,
+                itemCount: cards.length,
+                separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
+                itemBuilder: (_, index) => cards[index],
               ),
             )
           else if (layout.contains('list'))
