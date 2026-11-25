@@ -572,7 +572,7 @@ class _StoreHomeState extends State<StoreHome> {
     final mainAxisGap = (section['main_axis_spacing'] as num?)?.toDouble() ?? (section['item_gap'] as num?)?.toDouble() ?? 8.0;
     final crossAxisGap = (section['cross_axis_spacing'] as num?)?.toDouble() ?? (section['item_gap'] as num?)?.toDouble() ?? 8.0;
     final widthFactor = ((section['width'] as num?)?.toDouble() ??
-      (((section['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0);
+      (((section['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
     final margin = EdgeInsets.fromLTRB(
       (section['margin_left'] as num?)?.toDouble() ?? 0,
       (section['margin_top'] as num?)?.toDouble() ?? 0,
@@ -600,7 +600,7 @@ class _StoreHomeState extends State<StoreHome> {
         return Align(
           alignment: Alignment.center,
           child: SizedBox(
-            width: (MediaQuery.of(context).size.width - 24) * widthFactor,
+            width: ((MediaQuery.of(context).size.width - 24) * widthFactor).toDouble(),
             child: Padding(
               padding: EdgeInsets.only(
                 left: sectionMargin.left + paddingLeft,
@@ -711,7 +711,7 @@ class _StoreHomeState extends State<StoreHome> {
         return SizedBox(width: 128, height: cardHeight, child: card);
       }).toList();
       return Container(
-        width: (MediaQuery.of(context).size.width - margin.horizontal) * widthFactor,
+        width: ((MediaQuery.of(context).size.width - margin.horizontal) * widthFactor).toDouble(),
         margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
         padding: EdgeInsets.fromLTRB(
