@@ -11,6 +11,36 @@ void main() {
     expect(storeUrl, 'https://pluginstore.shop');
   });
 
+  test('Legacy banner-only draft restores the published Home product and category sections', () {
+    final merged = restoreLegacyHomeSections(
+      [
+        {'id': 'legacy-banner', 'type': 'ark_live_slider', 'title': 'Edited hero'},
+      ],
+      [
+        {'id': 'home-search', 'type': 'search', 'title': 'Search products'},
+        {'id': 'home-hero', 'type': 'ark_live_slider', 'title': 'Featured'},
+        {'id': 'home-cats', 'type': 'category_grid', 'title': 'Shop by category'},
+        {'id': 'home-featured', 'type': 'product_carousel', 'title': 'Featured products'},
+        {'id': 'home-products', 'type': 'product_grid', 'title': 'Shop products'},
+      ],
+    );
+    expect(merged, hasLength(5));
+    expect(merged.map((section) => section['id']), contains('home-cats'));
+    expect(merged.map((section) => section['id']), contains('home-products'));
+    expect(merged.firstWhere((section) => section['type'] == 'ark_live_slider')['title'], 'Edited hero');
+  });
+
+  test('Unrecognized published component type is preserved instead of becoming other_existing_section', () {
+    final component = DesignerComponent(
+      id: 'search-section',
+      type: 'Other',
+      title: 'Search products',
+      layout: 'Existing section',
+      properties: {'original_section_type': 'search'},
+    );
+    expect(component.toPublishedSection()['type'], 'search');
+  });
+
   testWidgets('Designer gallery shows component previews without title or edit controls', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const MaterialApp(
