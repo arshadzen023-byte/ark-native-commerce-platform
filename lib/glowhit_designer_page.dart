@@ -146,16 +146,31 @@ class DesignerComponent {
                 : (values['category_id'] as num?)?.toInt()) ?? 0;
 
     final children = values['children'] is List
-        ? (values['children'] as List).whereType<Map>().where((child) {
+        ? (values['children'] as List).whereType<Map>().map((rawChild) {
+            final child = Map<String, dynamic>.from(rawChild);
             final kind = (child['type'] ?? 'image').toString().toLowerCase();
-            final url = (child['image_url'] ?? child['source_url'] ?? child['url'] ?? '').toString();
-            final id = (child['attachment_id'] as num?)?.toInt() ?? 0;
-            return (kind == 'image' || kind == 'video') && (id > 0 || url.isNotEmpty);
-          }).map((child) => <String, dynamic>{
-            ...Map<String, dynamic>.from(child),
-            // Never auto-publish a Media Library filename as a visible title.
-            'title': (child['title'] ?? '').toString().trim(),
-          }).toList()
+            final rawId = child['attachment_id'] ?? child['media_id'] ?? child['id'];
+            final attachmentId = rawId is num
+                ? rawId.toInt()
+                : int.tryParse((rawId ?? '').toString()) ?? 0;
+            dynamic rawImage = child['image_url'] ?? child['source_url'] ?? child['url'] ?? child['src'] ?? child['image'] ?? '';
+            if (rawImage is Map) rawImage = rawImage['url'] ?? rawImage['src'] ?? '';
+            final imageUrl = rawImage.toString().trim();
+            final supported = kind == 'image' || kind == 'video';
+            if (!supported || (attachmentId < 1 && imageUrl.isEmpty)) return null;
+            return <String, dynamic>{
+              ...child,
+              'type': kind,
+              'attachment_id': attachmentId,
+              // WordPress SQL slider persistence expects image_url. Normalize
+              // source_url/url/src aliases here instead of dropping a selected
+              // Media Library image during publish.
+              'image_url': kind == 'image' ? imageUrl : '',
+              'source_url': imageUrl,
+              'title': (child['title'] ?? '').toString().trim(),
+              'active': child['active'] != false,
+            };
+          }).whereType<Map<String, dynamic>>().toList()
         : <dynamic>[];
 
     return <String, dynamic>{
