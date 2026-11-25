@@ -48,7 +48,7 @@ class DesignerComponent {
     final values = Map<String, dynamic>.from(properties);
     final prefix = type.toLowerCase();
     final derivedType = '${prefix}_${layout.toLowerCase().replaceFirst('${prefix} ', '').replaceAll(' ', '_')}';
-    final componentType = (values['designer_component_type'] ?? derivedType).toString();
+    final componentType = (values['designer_component_type'] ?? values['type'] ?? derivedType).toString();
     final width = (values['width'] as num?)?.toDouble() ?? 1.0;
     return <String, dynamic>{
       ...values,
@@ -70,8 +70,8 @@ class DesignerComponent {
       'card_aspect_ratio': values['cross_aspect_ratio'] ?? values['card_aspect_ratio'] ?? 1,
       'card_depth': values['elevation'] ?? values['card_depth'] ?? 1,
       'limit': values['fixed_grid_view_count'] ?? values['limit'] ?? 8,
-      'show_arrows': values['arrows'] ?? values['show_arrows'] ?? false,
-      'show_dots': values['dots'] ?? values['show_dots'] ?? true,
+      'show_arrows': values['control'] == false ? false : (values['arrows'] ?? values['show_arrows'] ?? false),
+      'show_dots': values['control'] == false ? false : (values['dots'] ?? values['show_dots'] ?? true),
       'pause_on_interaction': values['pause'] ?? values['pause_on_interaction'] ?? true,
       'transition': values['fade'] == true ? 'fade' : (values['transition'] ?? 'slide'),
       'card_width': values['view_fraction'] ?? values['card_width'] ?? 1,
