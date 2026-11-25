@@ -793,6 +793,8 @@ class _StoreHomeState extends State<StoreHome> {
       if (rows.isEmpty) return const SizedBox.shrink();
       final cardRadius = (config['corner_radius'] as num?)?.toDouble() ?? 12;
       final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 150;
+      final categoryCardWidth = ((config['max_width_px'] as num?)?.toDouble() ?? 180)
+          .clamp(88, MediaQuery.of(context).size.width).toDouble();
       final categoryAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .9).clamp(.4, 2.5);
       final categoryRowExtent = (cardHeight * (.9 / categoryAspect)).clamp(80, 500).toDouble();
       final cards = rows.map((category) {
@@ -813,7 +815,7 @@ class _StoreHomeState extends State<StoreHome> {
             ),
           ]),
         );
-        return SizedBox(width: 128, height: cardHeight, child: card);
+        return SizedBox(width: categoryCardWidth, height: cardHeight, child: card);
       }).toList();
       return Container(
         width: ((MediaQuery.of(context).size.width - margin.horizontal) * widthFactor).toDouble(),
