@@ -824,6 +824,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           showArrows: properties['arrows'] == true && properties['control'] != false,
           fade: properties['fade'] == true,
           viewFraction: ((properties['view_fraction'] as num?)?.toDouble() ?? .9).clamp(.4, 1).toDouble(),
+          onTap: onEdit,
         ));
       } else if (isScroll) {
         content = SizedBox(height: height.clamp(90, 500).toDouble(), child: ListView.separated(
@@ -903,10 +904,10 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final title = (properties['show_title'] == false) ? '' : component.title;
     return Listener(
       behavior: HitTestBehavior.translucent,
-      onPointerDown: onEdit == null ? null : (event) {
+      onPointerDown: onEdit == null || (isBanner && isSlider) ? null : (event) {
         _componentPointerDown[event.pointer] = event.position;
       },
-      onPointerUp: onEdit == null ? null : (event) {
+      onPointerUp: onEdit == null || (isBanner && isSlider) ? null : (event) {
         final start = _componentPointerDown.remove(event.pointer);
         if (start != null && (event.position - start).distance < 12) {
           onEdit();
