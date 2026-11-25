@@ -607,6 +607,11 @@ class _StoreHomeState extends State<StoreHome> {
         final layout = (config['designer_component_type'] ?? config['type'] ?? '').toString();
         final bannerGrid = layout == 'banner_grid';
         final bannerStyle = layout == 'banner_list' || layout == 'banner_scroll';
+        final bannerGridColumns = ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4);
+        final bannerGridAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3.0);
+        final bannerGridRowExtent = (height * (1.2 / bannerGridAspect)).clamp(60, 500).toDouble();
+        final bannerGridRows = (slides.length / bannerGridColumns).ceil().clamp(1, 10);
+        final bannerGridHeight = bannerGridRowExtent * bannerGridRows + mainAxisGap * (bannerGridRows - 1);
         return Align(
           alignment: Alignment.center,
           child: SizedBox(
@@ -625,16 +630,16 @@ class _StoreHomeState extends State<StoreHome> {
             ),
             bannerGrid
                 ? SizedBox(
-                    height: height,
+                    height: bannerGridHeight,
                     child: GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: slides.length,
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
+                        crossAxisCount: bannerGridColumns,
                         crossAxisSpacing: crossAxisGap,
                         mainAxisSpacing: mainAxisGap,
-                        childAspectRatio: ((config['card_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3),
+                        mainAxisExtent: bannerGridRowExtent,
                       ),
                       itemBuilder: (_, index) {
                         final url = (slides[index]['image_url'] ?? slides[index]['source_url'] ?? '').toString();
@@ -724,6 +729,8 @@ class _StoreHomeState extends State<StoreHome> {
       if (rows.isEmpty) return const SizedBox.shrink();
       final cardRadius = (config['corner_radius'] as num?)?.toDouble() ?? 12;
       final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 150;
+      final categoryAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .9).clamp(.4, 2.5);
+      final categoryRowExtent = (cardHeight * (.9 / categoryAspect)).clamp(80, 500).toDouble();
       final cards = rows.map((category) {
         final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
         final card = Card(
@@ -788,7 +795,7 @@ class _StoreHomeState extends State<StoreHome> {
                 crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
                 crossAxisSpacing: crossAxisGap,
                 mainAxisSpacing: mainAxisGap,
-                childAspectRatio: (config['card_aspect_ratio'] as num?)?.toDouble() ?? .9,
+                mainAxisExtent: categoryRowExtent,
               ),
               itemBuilder: (_, index) => cards[index],
             ),
@@ -802,6 +809,8 @@ class _StoreHomeState extends State<StoreHome> {
       final layout = (config['layout_variant'] ?? config['designer_component_type'] ?? type).toString().toLowerCase();
       final cardWidth = (config['max_width_px'] as num?)?.toDouble() ?? 174;
       final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 260;
+      final productAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .66).clamp(.4, 2.5);
+      final productRowExtent = (cardHeight * (.66 / productAspect)).clamp(120, 600).toDouble();
       final cards = rows.map((product) => SizedBox(
         width: cardWidth,
         child: productCard(product),
@@ -844,7 +853,7 @@ class _StoreHomeState extends State<StoreHome> {
               itemCount: rows.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
-                childAspectRatio: (config['card_aspect_ratio'] as num?)?.toDouble() ?? .66,
+                mainAxisExtent: productRowExtent,
                 crossAxisSpacing: crossAxisGap,
                 mainAxisSpacing: mainAxisGap,
               ),
