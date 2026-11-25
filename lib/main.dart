@@ -560,8 +560,8 @@ class _StoreHomeState extends State<StoreHome> {
   }
 
   Widget _designerSection(Map<String, dynamic> section) {
-    final nested = config['properties'] is Map
-        ? Map<String, dynamic>.from(config['properties'] as Map)
+    final nested = section['properties'] is Map
+        ? Map<String, dynamic>.from(section['properties'] as Map)
         : <String, dynamic>{};
     // DesignerComponent JSON keeps editable values under "properties";
     // legacy WordPress sections keep the same values at the root.
