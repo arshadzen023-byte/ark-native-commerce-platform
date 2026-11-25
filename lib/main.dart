@@ -533,7 +533,7 @@ class _StoreHomeState extends State<StoreHome> {
     final categoryId = (section['category_id'] as num?)?.toInt() ?? 0;
     final tagId = (section['tag_id'] as num?)?.toInt() ?? 0;
     var rows = products.where((p) {
-      if (source == 'sale') return p['on_sale'] == true;
+      if (source == 'sale' || source == 'on_sale') return p['on_sale'] == true;
       if (source == 'featured') return p['is_featured'] == true;
       if (source == 'wishlist') return wishlist.any((w) => w['id'] == p['id']);
       if (source == 'best_selling') return (p['total_sales'] as num?) != null;
@@ -782,12 +782,13 @@ class _StoreHomeState extends State<StoreHome> {
         child: productCard(product),
       )).toList();
       return Container(
+        width: (MediaQuery.of(context).size.width * widthFactor - margin.horizontal).clamp(0, MediaQuery.of(context).size.width).toDouble(),
         margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
         padding: EdgeInsets.fromLTRB(
-          (config['padding_left'] as num?)?.toDouble() ?? 12,
+          paddingLeft,
           padding,
-          (config['padding_right'] as num?)?.toDouble() ?? 12,
+          paddingRight,
           (config['padding_bottom'] as num?)?.toDouble() ?? 12,
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
