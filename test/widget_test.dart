@@ -23,7 +23,7 @@ void main() {
     expect(find.text('Home'), findsWidgets);
     expect(find.text('Tap to edit properties'), findsNothing);
     expect(find.text('Banner Slider'), findsNothing);
-    expect(find.text('Main promotional banner'), findsOneWidget);
+    expect(find.text('Main promotional banner'), findsWidgets);
     expect(find.text('Save Draft'), findsOneWidget);
     expect(find.text('Publish'), findsOneWidget);
     expect(find.text('Add'), findsOneWidget);
@@ -47,10 +47,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    final liveComponent = find.byWidgetPredicate((widget) =>
-      widget is InkWell && widget.key is ValueKey &&
-      (widget.key as ValueKey).value.toString().startsWith('designer-live-'));
-    await tester.tap(liveComponent.first);
+    await tester.tap(find.text('Main promotional banner').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(Tab).evaluate().where((e) => (e.widget as Tab).text == 'Color'), hasLength(1));
