@@ -44,6 +44,45 @@ class DesignerComponent {
     'properties': properties,
   };
 
+  Map<String, dynamic> toPublishedSection() {
+    final values = Map<String, dynamic>.from(properties);
+    final prefix = type.toLowerCase();
+    final derivedType = '${prefix}_${layout.toLowerCase().replaceFirst('${prefix} ', '').replaceAll(' ', '_')}';
+    final componentType = (values['designer_component_type'] ?? derivedType).toString();
+    final width = (values['width'] as num?)?.toDouble() ?? 1.0;
+    return <String, dynamic>{
+      ...values,
+      'id': id,
+      'type': componentType,
+      'designer_component_type': componentType,
+      'layout_variant': componentType,
+      'title': title.trim(),
+      'visible': enabled && values['visible'] != false,
+      'section_background': values['background_color'] ?? values['section_background'] ?? '#FFFFFF',
+      'text_color': values['title_color'] ?? values['text_color'] ?? '#24212B',
+      'height_px': values['height'] ?? values['height_px'] ?? 180,
+      'width': width,
+      'width_pct': values['width_pct'] ?? (width * 100),
+      'max_width_px': values['max_cross_axis_extent'] ?? values['max_width_px'] ?? 300,
+      'item_gap': values['cross_axis_spacing'] ?? values['item_gap'] ?? 10,
+      'corner_radius': values['border_radius'] ?? values['corner_radius'] ?? 16,
+      'columns': values['cross_axis_count'] ?? values['columns'] ?? 2,
+      'card_aspect_ratio': values['cross_aspect_ratio'] ?? values['card_aspect_ratio'] ?? 1,
+      'card_depth': values['elevation'] ?? values['card_depth'] ?? 1,
+      'limit': values['fixed_grid_view_count'] ?? values['limit'] ?? 8,
+      'show_arrows': values['arrows'] ?? values['show_arrows'] ?? false,
+      'show_dots': values['dots'] ?? values['show_dots'] ?? true,
+      'pause_on_interaction': values['pause'] ?? values['pause_on_interaction'] ?? true,
+      'transition': values['fade'] == true ? 'fade' : (values['transition'] ?? 'slide'),
+      'card_width': values['view_fraction'] ?? values['card_width'] ?? 1,
+      'interval_ms': values['interval_ms'] ??
+          ((((values['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000).round()),
+      'category_id': values['parent_category_id'] ?? values['category_id'] ?? 0,
+      'tag_id': values['tag_id'] ?? (values['source'] == 'tag' ? values['source_id'] ?? 0 : 0),
+      'children': values['children'] is List ? values['children'] : <dynamic>[],
+    };
+  }
+
   factory DesignerComponent.fromJson(Map<String, dynamic> json) => DesignerComponent(
     id: (json['id'] ?? DateTime.now().microsecondsSinceEpoch).toString(),
     type: (json['type'] ?? 'banner').toString(),
@@ -106,6 +145,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   String? error;
   Map<String, List<DesignerComponent>> pages = {};
   Map<String, dynamic> templates = {};
+  Map<String, dynamic> wordpressConfig = <String, dynamic>{};
   late final TextEditingController _titleController = TextEditingController();
   late final TextEditingController _descriptionController = TextEditingController();
 
@@ -135,7 +175,11 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   };
 
   Future<DesignerComponent> _fromWordPressSection(Map<String, dynamic> section) async {
-    final rawType = (section['designer_component_type'] ?? section['type'] ?? '').toString().toLowerCase();
+    final nested = section['properties'] is Map
+        ? Map<String, dynamic>.from(section['properties'] as Map)
+        : <String, dynamic>{};
+    final normalized = <String, dynamic>{...section, ...nested}..remove('properties');
+    final rawType = (normalized['designer_component_type'] ?? normalized['type'] ?? '').toString().toLowerCase();
     String type = 'Other';
     String layout = 'Existing section';
     if (rawType.startsWith('banner') || rawType == 'ark_live_slider') {
@@ -164,41 +208,41 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       };
     }
 
-    final properties = Map<String, dynamic>.from(section);
-    properties['background_color'] = section['section_background'] ?? section['background_color'] ?? '#FFFFFF';
-    properties['title_color'] = section['text_color'] ?? section['title_color'] ?? '#241D33';
-    properties['height'] = section['height_px'] ?? section['height'] ?? 180;
-    properties['width'] = ((section['width_pct'] as num?)?.toDouble() ?? 100) / 100;
-    properties['max_cross_axis_extent'] = section['max_width_px'] ?? 300;
-    properties['main_axis_spacing'] = section['item_gap'] ?? 10;
-    properties['cross_axis_spacing'] = section['item_gap'] ?? 10;
-    properties['border_radius'] = section['corner_radius'] ?? 16;
-    properties['cross_axis_count'] = section['columns'] ?? 2;
-    properties['cross_aspect_ratio'] = section['card_aspect_ratio'] ?? 1;
-    properties['elevation'] = section['card_depth'] ?? 1;
-    properties['fixed_grid_view_count'] = section['limit'] ?? 12;
-    properties['parent_category_id'] = section['category_id'] ?? 0;
-    properties['show_all_categories'] = (section['limit'] as num?)?.toInt() == 100;
-    properties['arrows'] = section['show_arrows'] ?? false;
-    properties['dots'] = section['show_dots'] ?? false;
-    properties['control'] = section['control'] ?? true;
-    properties['autoplay'] = section['autoplay'] ?? true;
-    properties['autoplay_seconds'] = ((section['interval_ms'] as num?)?.toDouble() ?? 4000) / 1000;
-    properties['fade'] = (section['transition'] ?? '') == 'fade';
-    properties['view_fraction'] = section['card_width'] ?? 1;
-    properties['pause'] = section['pause_on_interaction'] ?? true;
-    properties['horizontal'] = section['horizontal'] ?? true;
-    properties['link'] = section['tap_url'] ?? '';
-    properties['image_url'] = section['image_url'] ?? section['background_image_url'] ?? '';
-    properties['source'] = section['source'] ?? 'featured';
-    properties['source_id'] = section['category_id'] ?? 0;
-    properties['title_font_size'] = section['title_font_size'] ?? 18;
-    properties['title_font_weight'] = section['title_font_weight'] ?? 'bold';
-    properties['title_text_align'] = section['title_text_align'] ?? 'left';
-    properties['title_max_lines'] = section['title_max_lines'] ?? 2;
-    properties['countdown_enabled'] = section['countdown_enabled'] ?? false;
-    properties['countdown_time'] = section['countdown_time'] ?? '';
-    properties['children'] = section['children'] ?? section['slides'] ?? <dynamic>[];
+    final properties = Map<String, dynamic>.from(normalized);
+    properties['background_color'] = normalized['section_background'] ?? normalized['background_color'] ?? '#FFFFFF';
+    properties['title_color'] = normalized['text_color'] ?? normalized['title_color'] ?? '#241D33';
+    properties['height'] = normalized['height_px'] ?? normalized['height'] ?? 180;
+    properties['width'] = ((normalized['width_pct'] as num?)?.toDouble() ?? 100) / 100;
+    properties['max_cross_axis_extent'] = normalized['max_width_px'] ?? 300;
+    properties['main_axis_spacing'] = normalized['main_axis_spacing'] ?? normalized['item_gap'] ?? 10;
+    properties['cross_axis_spacing'] = normalized['cross_axis_spacing'] ?? normalized['item_gap'] ?? 10;
+    properties['border_radius'] = normalized['corner_radius'] ?? 16;
+    properties['cross_axis_count'] = normalized['columns'] ?? 2;
+    properties['cross_aspect_ratio'] = normalized['card_aspect_ratio'] ?? 1;
+    properties['elevation'] = normalized['card_depth'] ?? 1;
+    properties['fixed_grid_view_count'] = normalized['limit'] ?? 12;
+    properties['parent_category_id'] = normalized['category_id'] ?? normalized['parent_category_id'] ?? 0;
+    properties['show_all_categories'] = (normalized['limit'] as num?)?.toInt() == 100;
+    properties['arrows'] = normalized['show_arrows'] ?? false;
+    properties['dots'] = normalized['show_dots'] ?? false;
+    properties['control'] = normalized['control'] ?? true;
+    properties['autoplay'] = normalized['autoplay'] ?? true;
+    properties['autoplay_seconds'] = ((normalized['interval_ms'] as num?)?.toDouble() ?? 4000) / 1000;
+    properties['fade'] = (normalized['transition'] ?? '') == 'fade';
+    properties['view_fraction'] = normalized['card_width'] ?? 1;
+    properties['pause'] = normalized['pause_on_interaction'] ?? true;
+    properties['horizontal'] = normalized['horizontal'] ?? true;
+    properties['link'] = normalized['tap_url'] ?? '';
+    properties['image_url'] = normalized['image_url'] ?? normalized['background_image_url'] ?? '';
+    properties['source'] = normalized['source'] ?? 'featured';
+    properties['source_id'] = normalized['source_id'] ?? normalized['category_id'] ?? normalized['tag_id'] ?? 0;
+    properties['title_font_size'] = normalized['title_font_size'] ?? 18;
+    properties['title_font_weight'] = normalized['title_font_weight'] ?? 'bold';
+    properties['title_text_align'] = normalized['title_text_align'] ?? 'left';
+    properties['title_max_lines'] = normalized['title_max_lines'] ?? 2;
+    properties['countdown_enabled'] = normalized['countdown_enabled'] ?? false;
+    properties['countdown_time'] = normalized['countdown_time'] ?? '';
+    properties['children'] = normalized['children'] ?? normalized['slides'] ?? <dynamic>[];
 
     final sliderKey = (section['slider_key'] ?? '').toString();
     if (sliderKey.isNotEmpty) {
@@ -222,7 +266,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     return DesignerComponent(
       id: (section['id'] ?? _id()).toString(),
       type: type,
-      title: (section['title'] ?? 'New component').toString(),
+      title: (normalized['title'] ?? 'New component').toString(),
       layout: layout,
       enabled: section['visible'] != false,
       properties: properties,
@@ -243,7 +287,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             final sections = pageConfig is Map && pageConfig['sections'] is List
                 ? pageConfig['sections'] as List
                 : <dynamic>[];
-            pages[page] = <DesignerComponent>[];
+            wordpressConfig = Map<String, dynamic>.from(remote);
+          pages[page] = <DesignerComponent>[];
             for (final section in sections) {
               if (section is Map) {
                 pages[page]!.add(await _fromWordPressSection(Map<String, dynamic>.from(section)));
@@ -321,22 +366,36 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   Future<void> _persist({bool publish = false}) async {
     setState(() { saving = !publish; publishing = publish; error = null; });
     try {
-      final data = <String, dynamic>{
+      final now = DateTime.now().toUtc().toIso8601String();
+      final localData = <String, dynamic>{
         'schema': 'ark-glowhit-designer/v1',
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
+        'updated_at': now,
         'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
         'templates': templates,
       };
-      final json = const JsonEncoder.withIndent('  ').convert(data);
+      final localJson = const JsonEncoder.withIndent('  ').convert(localData);
+      final publishedConfig = Map<String, dynamic>.from(wordpressConfig);
+      final configPages = publishedConfig['pages'] is Map
+          ? Map<String, dynamic>.from(publishedConfig['pages'] as Map)
+          : <String, dynamic>{};
+      for (final page in _pages) {
+        final pageKey = _wordpressPageKey(page);
+        final existing = configPages[pageKey] is Map
+            ? Map<String, dynamic>.from(configPages[pageKey] as Map)
+            : <String, dynamic>{'title': page};
+        existing['title'] ??= page;
+        existing['sections'] = (pages[page] ?? <DesignerComponent>[])
+            .map((component) => component.toPublishedSection()).toList();
+        configPages[pageKey] = existing;
+      }
+      publishedConfig['schema_version'] = 3;
+      publishedConfig['updated_at'] = now;
+      publishedConfig['pages'] = configPages;
       final prefs = await SharedPreferences.getInstance();
-
-      // Preserve a recoverable local copy before calling the server, but mark
-      // it explicitly as pending so the editor never confuses it with a publish.
-      await prefs.setString(_storageKey, json);
+      await prefs.setString(_storageKey, localJson);
       try {
         final response = await ArkCustomerApi(widget.token).request('designer/config', method: 'POST', body: {
-          'config': data,
-          'schema': 'ark-glowhit-designer/v1',
+          'config': publishedConfig,
           'status': publish ? 'published' : 'draft',
         });
         if (response is Map) {
@@ -345,7 +404,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             throw Exception('WordPress returned a non-published configuration response.');
           }
         }
-        await prefs.setString('glowhit_published_designer_config', jsonEncode(data));
+        wordpressConfig = Map<String, dynamic>.from(publishedConfig);
+        await prefs.setString('glowhit_published_designer_config', jsonEncode(publishedConfig));
         await prefs.setString('glowhit_designer_last_server_sync', DateTime.now().toUtc().toIso8601String());
       } catch (e) {
         // The device draft remains recoverable, but do not claim that the server saved it.
@@ -633,8 +693,32 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final isSlider = layout.contains('slider');
     final isScroll = layout.contains('scroll') || isSlider;
     final isList = layout.contains('list');
-    final productItems = previewProducts.take(((properties['fixed_grid_view_count'] as num?)?.toInt() ?? 8).clamp(1, 12).toInt()).toList();
-    final categoryItems = previewCategories.take(((properties['fixed_grid_view_count'] as num?)?.toInt() ?? 8).clamp(1, 12).toInt()).toList();
+    final previewLimit = ((properties['fixed_grid_view_count'] as num?)?.toInt() ?? 8).clamp(1, 40).toInt();
+    final productSource = (properties['source'] ?? 'latest').toString();
+    final sourceId = ((properties['source_id'] ?? properties['category_id'] ?? properties['tag_id']) as num?)?.toInt() ?? 0;
+    final productItems = previewProducts.where((product) {
+      if (productSource == 'featured') return product['is_featured'] == true;
+      if (productSource == 'on_sale' || productSource == 'sale') return product['on_sale'] == true;
+      if (productSource == 'category' && sourceId > 0) {
+        final ids = product['categories'] is List
+            ? (product['categories'] as List).whereType<Map>().map((entry) => (entry['id'] as num?)?.toInt()).toList()
+            : <int?>[];
+        return ids.contains(sourceId);
+      }
+      if (productSource == 'tag' && sourceId > 0) {
+        final ids = product['tags'] is List
+            ? (product['tags'] as List).whereType<Map>().map((entry) => (entry['id'] as num?)?.toInt()).toList()
+            : <int?>[];
+        return ids.contains(sourceId);
+      }
+      if (productSource == 'wishlist') return false;
+      return true;
+    }).take(previewLimit).toList();
+    final parentCategoryId = ((properties['parent_category_id'] ?? properties['category_id']) as num?)?.toInt() ?? 0;
+    final categoryItems = previewCategories.where((category) {
+      if (properties['show_all_categories'] == true || parentCategoryId <= 0) return true;
+      return (category['parent'] as num?)?.toInt() == parentCategoryId;
+    }).take(previewLimit).toList();
 
     Widget imageTile(Map<String, dynamic> child, {double? tileWidth}) {
       final url = (child['image_url'] ?? child['source_url'] ?? child['url'] ?? '').toString();
@@ -1128,6 +1212,13 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
       if (key == 'source_id' && item.properties['source'] == 'category') {
         item.properties['category_id'] = value;
       }
+      if (key == 'source_id' && item.properties['source'] == 'tag') {
+        item.properties['tag_id'] = value;
+      }
+      if (key == 'show_all_categories') {
+        item.properties['limit'] = value == true ? 100 : 8;
+        item.properties['fixed_grid_view_count'] = item.properties['limit'];
+      }
     });
     widget.onChanged();
   }
@@ -1189,7 +1280,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                   'video_url': isVideo ? source : '',
                   'source_url': source,
                   'mime_type': mime,
-                  'title': (media['title'] ?? 'New').toString(),
+                  'title': '',
                   'alt_text': (media['alt_text'] ?? '').toString(),
                   'link_type': 'in_app', 'link_value': '', 'active': true,
                 });
@@ -1267,7 +1358,9 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                         ? Icon(type == 'link' ? Icons.link : type == 'text' ? Icons.text_fields : Icons.image)
                         : Image.network(src, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)),
                   ),
-                  title: Text((child['title'] ?? 'New').toString()),
+                  title: Text((child['title'] ?? '').toString().trim().isEmpty
+                      ? (type == 'link' ? 'Link' : type == 'text' ? 'Text' : 'Image / Video')
+                      : child['title'].toString()),
                   subtitle: Text(type.toUpperCase()),
                   trailing: IconButton(
                     tooltip: 'Delete child',
@@ -1394,7 +1487,19 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
               DropdownMenuItem(value: 'best_selling', child: Text('Best Selling')),
               DropdownMenuItem(value: 'top_rated', child: Text('Top Rated')),
             ],
-            onChanged: (value) { if (value != null) _change('source', value); },
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() {
+                item.properties['source'] = value;
+                item.properties['source_id'] = 0;
+                if (value == 'category') {
+                  item.properties['category_id'] = 0;
+                } else if (value == 'tag') {
+                  item.properties['tag_id'] = 0;
+                }
+              });
+              widget.onChanged();
+            },
           ),
           if (['category','tag'].contains(item.properties['source']))
             TextFormField(
@@ -1847,7 +1952,7 @@ class _DesignerChildEditPageState extends State<_DesignerChildEditPage> {
   void initState() {
     super.initState();
     child = Map<String, dynamic>.from(widget.child);
-    title = TextEditingController(text: (child['title'] ?? 'New').toString());
+    title = TextEditingController(text: (child['title'] ?? '').toString());
     link = TextEditingController(text: (child['link_value'] ?? '').toString());
   }
 
@@ -1869,6 +1974,8 @@ class _DesignerChildEditPageState extends State<_DesignerChildEditPage> {
       child['source_url'] = url;
       child['mime_type'] = mime;
       child['alt_text'] = media['alt_text'] ?? '';
+      child['title'] = '';
+      title.clear();
     });
   }
 
