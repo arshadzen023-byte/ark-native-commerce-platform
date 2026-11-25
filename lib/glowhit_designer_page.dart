@@ -146,6 +146,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   Map<String, List<DesignerComponent>> pages = {};
   Map<String, dynamic> templates = {};
   Map<String, dynamic> wordpressConfig = <String, dynamic>{};
+  final Map<int, Offset> _componentPointerDown = <int, Offset>{};
   late final TextEditingController _titleController = TextEditingController();
   late final TextEditingController _descriptionController = TextEditingController();
 
@@ -900,9 +901,21 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     }
 
     final title = (properties['show_title'] == false) ? '' : component.title;
-    return Opacity(
-      opacity: component.enabled ? 1 : .38,
-      child: LayoutBuilder(builder: (context, constraints) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: onEdit == null ? null : (event) {
+        _componentPointerDown[event.pointer] = event.position;
+      },
+      onPointerUp: onEdit == null ? null : (event) {
+        final start = _componentPointerDown.remove(event.pointer);
+        if (start != null && (event.position - start).distance < 12) {
+          onEdit();
+        }
+      },
+      onPointerCancel: (event) => _componentPointerDown.remove(event.pointer),
+      child: Opacity(
+        opacity: component.enabled ? 1 : .38,
+        child: LayoutBuilder(builder: (context, constraints) {
         final availableWidth = constraints.maxWidth.isFinite
             ? constraints.maxWidth
             : MediaQuery.of(context).size.width - 24;
@@ -925,9 +938,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
               if (title.isNotEmpty) Padding(
                 padding: EdgeInsets.only(bottom: ((properties['title_bottom_spacing'] as num?)?.toDouble() ?? 8)),
-                child: InkWell(
-                  onTap: onEdit,
-                  child: Text(title,
+                child: Text(title,
                     maxLines: ((properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4).toInt(),
                     overflow: TextOverflow.ellipsis,
                     textAlign: (properties['title_text_align'] ?? 'left') == 'center' ? TextAlign.center : (properties['title_text_align'] ?? 'left') == 'right' ? TextAlign.right : TextAlign.left,
@@ -949,7 +960,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             ),
           ),
         );
-      }),
+        }),
+      ),
     );
   }
 
@@ -1113,11 +1125,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                   itemCount: currentComponents.length,
                   itemBuilder: (context, index) {
                     final component = currentComponents[index];
-                    return InkWell(
-                      key: ValueKey('designer-live-${component.id}'),
-                      onTap: () => _editComponent(component),
-                      child: _componentVisual(component, onEdit: () => _editComponent(component)),
-                    );
+                    return _componentVisual(component, onEdit: () => _editComponent(component));
                   },
                 ),
         ),
