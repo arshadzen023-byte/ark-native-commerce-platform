@@ -964,8 +964,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       if (productSource == 'wishlist') return false;
       return true;
     }).toList();
-    final productPreviewRows = productItems.isEmpty ? previewProducts : productItems;
-    final visibleProductItems = productPreviewRows.take(previewLimit).toList();
+    // Never substitute all products when a selected source/filter has no
+    // matches; the Designer preview must show the same selection as Home.
+    final visibleProductItems = productItems.take(previewLimit).toList();
     final parentCategoryId = ((properties['parent_category_id'] ?? properties['category_id']) as num?)?.toInt() ?? 0;
     final categoryItems = previewCategories.where((category) {
       if (properties['show_all_categories'] == true || parentCategoryId <= 0) return true;
