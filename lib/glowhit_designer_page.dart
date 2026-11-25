@@ -587,6 +587,34 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                   missingIds.join(', '));
             }
           }
+          // WordPress sanitizes legacy Banner sections to ark_live_slider and
+          // may preserve an older partial editor draft. Keep the exact public
+          // server document, but restore its published Home sections into the
+          // native editor snapshot when the editor draft is only a partial list.
+          final publishedPages = serverConfig['pages'] is Map
+              ? Map<String, dynamic>.from(serverConfig['pages'] as Map)
+              : <String, dynamic>{};
+          final publishedHome = publishedPages['home'] is Map
+              ? Map<String, dynamic>.from(publishedPages['home'] as Map)
+              : <String, dynamic>{};
+          final publishedHomeSections = publishedHome['sections'] is List
+              ? List<dynamic>.from(publishedHome['sections'] as List)
+              : <dynamic>[];
+          final currentHomeSections = configPages['home'] is Map &&
+                  (configPages['home'] as Map)['sections'] is List
+              ? List<dynamic>.from((configPages['home'] as Map)['sections'] as List)
+              : <dynamic>[];
+          if (publishedHomeSections.isEmpty && currentHomeSections.isNotEmpty) {
+            throw Exception('WordPress published Home contains no sections although the editor submitted components. Check the Designer publish sanitizer.');
+          }
+          final publishedHomeIds = publishedHomeSections.whereType<Map>()
+              .map((section) => (section['id'] ?? '').toString()).toSet();
+          final submittedHomeIds = currentHomeSections.whereType<Map>()
+              .map((section) => (section['id'] ?? '').toString()).toSet();
+          if (submittedHomeIds.isNotEmpty &&
+              !submittedHomeIds.every(publishedHomeIds.contains)) {
+            throw Exception('WordPress published Home did not retain every submitted component ID.');
+          }
           acceptedConfig = serverConfig;
           await prefs.setString('glowhit_published_designer_config', jsonEncode(acceptedConfig));
         }
