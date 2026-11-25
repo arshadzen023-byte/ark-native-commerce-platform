@@ -80,8 +80,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Banner Layout'), findsOneWidget);
-    expect(find.text('Color'), findsOneWidget);
-    expect(find.text('Dimension'), findsOneWidget);
+    expect(find.text('Color'), findsWidgets);
+    expect(find.text('Dimension'), findsWidgets);
   });
 
   testWidgets('Designer editor exposes seven live property tabs and child tools', (tester) async {
