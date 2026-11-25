@@ -153,7 +153,7 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
     // Pointer listeners do not enter Flutter's gesture arena. The previous
     // GestureDetector consumed tap gestures before the parent Designer card's
     // InkWell could open the component property editor.
-    return Listener(
+    final listener = Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (event) {
         _activePointer = event.pointer;
@@ -175,12 +175,8 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
             final arrowControlTap = widget.showArrows &&
                 (start.dx < 56 || start.dx > width - 56);
             final dotControlTap = widget.showDots && start.dy > widget.height - 36;
-            if (!arrowControlTap && !dotControlTap) {
-              if (_index >= 0 && _index < widget.slides.length && widget.onSlideTap != null) {
-                widget.onSlideTap!(widget.slides[_index]);
-              } else {
-                widget.onTap?.call();
-              }
+            if (!arrowControlTap && !dotControlTap && widget.onSlideTap == null) {
+              widget.onTap?.call();
             }
           }
         }
@@ -238,6 +234,16 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
             ),
           ]),
         ),
+    );
+    if (widget.onSlideTap == null) return listener;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (_index >= 0 && _index < widget.slides.length) {
+          widget.onSlideTap!(widget.slides[_index]);
+        }
+      },
+      child: listener,
     );
   }
 }
