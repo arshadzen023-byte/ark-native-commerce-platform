@@ -567,6 +567,12 @@ class _StoreHomeState extends State<StoreHome> {
     final background = (section['section_background'] ?? 'transparent').toString();
     final textColor = (section['text_color'] ?? '#202733').toString();
     final padding = (section['padding_top'] as num?)?.toDouble() ?? 12.0;
+    final paddingLeft = (section['padding_left'] as num?)?.toDouble() ?? 12.0;
+    final paddingRight = (section['padding_right'] as num?)?.toDouble() ?? 12.0;
+    final mainAxisGap = (section['main_axis_spacing'] as num?)?.toDouble() ?? (section['item_gap'] as num?)?.toDouble() ?? 8.0;
+    final crossAxisGap = (section['cross_axis_spacing'] as num?)?.toDouble() ?? (section['item_gap'] as num?)?.toDouble() ?? 8.0;
+    final widthFactor = ((section['width'] as num?)?.toDouble() ??
+      (((section['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0);
     final margin = EdgeInsets.fromLTRB(
       (section['margin_left'] as num?)?.toDouble() ?? 0,
       (section['margin_top'] as num?)?.toDouble() ?? 0,
@@ -593,8 +599,8 @@ class _StoreHomeState extends State<StoreHome> {
         final bannerStyle = layout == 'banner_grid' || layout == 'banner_list' || layout == 'banner_scroll';
         return Padding(
           padding: EdgeInsets.only(
-            left: sectionMargin.left,
-            right: sectionMargin.right,
+            left: sectionMargin.left + paddingLeft,
+            right: sectionMargin.right + paddingRight,
             top: sectionMargin.top + padding,
             bottom: sectionMargin.bottom + ((section['padding_bottom'] as num?)?.toDouble() ?? 12),
           ),
@@ -612,7 +618,7 @@ class _StoreHomeState extends State<StoreHome> {
                       children: slides.map((slide) {
                         final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
                         return Padding(
-                          padding: EdgeInsets.all(((section['item_gap'] as num?)?.toDouble() ?? 8) / 2),
+                          padding: EdgeInsets.symmetric(horizontal: crossAxisGap / 2, vertical: mainAxisGap / 2),
                           child: SizedBox(
                             width: (section['width_pct'] as num?)?.toDouble() == null ? 260 : MediaQuery.of(context).size.width * ((section['width_pct'] as num).toDouble() / 100),
                             child: ClipRRect(
@@ -699,6 +705,7 @@ class _StoreHomeState extends State<StoreHome> {
         return SizedBox(width: 128, height: cardHeight, child: card);
       }).toList();
       return Container(
+        width: (MediaQuery.of(context).size.width - margin.horizontal) * widthFactor,
         margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
         padding: EdgeInsets.fromLTRB(
@@ -737,8 +744,8 @@ class _StoreHomeState extends State<StoreHome> {
               itemCount: cards.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: ((section['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
-                crossAxisSpacing: (section['item_gap'] as num?)?.toDouble() ?? 8,
-                mainAxisSpacing: (section['item_gap'] as num?)?.toDouble() ?? 8,
+                crossAxisSpacing: crossAxisGap,
+                mainAxisSpacing: mainAxisGap,
                 childAspectRatio: (section['card_aspect_ratio'] as num?)?.toDouble() ?? .9,
               ),
               itemBuilder: (_, index) => cards[index],
@@ -793,8 +800,8 @@ class _StoreHomeState extends State<StoreHome> {
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: ((section['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
                 childAspectRatio: (section['card_aspect_ratio'] as num?)?.toDouble() ?? .66,
-                crossAxisSpacing: (section['item_gap'] as num?)?.toDouble() ?? 8,
-                mainAxisSpacing: (section['item_gap'] as num?)?.toDouble() ?? 8,
+                crossAxisSpacing: crossAxisGap,
+                mainAxisSpacing: mainAxisGap,
               ),
               itemBuilder: (_, index) => productCard(rows[index]),
             ),
