@@ -2143,12 +2143,84 @@ class _DesignerChildEditPageState extends State<_DesignerChildEditPage> {
         // manually, but selecting/replacing an image always clears it.
         child['title'] = '';
         title.clear();
-        child.remove('link_type');
-        child.remove('link_value');
       });
     } finally {
       if (mounted) setState(() => selectingImage = false);
     }
+  }
+
+  Future<void> _chooseLink() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: ListView(shrinkWrap: true, children: [
+          const ListTile(title: Text('Choose child destination', style: TextStyle(fontWeight: FontWeight.w800))),
+          for (final entry in const <MapEntry<String, String>>[
+            MapEntry('page:home', 'Home'),
+            MapEntry('page:categories', 'Categories'),
+            MapEntry('page:wishlist', 'Wishlist'),
+            MapEntry('page:cart', 'Cart'),
+            MapEntry('page:account', 'Account'),
+            MapEntry('page:orders', 'My Orders'),
+          ])
+            ListTile(
+              leading: const Icon(Icons.radio_button_unchecked),
+              title: Text(entry.value),
+              onTap: () => Navigator.pop(ctx, entry.key),
+            ),
+          ListTile(
+            leading: const Icon(Icons.shopping_bag_outlined),
+            title: const Text('Product by ID'),
+            onTap: () => Navigator.pop(ctx, '__product_id__'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.link_off),
+            title: const Text('Remove link'),
+            onTap: () => Navigator.pop(ctx, '__clear__'),
+          ),
+        ]),
+      ),
+    );
+    if (!mounted || selected == null) return;
+    if (selected == '__clear__') {
+      setState(() {
+        child.remove('link_type');
+        child.remove('link_value');
+      });
+      return;
+    }
+    if (selected == '__product_id__') {
+      final controller = TextEditingController();
+      final id = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Product ID'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'WooCommerce product ID'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Save')),
+          ],
+        ),
+      );
+      controller.dispose();
+      final productId = int.tryParse(id ?? '');
+      if (productId == null || productId < 1) return;
+      setState(() {
+        child['link_type'] = 'in_app';
+        child['link_value'] = 'product:$productId';
+      });
+      return;
+    }
+    setState(() {
+      child['link_type'] = 'in_app';
+      child['link_value'] = selected;
+    });
   }
 
   @override
@@ -2168,8 +2240,6 @@ class _DesignerChildEditPageState extends State<_DesignerChildEditPage> {
           ),
           TextButton(onPressed: () {
             child['title'] = title.text.trim();
-            child.remove('link_type');
-            child.remove('link_value');
             Navigator.pop(context, child);
           }, child: const Text('SAVE')),
         ],
@@ -2213,6 +2283,18 @@ class _DesignerChildEditPageState extends State<_DesignerChildEditPage> {
                   hintText: 'Leave blank to show no title',
                 ),
                 onChanged: (value) => child['title'] = value,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _chooseLink,
+                icon: const Icon(Icons.link_rounded),
+                label: Text(
+                  (child['link_value'] ?? '').toString().isEmpty
+                      ? 'Add link destination'
+                      : 'Link: ${child['link_value']}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ]),
           ),
