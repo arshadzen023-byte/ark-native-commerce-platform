@@ -340,7 +340,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   Future<void> _loadPreviewCatalog() async {
     try {
       final responses = await Future.wait([
-        http.get(Uri.parse('https://pluginstore.shop/wp-json/wc/store/v1/products?per_page=12')).timeout(const Duration(seconds: 8)),
+        http.get(Uri.parse('https://pluginstore.shop/wp-json/wc/store/v1/products?per_page=40')).timeout(const Duration(seconds: 8)),
         http.get(Uri.parse('https://pluginstore.shop/wp-json/wc/store/v1/products/categories?per_page=40&hide_empty=true')).timeout(const Duration(seconds: 8)),
       ]);
       final products = responses[0].statusCode == 200 ? jsonDecode(responses[0].body) : const [];
@@ -717,7 +717,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       }
       if (productSource == 'wishlist') return false;
       return true;
-    }).take(previewLimit).toList();
+    }).toList();
+    final productPreviewRows = productItems.isEmpty ? previewProducts : productItems;
+    final visibleProductItems = productPreviewRows.take(previewLimit).toList();
     final parentCategoryId = ((properties['parent_category_id'] ?? properties['category_id']) as num?)?.toInt() ?? 0;
     final categoryItems = previewCategories.where((category) {
       if (properties['show_all_categories'] == true || parentCategoryId <= 0) return true;
@@ -817,7 +819,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           autoplay: properties['autoplay'] != false,
           interval: Duration(milliseconds: (((properties['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000).round().clamp(1000, 30000).toInt()),
           pauseOnInteraction: properties['pause'] != false,
-          showDots: properties['dots'] != false,
+          showDots: properties['dots'] != false && properties['control'] != false,
           showArrows: properties['arrows'] == true && properties['control'] != false,
           fade: properties['fade'] == true,
           viewFraction: ((properties['view_fraction'] as num?)?.toDouble() ?? .9).clamp(.4, 1).toDouble(),
@@ -852,11 +854,11 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         );
       }
     } else if (isProduct || isCategory) {
-      final count = isProduct ? productItems.length : categoryItems.length;
+      final count = isProduct ? visibleProductItems.length : categoryItems.length;
       final cardHeight = height.clamp(120, 440).toDouble();
       final cardWidth = ((properties['max_cross_axis_extent'] as num?)?.toDouble() ?? 180).clamp(110, 360).toDouble();
       Widget tile(int index, {double? width}) => isProduct
-          ? productTile(productItems[index], tileWidth: width)
+          ? productTile(visibleProductItems[index], tileWidth: width)
           : categoryTile(categoryItems[index], tileWidth: width);
       if (count == 0) {
         content = SizedBox(height: cardHeight, child: Center(child: Text(
