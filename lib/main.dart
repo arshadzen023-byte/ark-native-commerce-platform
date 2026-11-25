@@ -741,6 +741,12 @@ class _StoreHomeState extends State<StoreHome> {
         );
       }
 
+      // Inline Designer children are the newest published source of truth.
+      // SQL slider data remains a fallback for older sections that have no
+      // inline children yet.
+      if (normalizedInline.isNotEmpty) {
+        return renderCarousel(normalizedInline, section);
+      }
       if (key.isNotEmpty) {
         final future = _sliderFutures.putIfAbsent(key, () => _loadDesignerSlider(key));
         return FutureBuilder<Map<String, dynamic>>(
@@ -755,9 +761,6 @@ class _StoreHomeState extends State<StoreHome> {
             return renderCarousel(slides, settings);
           },
         );
-      }
-      if (normalizedInline.isNotEmpty) {
-        return renderCarousel(normalizedInline, section);
       }
       if ((config['image_url'] ?? '').toString().isNotEmpty) {
         return renderCarousel([
