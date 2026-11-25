@@ -40,6 +40,50 @@ void main() {
     expect(find.text('Banner Slider'), findsOneWidget);
   });
 
+  test('Published component JSON keeps the selected layout and every edited dimension', () {
+    final component = DesignerComponent(
+      id: 'banner-test',
+      type: 'Banner',
+      title: 'Hero banner',
+      layout: 'Banner Slider',
+      properties: {
+        'designer_component_type': 'banner_slider',
+        'height': 240,
+        'width': .85,
+        'margin_top': 18,
+        'padding_bottom': 22,
+        'border_radius': 16,
+        'children': [
+          {'type': 'image', 'image_url': 'https://example.com/hero.jpg', 'title': ''},
+        ],
+      },
+    );
+    final section = component.toPublishedSection();
+    expect(section['type'], 'banner_slider');
+    expect(section['designer_component_type'], 'banner_slider');
+    expect(section['height_px'], 240);
+    expect(section['width_pct'], 85);
+    expect(section['margin_top'], 18);
+    expect(section['padding_bottom'], 22);
+    expect((section['children'] as List).first['title'], '');
+  });
+
+  testWidgets('Tapping the live banner image opens its property editor', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const MaterialApp(
+      home: GlowHitDesignerPage(token: 'test-token', loadRemoteConfig: false),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PageView), findsWidgets);
+    await tester.tap(find.byType(PageView).first);
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Banner Layout'), findsOneWidget);
+    expect(find.text('Color'), findsOneWidget);
+    expect(find.text('Dimension'), findsOneWidget);
+  });
+
   testWidgets('Designer editor exposes seven live property tabs and child tools', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const MaterialApp(
