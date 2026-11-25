@@ -155,18 +155,25 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
       behavior: HitTestBehavior.translucent,
       onPointerDown: (event) {
         _activePointer = event.pointer;
-        _pointerStart = event.position;
+        _pointerStart = event.localPosition;
         _touchPause(true);
       },
       onPointerUp: (event) {
         final start = _pointerStart;
         if (_activePointer == event.pointer && start != null) {
-          final delta = event.position - start;
+          final delta = event.localPosition - start;
           if (delta.dx.abs() > 32 && delta.dx.abs() > delta.dy.abs() && widget.slides.length > 1) {
             final step = delta.dx < 0 ? 1 : -1;
             _goTo((_index + step + widget.slides.length) % widget.slides.length);
           } else if (delta.distance < 12) {
-            widget.onTap?.call();
+            final renderObject = context.findRenderObject();
+            final width = renderObject is RenderBox
+                ? renderObject.size.width
+                : MediaQuery.of(context).size.width;
+            final arrowControlTap = widget.showArrows &&
+                (start.dx < 56 || start.dx > width - 56);
+            final dotControlTap = widget.showDots && start.dy > widget.height - 36;
+            if (!arrowControlTap && !dotControlTap) widget.onTap?.call();
           }
         }
         _activePointer = null;
