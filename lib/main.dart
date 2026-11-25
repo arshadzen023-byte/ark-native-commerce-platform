@@ -292,6 +292,47 @@ class _StoreHomeState extends State<StoreHome> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
+
+  Future<void> _openDesignerChildLink(Map<String, dynamic> child) async {
+    final linkType = (child['link_type'] ?? 'in_app').toString();
+    final value = (child['link_value'] ?? child['link'] ?? '').toString().trim();
+    if (value.isEmpty) return;
+    if (linkType == 'chrome') {
+      final uri = Uri.tryParse(value);
+      if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
+    if (value.startsWith('page:')) {
+      final page = value.substring(5).toLowerCase();
+      final nextTab = switch (page) {
+        'home' => 0,
+        'categories' => 1,
+        'wishlist' => 2,
+        'cart' => 3,
+        'account' || 'orders' => 4,
+        _ => -1,
+      };
+      if (nextTab >= 0 && mounted) setState(() => tab = nextTab);
+      if (page == 'orders' && customerToken != null && mounted) {
+        await Navigator.push(context, MaterialPageRoute(
+          builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders'),
+        ));
+      }
+      return;
+    }
+    if (value.startsWith('product:')) {
+      await _handleNotificationLink('ark://product/' + value.substring(8));
+      return;
+    }
+    if (value.startsWith('category:')) {
+      if (mounted) setState(() => tab = 1);
+      return;
+    }
+    await _handleNotificationLink(value);
+  }
+
   @override void dispose() { searchController.dispose(); super.dispose(); }
 
   Future<void> load({String order = 'date', bool sale = false}) async {
@@ -642,12 +683,16 @@ class _StoreHomeState extends State<StoreHome> {
                         mainAxisExtent: bannerGridRowExtent,
                       ),
                       itemBuilder: (_, index) {
-                        final url = (slides[index]['image_url'] ?? slides[index]['source_url'] ?? '').toString();
-                        return ClipRRect(
-                          borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
-                          child: url.isEmpty
-                              ? const ColoredBox(color: Color(0xFFEDEAF2), child: Icon(Icons.image_outlined))
-                              : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                        final slide = slides[index];
+                        final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
+                        return InkWell(
+                          onTap: () => _openDesignerChildLink(slide),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
+                            child: url.isEmpty
+                                ? const ColoredBox(color: Color(0xFFEDEAF2), child: Icon(Icons.image_outlined))
+                                : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                          ),
                         );
                       },
                     ),
@@ -662,11 +707,14 @@ class _StoreHomeState extends State<StoreHome> {
                         final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
                         return Padding(
                           padding: EdgeInsets.symmetric(horizontal: crossAxisGap / 2, vertical: mainAxisGap / 2),
-                          child: SizedBox(
-                            width: (config['width_pct'] as num?)?.toDouble() == null ? 260 : MediaQuery.of(context).size.width * ((config['width_pct'] as num).toDouble() / 100),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
-                              child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                          child: InkWell(
+                            onTap: () => _openDesignerChildLink(slide),
+                            child: SizedBox(
+                              width: (config['width_pct'] as num?)?.toDouble() == null ? 260 : MediaQuery.of(context).size.width * ((config['width_pct'] as num).toDouble() / 100),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
+                                child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                              ),
                             ),
                           ),
                         );
@@ -684,6 +732,7 @@ class _StoreHomeState extends State<StoreHome> {
                     showArrows: config['control'] != false && config['show_arrows'] == true,
                     fade: config['transition'] == 'fade',
                     viewFraction: ((config['card_width'] ?? config['view_fraction'] ?? 1) as num).toDouble(),
+                    onSlideTap: _openDesignerChildLink,
                   ),
               ]),
             ),
