@@ -973,7 +973,6 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   }
 
   void _editComponent(DesignerComponent item) {
-    debugPrint('ARK_DESIGNER_EDIT_COMPONENT ${item.id} ${item.type} ${item.layout}');
     Navigator.push<void>(context, MaterialPageRoute(builder: (_) => _DesignerComponentEditor(
       component: item,
       onChanged: () { if (mounted) setState(() {}); },
