@@ -269,7 +269,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     properties['background_color'] = normalized['section_background'] ?? normalized['background_color'] ?? '#FFFFFF';
     properties['title_color'] = normalized['text_color'] ?? normalized['title_color'] ?? '#241D33';
     properties['height'] = normalized['height_px'] ?? normalized['height'] ?? 180;
-    properties['width'] = ((normalized['width_pct'] as num?)?.toDouble() ?? 100) / 100;
+    properties['width'] = (normalized['width'] as num?)?.toDouble() ??
+        (((normalized['width_pct'] as num?)?.toDouble() ?? 100) / 100);
     properties['max_cross_axis_extent'] = normalized['max_width_px'] ?? 300;
     properties['main_axis_spacing'] = normalized['main_axis_spacing'] ?? normalized['item_gap'] ?? 10;
     properties['cross_axis_spacing'] = normalized['cross_axis_spacing'] ?? normalized['item_gap'] ?? 10;
