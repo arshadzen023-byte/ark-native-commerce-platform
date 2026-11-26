@@ -205,7 +205,7 @@ class NavIconChoice {
 }
 
 class DesignerNavIcons {
-  static const families = ['All', 'Material', 'Cupertino', 'Font Awesome', 'Remix Icons', 'FluentUI'];
+  static const families = ['Material', 'Cupertino', 'Font Awesome', 'Remix Icons', 'FluentUI'];
 
   static const categories = ['All', 'Nature', 'Transport', 'Water', 'Weather', 'E-commerce', 'Social', 'Buildings', 'Digital', 'Internet'];
 
@@ -1080,7 +1080,7 @@ class _NavigationIconPickerPageState extends State<_NavigationIconPickerPage> {
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              children: DesignerNavIcons.families.map((name) => Padding(
+              children: ['All', ...DesignerNavIcons.families].map((name) => Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 3),
                 child: ChoiceChip(
                   label: Text(name),
