@@ -215,10 +215,12 @@ void main() {
     expect(find.text('Save Draft'), findsOneWidget);
     expect(find.text('Publish JSON'), findsOneWidget);
     expect(find.text('Layout consistency'), findsNothing);
-    // The added Settings shortcuts make the final App Settings card scrollable.
-    await tester.drag(find.byType(ListView).first, const Offset(0, -700));
+    // Reveal the final card using the widget's actual scroll position rather
+    // than assuming a fixed drag distance (CI font metrics can differ).
+    final appSettingsTile = find.text('App Settings').last;
+    await tester.ensureVisible(appSettingsTile);
     await tester.pumpAndSettle();
-    expect(find.text('App Settings'), findsOneWidget);
+    expect(appSettingsTile, findsOneWidget);
     await tester.tap(find.text('App Settings'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('designer-app-settings-page')), findsOneWidget);
