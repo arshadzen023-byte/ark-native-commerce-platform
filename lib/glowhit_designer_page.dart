@@ -1202,8 +1202,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final mainGap = ((properties['main_axis_spacing'] ?? properties['item_gap']) as num?)?.toDouble() ?? gap;
     final radius = ((properties['border_radius'] ?? properties['corner_radius']) as num?)?.toDouble() ?? 14;
     // Dimension values describe child items, never the outer section/card.
-    final childWidthFactor = ((properties['width'] as num?)?.toDouble() ?? 1).clamp(.25, 1.0).toDouble();
-    final maxChildWidth = ((properties['max_cross_axis_extent'] ?? properties['max_width_px']) as num?)?.toDouble() ?? 600;
+    final childWidthFactor = ((properties['width'] as num?)?.toDouble() ?? 1).clamp(.2, 1.0).toDouble();
+    final maxChildWidth = ((properties['max_cross_axis_extent'] ?? properties['max_width_px']) as num?)?.toDouble() ?? (component.type == 'Category' ? 180 : component.type == 'Product' ? 174 : 600);
     final margin = EdgeInsets.fromLTRB(
       ((properties['margin_left'] as num?)?.toDouble() ?? 0),
       ((properties['margin_top'] as num?)?.toDouble() ?? 0),
@@ -1344,7 +1344,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       final slides = imageChildren.isEmpty ? <Map<String, dynamic>>[{'image_url': '', 'title': ''}] : imageChildren;
       if (isSlider) {
         content = LayoutBuilder(builder: (context, constraints) {
-          final childWidth = constraints.maxWidth * childWidthFactor;
+          final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, maxChildWidth).toDouble();
           return Align(alignment: Alignment.centerLeft, child: SizedBox(
             width: childWidth,
             height: height.clamp(40, 500).toDouble(),
@@ -1367,7 +1367,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         content = LayoutBuilder(builder: (context, constraints) => SizedBox(height: height.clamp(40, 500).toDouble(), child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: slides.length,
-          separatorBuilder: (_, __) => SizedBox(width: gap),
+          separatorBuilder: (_, __) => properties['horizontal'] == false ? SizedBox(height: mainGap) : SizedBox(width: gap),
           itemBuilder: (_, index) => imageTile(slides[index], tileWidth: (constraints.maxWidth * childWidthFactor).clamp(40, maxChildWidth).toDouble()),
         )));
       } else if (isList) {
@@ -1421,7 +1421,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       final cardHeight = height.clamp(40, 500).toDouble();
       final gridAspect = ((properties['cross_aspect_ratio'] ?? properties['card_aspect_ratio']) as num?)?.toDouble() ?? (isProduct ? .66 : .9);
       final gridChildHeight = (cardHeight * ((isProduct ? .66 : .9) / gridAspect)).clamp(40, 700).toDouble();
-      final cardWidth = ((properties['max_cross_axis_extent'] ?? properties['max_width_px']) as num?)?.toDouble() ?? 180;
+      final cardWidth = ((properties['max_cross_axis_extent'] ?? properties['max_width_px']) as num?)?.toDouble() ?? (isProduct ? 174 : 180);
       Widget tile(int index, {double? width}) => isProduct
           ? productTile(visibleProductItems[index], tileWidth: width)
           : categoryTile(categoryItems[index], tileWidth: width);
@@ -1451,7 +1451,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         content = SizedBox(height: cardHeight, child: ListView.separated(
           scrollDirection: properties['horizontal'] == false ? Axis.vertical : Axis.horizontal,
           itemCount: count,
-          separatorBuilder: (_, __) => SizedBox(width: gap),
+          separatorBuilder: (_, __) => properties['horizontal'] == false ? SizedBox(height: mainGap) : SizedBox(width: gap),
           itemBuilder: (_, index) => tile(index, width: cardWidth * childWidthFactor),
         ));
       } else if (isList) {
