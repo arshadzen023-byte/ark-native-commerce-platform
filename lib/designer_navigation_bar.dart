@@ -589,7 +589,7 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
           actions: [
             IconButton(
               tooltip: reordering ? 'Done reordering' : 'Reorder',
-              icon: Icon(reordering ? Icons.check_rounded : Icons.reorder_rounded),
+              icon: Icon(reordering ? Icons.check_rounded : Icons.swap_vert_rounded),
               onPressed: () => setState(() => reordering = !reordering),
             ),
           ],
