@@ -152,6 +152,9 @@ class DesignerComponent {
       'main_axis_spacing', 'cross_axis_spacing', 'item_gap',
       'border_radius', 'corner_radius', 'elevation', 'card_depth',
       'cross_axis_count', 'columns', 'fixed_grid_view_count', 'limit',
+      'padding_top', 'padding_bottom', 'padding_left', 'padding_right',
+      'margin_top', 'margin_bottom', 'margin_left', 'margin_right',
+      'title_bottom_spacing',
     ];
     for (final key in integerLayoutKeys) {
       final value = values[key];
@@ -786,16 +789,27 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         await prefs.setString('glowhit_designer_last_server_sync', DateTime.now().toUtc().toIso8601String());
       } catch (e) {
         // The device draft remains recoverable, but do not claim that the server saved it.
-        if (mounted) setState(() => error = publish
-            ? 'Local draft saved, but Publish was not confirmed: ' + _friendlyDesignerError(e)
-            : 'Local draft saved, but server sync was not confirmed: ' + _friendlyDesignerError(e));
+        if (mounted) {
+          final message = publish
+              ? 'Local draft saved, but Publish was not confirmed: ' + _friendlyDesignerError(e)
+              : 'Local draft saved, but server sync was not confirmed: ' + _friendlyDesignerError(e);
+          setState(() => error = message);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(message),
+            duration: const Duration(seconds: 6),
+          ));
+        }
         return;
       }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(publish ? 'Published configuration synced to WordPress.' : 'Draft synced to WordPress.'),
       ));
     } catch (e) {
-      if (mounted) setState(() => error = _friendlyDesignerError(e));
+      if (mounted) {
+        final message = _friendlyDesignerError(e);
+        setState(() => error = message);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
     } finally {
       if (mounted) setState(() { saving = false; publishing = false; });
     }
@@ -1796,14 +1810,15 @@ class _DesignerSettingsPage extends StatefulWidget {
 
 class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
   bool busy = false;
+  bool publishingAction = false;
 
-  Future<void> _run(Future<void> Function() action) async {
+  Future<void> _run(Future<void> Function() action, {required bool publish}) async {
     if (busy) return;
-    setState(() => busy = true);
+    setState(() { busy = true; publishingAction = publish; });
     try {
       await action();
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) setState(() { busy = false; publishingAction = false; });
     }
   }
 
@@ -1828,7 +1843,7 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: working ? null : () => _run(widget.onSaveDraft),
+                        onPressed: working ? null : () => _run(widget.onSaveDraft, publish: false),
                         icon: const Icon(Icons.save_outlined),
                         label: const Text('Save Draft'),
                       ),
@@ -1837,7 +1852,7 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: working ? null : () => _run(widget.onPublish),
+                        onPressed: working ? null : () => _run(widget.onPublish, publish: true),
                         icon: const Icon(Icons.publish_rounded),
                         label: const Text('Publish JSON'),
                       ),
@@ -1871,7 +1886,7 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
                         children: [
                           const SizedBox(width: 42, height: 42, child: CircularProgressIndicator(strokeWidth: 4)),
                           const SizedBox(height: 14),
-                          Text(widget.publishing ? 'Publishing…' : 'Saving draft…'),
+                          Text(publishingAction || widget.publishing ? 'Publishing…' : 'Saving draft…'),
                         ],
                       ),
                     ),
