@@ -968,7 +968,7 @@ class _StoreHomeState extends State<StoreHome> {
         (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
       final categoryCardWidth = (((config['max_cross_axis_extent'] ?? config['max_width_px']) as num?)?.toDouble() ?? 180)
           .clamp(40, MediaQuery.of(context).size.width).toDouble();
-      final categoryAspect = ((config['card_aspect_ratio'] ?? config['cross_aspect_ratio']) as num?)?.toDouble() ?? .9;
+      final categoryAspect = (((config['card_aspect_ratio'] ?? config['cross_aspect_ratio']) as num?)?.toDouble() ?? .9).clamp(.4, 2.5);
       final categoryRowExtent = (cardHeight * (.9 / categoryAspect)).clamp(40, 600).toDouble();
       final cards = rows.map((category) {
         final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
