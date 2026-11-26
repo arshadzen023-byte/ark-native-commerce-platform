@@ -353,26 +353,11 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
                     elevation: 0,
                     color: const Color(0xFFFAF9FC),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: _navBorder)),
-                    child: Column(children: [
-                      for (var index = 0; index < previewItems.length; index++)
-                        if (reordering)
-                          ReorderableDragStartListener(
-                            key: ValueKey(previewItems[index].id),
-                            index: index,
-                            child: _navigationRow(previewItems[index], index),
-                          )
-                        else
-                          InkWell(
-                            key: ValueKey(previewItems[index].id),
-                            onTap: () => _editItem(previewItems[index]),
-                            child: _navigationRow(previewItems[index], index),
-                          ),
-                      if (reordering)
-                        SizedBox(
-                          height: 210,
-                          child: ReorderableListView(
+                    child: reordering
+                        ? ReorderableListView(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
+                            buildDefaultDragHandles: true,
                             onReorder: (oldIndex, newIndex) {
                               if (newIndex > oldIndex) newIndex--;
                               final item = config.items.removeAt(oldIndex);
@@ -384,11 +369,17 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
                               key: ValueKey(item.id),
                               leading: Icon(DesignerNavIcons.data(item.iconFamily, item.iconName)),
                               title: Text(item.label),
+                              subtitle: Text(_linkLabel(item.link)),
                               trailing: const Icon(Icons.drag_handle),
                             )).toList(),
-                          ),
-                        ),
-                    ]),
+                          )
+                        : Column(children: [
+                            for (var index = 0; index < previewItems.length; index++)
+                              InkWell(
+                                onTap: () => _editItem(previewItems[index]),
+                                child: _navigationRow(previewItems[index], index),
+                              ),
+                          ]),
                   ),
                   const SizedBox(height: 14),
                   const Text('Navigation Type', style: TextStyle(fontWeight: FontWeight.w800)),
