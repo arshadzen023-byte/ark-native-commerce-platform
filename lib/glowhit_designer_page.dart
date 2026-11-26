@@ -747,11 +747,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                 // These aliases are redundant fields that the WordPress
                 // sanitizer may round or regenerate. They must not veto a
                 // publish when the canonical value is unchanged.
-                final isAlias = const <String>{
-                  'item_gap', 'height', 'max_cross_axis_extent',
-                  'border_radius', 'cross_axis_count', 'cross_aspect_ratio',
-                  'elevation',
-                }.contains(key);
+                final isAlias = aliasGroups.values.any(
+                  (aliases) => aliases.skip(1).contains(key),
+                );
                 final effectiveBefore = before is num ? before.toDouble() : before;
                 final effectiveAfter = after is num ? after.toDouble() : after;
                 final equal = numEqual || jsonEncode(effectiveBefore) == jsonEncode(effectiveAfter);
