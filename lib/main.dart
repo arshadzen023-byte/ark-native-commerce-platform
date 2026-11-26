@@ -836,36 +836,70 @@ class _StoreHomeState extends State<StoreHome> {
                     ),
                   )
                 : bannerStyle
-                ? SizedBox(
-                    height: height,
-                    child: ListView(
-                      scrollDirection: config['horizontal'] == false || layout == 'banner_list' ? Axis.vertical : Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      children: slides.map((slide) {
-                        final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
-                        return Padding(
-                          padding: EdgeInsets.symmetric(horizontal: crossAxisGap / 2, vertical: mainAxisGap / 2),
-                          child: InkWell(
-                            onTap: () => _openDesignerChildLink(slide),
-                            child: SizedBox(
-                              width: (MediaQuery.of(context).size.width * childWidthFactor).clamp(40, maxChildWidth).toDouble(),
-                              height: height,
-                              child: Card(
-                                margin: EdgeInsets.zero,
-                                elevation: childElevation,
-                                clipBehavior: Clip.antiAlias,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
-                                ),
-                                child: Image.network(url, fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                ? LayoutBuilder(builder: (context, constraints) {
+                    // Keep the published Banner Scroll child geometry identical
+                    // to Designer preview: size from the inner content viewport,
+                    // not the full device width (which ignores section margin/padding).
+                    final availableChildWidth = (constraints.maxWidth - 48)
+                        .clamp(40.0, constraints.maxWidth);
+                    final childWidth = (availableChildWidth * childWidthFactor)
+                        .clamp(40.0, maxChildWidth).toDouble();
+                    final verticalList = layout == 'banner_list' ||
+                        config['horizontal'] == false;
+                    Widget buildBannerChild(Map<String, dynamic> slide) {
+                      final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
+                      return SizedBox(
+                        width: childWidth,
+                        height: height,
+                        child: InkWell(
+                          onTap: () => _openDesignerChildLink(slide),
+                          child: Card(
+                            margin: EdgeInsets.zero,
+                            elevation: childElevation,
+                            clipBehavior: Clip.antiAlias,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                (config['corner_radius'] as num?)?.toDouble() ?? 16,
                               ),
                             ),
+                            child: url.isEmpty
+                                ? const ColoredBox(
+                                    color: Color(0xFFEDEAF2),
+                                    child: Icon(Icons.image_outlined),
+                                  )
+                                : Image.network(
+                                    url,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        const Icon(Icons.broken_image_outlined),
+                                  ),
                           ),
-                        );
-                      }).toList(),
-                    ),
-                  )
+                        ),
+                      );
+                    }
+                    if (verticalList) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: slides.map((slide) => Padding(
+                          padding: EdgeInsets.only(bottom: mainAxisGap),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: buildBannerChild(slide),
+                          ),
+                        )).toList(),
+                      );
+                    }
+                    return SizedBox(
+                      height: height,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: EdgeInsets.zero,
+                        itemCount: slides.length,
+                        separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
+                        itemBuilder: (_, index) => buildBannerChild(slides[index]),
+                      ),
+                    );
+                  })
                 : ArkDesignerBannerCarousel(
                     slides: slides,
                     height: height,
