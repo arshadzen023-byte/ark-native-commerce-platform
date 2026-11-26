@@ -993,7 +993,7 @@ class _StoreHomeState extends State<StoreHome> {
         final parent = (category['parent'] as num?)?.toInt() ?? 0;
         return parent == parentId;
       }).toList();
-      final limit = (config['limit'] as num?)?.toInt() ?? 8;
+      final limit = (config['limit'] as num?)?.toInt() ?? layoutSpec.fixedGridViewCount;
       rows = rows.take(limit.clamp(1, 100)).toList();
       if (rows.isEmpty) return const SizedBox.shrink();
       final cardRadius = layoutSpec.borderRadius.clamp(0, 28).toDouble();
@@ -1039,7 +1039,9 @@ class _StoreHomeState extends State<StoreHome> {
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (showTitle) Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            padding: EdgeInsets.only(
+              bottom: (config['title_bottom_spacing'] as num?)?.toDouble() ?? 8,
+            ),
             child: Text(title, style: sectionTitleStyle()),
           ),
           if (layout.contains('list_tile'))
@@ -1062,7 +1064,7 @@ class _StoreHomeState extends State<StoreHome> {
             SizedBox(
               height: cardHeight,
               child: ListView.separated(
-                scrollDirection: renderSpec.horizontal ? Axis.horizontal : Axis.vertical,
+                scrollDirection: layoutSpec.horizontal ? Axis.horizontal : Axis.vertical,
                 itemCount: cards.length,
                 separatorBuilder: (_, __) => layoutSpec.horizontal
                     ? SizedBox(width: crossAxisGap)
@@ -1080,7 +1082,7 @@ class _StoreHomeState extends State<StoreHome> {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: cards.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 6),
+                crossAxisCount: layoutSpec.crossAxisCount,
                 crossAxisSpacing: crossAxisGap,
                 mainAxisSpacing: mainAxisGap,
                 mainAxisExtent: categoryRowExtent,
