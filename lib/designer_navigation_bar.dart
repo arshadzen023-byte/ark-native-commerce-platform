@@ -342,6 +342,13 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
       ),
       child: Scaffold(
         backgroundColor: Colors.white,
+        floatingActionButton: FloatingActionButton(
+          tooltip: 'Add New Navigation Button',
+          onPressed: _addItem,
+          backgroundColor: _navPurple,
+          foregroundColor: Colors.white,
+          child: const Icon(Icons.add_rounded),
+        ),
         appBar: AppBar(
           title: const Text('Navigation Bar', style: TextStyle(fontWeight: FontWeight.w700)),
           actions: [
@@ -417,11 +424,7 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
                     onChanged: (value) { config.showLabels = value; _changed(); },
                   ),
                   const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _addItem,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add New Navigation Button'),
-                  ),
+
                 ],
               ),
             ),
