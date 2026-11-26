@@ -1372,7 +1372,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         )));
       } else if (isList) {
         content = LayoutBuilder(builder: (context, constraints) => SizedBox(
-          height: (height.clamp(40, 500) * slides.length).clamp(40, 7200).toDouble(),
+          height: (height.clamp(40, 500) * slides.length +
+              mainGap * (slides.length > 0 ? slides.length - 1 : 0)).clamp(40, 7200).toDouble(),
           child: ListView.separated(
             physics: const NeverScrollableScrollPhysics(),
             itemCount: slides.length,
@@ -1455,7 +1456,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           itemBuilder: (_, index) => tile(index, width: cardWidth * childWidthFactor),
         ));
       } else if (isList) {
-        content = SizedBox(height: (cardHeight * count).clamp(cardHeight, 900).toDouble(), child: ListView.separated(
+        content = SizedBox(height: (cardHeight * count + mainGap * (count > 0 ? count - 1 : 0)).clamp(cardHeight, 900).toDouble(), child: ListView.separated(
           physics: const NeverScrollableScrollPhysics(),
           itemCount: count,
           separatorBuilder: (_, __) => SizedBox(height: mainGap),
