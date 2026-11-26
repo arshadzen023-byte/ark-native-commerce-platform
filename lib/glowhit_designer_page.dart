@@ -1455,6 +1455,32 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           separatorBuilder: (_, __) => properties['horizontal'] == false ? SizedBox(height: mainGap) : SizedBox(width: gap),
           itemBuilder: (_, index) => tile(index, width: cardWidth * childWidthFactor),
         ));
+      } else if (isCategory && layout.contains('list_tile')) {
+        content = Column(
+          children: categoryItems.map((category) {
+            final image = category['image'] is Map
+                ? Map<String, dynamic>.from(category['image'] as Map)
+                : <String, dynamic>{};
+            final url = (image['src'] ?? '').toString();
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: url.isNotEmpty
+                  ? SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: Image.network(
+                        url,
+                        fit: BoxFit.cover,
+                        cacheWidth: imageCacheWidth,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.category_outlined),
+                      ),
+                    )
+                  : const Icon(Icons.category_outlined),
+              title: Text((category['name'] ?? '').toString()),
+            );
+          }).toList(),
+        );
       } else if (isList) {
         content = SizedBox(height: (cardHeight * count + mainGap * (count > 0 ? count - 1 : 0)).clamp(cardHeight, 900).toDouble(), child: ListView.separated(
           physics: const NeverScrollableScrollPhysics(),
