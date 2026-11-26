@@ -1279,6 +1279,35 @@ class _StoreHomeState extends State<StoreHome> {
       });
       return;
     }
+    if (link == 'page') {
+      final pageKey = item.linkValue.trim().replaceFirst(RegExp(r'^page:'), '');
+      final pages = designerConfig['pages'];
+      final pageData = pages is Map ? pages[pageKey] : null;
+      if (pageKey.isEmpty || pageData is! Map) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This native Page key was not found in the published Designer Pages.')),
+        );
+        return;
+      }
+      final sections = pageData['sections'] is List
+          ? (pageData['sections'] as List)
+              .whereType<Map>()
+              .where((section) => section['visible'] != false)
+              .map((section) => Map<String, dynamic>.from(section))
+              .toList()
+          : <Map<String, dynamic>>[];
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: Text((pageData['title'] ?? item.label).toString())),
+          body: ListView(
+            padding: const EdgeInsets.only(bottom: 16),
+            children: sections.map(_designerSection).toList(),
+          ),
+          bottomNavigationBar: _buildDesignerBottomNavigation(),
+        ),
+      ));
+      return;
+    }
     if (link == 'orders') {
       if (customerToken == null || customerToken!.isEmpty) {
         setState(() => tab = 4);
