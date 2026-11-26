@@ -106,6 +106,15 @@ void main() {
     expect(find.text('Designer Settings'), findsOneWidget);
     expect(find.text('Save Draft'), findsOneWidget);
     expect(find.text('Publish JSON'), findsOneWidget);
+    expect(find.text('Layout consistency'), findsNothing);
+    expect(find.text('App Settings'), findsOneWidget);
+    await tester.tap(find.text('App Settings'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('designer-app-settings-page')), findsOneWidget);
+    expect(find.text('App Settings'), findsOneWidget);
+    expect(tester.widget<Scaffold>(find.byKey(const ValueKey('designer-app-settings-page'))).backgroundColor, Colors.white);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();
 
