@@ -447,8 +447,8 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
                     showUnselectedLabels: config.showLabels,
                     elevation: config.elevation,
                     items: previewItems.map((item) => BottomNavigationBarItem(
-                      icon: Icon(DesignerNavIcons.data(item.iconFamily, item.iconName)),
-                      activeIcon: Icon(DesignerNavIcons.data(item.activeIconFamily, item.activeIconName)),
+                      icon: DesignerNavIcons.icon(item.iconFamily, item.iconName),
+                      activeIcon: DesignerNavIcons.icon(item.activeIconFamily, item.activeIconName),
                       label: item.label,
                       backgroundColor: navColorFromHex(item.activeBackgroundColor),
                     )).toList(),
@@ -624,7 +624,7 @@ class _DesignerNavigationItemPageState extends State<DesignerNavigationItemPage>
             _editTile('Active Icon Color', item.activeIconColor, Icons.color_lens_outlined, () => _pickColor('active', item.activeIconColor)),
             _editTile('Active Background Color', item.activeBackgroundColor, Icons.color_lens, () => _pickColor('activeBackground', item.activeBackgroundColor)),
             ListTile(
-              leading: Icon(DesignerNavIcons.data(item.iconFamily, item.iconName), color: navColorFromHex(item.iconColor)),
+              leading: DesignerNavIcons.icon(item.iconFamily, item.iconName, color: navColorFromHex(item.iconColor)),
               title: const Text('Icon'),
               subtitle: Text('${item.iconFamily} · ${item.iconName}'),
               trailing: const Icon(Icons.chevron_right),
