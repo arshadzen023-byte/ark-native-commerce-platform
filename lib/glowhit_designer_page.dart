@@ -2009,7 +2009,7 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   leading: const Icon(Icons.navigation, color: _designerPurple),
                   title: const Text('Navigation Bar', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: Text('${widget.navigationConfig.items.length} buttons · ${widget.navigationConfig.type == 'fixed' ? 'Fixed' : 'Shifting'}'),
+                  subtitle: const Text('Edit buttons, links, icons, colours and live preview'),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: working ? null : widget.onOpenNavigation,
                 ),
