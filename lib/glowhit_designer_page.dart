@@ -1836,28 +1836,13 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       publishing: publishing,
       navigationConfig: navigationConfig,
       onOpenNavigation: _openNavigationBar,
+      onReorder: _openReorder,
+      onTemplates: _openTemplates,
+      onMyTemplates: _openMyTemplates,
       onSaveDraft: () => _persist(),
       onPublish: () => _persist(publish: true),
     )));
   }
-
-  Widget _designerMenu() => PopupMenuButton<String>(
-    icon: const Icon(Icons.menu_rounded),
-    tooltip: 'Designer menu',
-    onSelected: (value) {
-      if (value == 'reorder') _openReorder();
-      if (value == 'templates') _openTemplates();
-      if (value == 'my_templates') _openMyTemplates();
-      if (value == 'settings') _openDesignerSettings();
-    },
-    itemBuilder: (_) => const [
-      PopupMenuItem(value: 'reorder', child: ListTile(leading: Icon(Icons.reorder), title: Text('Reorder Components'), dense: true)),
-      PopupMenuItem(value: 'templates', child: ListTile(leading: Icon(Icons.dashboard_customize), title: Text('Templates'), dense: true)),
-      PopupMenuItem(value: 'my_templates', child: ListTile(leading: Icon(Icons.collections_bookmark), title: Text('My Templates'), dense: true)),
-      PopupMenuDivider(),
-      PopupMenuItem(value: 'settings', child: ListTile(leading: Icon(Icons.settings_outlined), title: Text('Settings'), dense: true)),
-    ],
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -1935,6 +1920,9 @@ class _DesignerSettingsPage extends StatefulWidget {
     required this.publishing,
     required this.navigationConfig,
     required this.onOpenNavigation,
+    required this.onReorder,
+    required this.onTemplates,
+    required this.onMyTemplates,
     required this.onSaveDraft,
     required this.onPublish,
   });
@@ -1942,6 +1930,9 @@ class _DesignerSettingsPage extends StatefulWidget {
   final bool publishing;
   final DesignerNavigationConfig navigationConfig;
   final VoidCallback onOpenNavigation;
+  final VoidCallback onReorder;
+  final VoidCallback onTemplates;
+  final VoidCallback onMyTemplates;
   final Future<void> Function() onSaveDraft;
   final Future<void> Function() onPublish;
 
@@ -1999,6 +1990,34 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
                       ),
                     ),
                   ]),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.reorder_rounded),
+                      title: const Text('Reorder Components'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: working ? null : widget.onReorder,
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.dashboard_customize_rounded),
+                      title: const Text('Templates'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: working ? null : widget.onTemplates,
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.collections_bookmark_rounded),
+                      title: const Text('My Templates'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: working ? null : widget.onMyTemplates,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 12),
