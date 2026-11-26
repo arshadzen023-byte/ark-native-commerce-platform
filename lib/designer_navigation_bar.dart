@@ -146,7 +146,7 @@ class NavIconChoice {
   final String family;
   final String name;
   final String label;
-  final IconData data;
+  final dynamic data;
 }
 
 class DesignerNavIcons {
@@ -187,7 +187,7 @@ class DesignerNavIcons {
     const NavIconChoice('Cupertino', 'doc_text', 'Document', CupertinoIcons.doc_text),
     const NavIconChoice('Cupertino', 'list_bullet', 'List', CupertinoIcons.list_bullet),
     const NavIconChoice('Cupertino', 'plus', 'Add', CupertinoIcons.plus),
-    const NavIconChoice('Cupertino', 'line_3_horizontal', 'Menu', CupertinoIcons.line_3_horizontal),
+    const NavIconChoice('Cupertino', 'line_3_horizontal', 'Menu', CupertinoIcons.line_horizontal_3),
     NavIconChoice('Font Awesome', 'house', 'House', FontAwesomeIcons.house),
     NavIconChoice('Font Awesome', 'houseSolid', 'House Solid', FontAwesomeIcons.house),
     NavIconChoice('Font Awesome', 'heart', 'Heart', FontAwesomeIcons.heart),
@@ -242,8 +242,12 @@ class DesignerNavIcons {
     return null;
   }
 
-  static IconData data(String family, String name) =>
-      find(family, name)?.data ?? Icons.circle_outlined;
+  static Widget icon(String family, String name, {Color? color, double size = 24}) {
+    final value = find(family, name)?.data;
+    if (value is FaIconData) return FaIcon(value, color: color, size: size);
+    if (value is IconData) return Icon(value, color: color, size: size);
+    return Icon(Icons.circle_outlined, color: color, size: size);
+  }
 }
 
 class DesignerNavigationBarPage extends StatefulWidget {
@@ -372,7 +376,7 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
                             },
                             children: config.items.map((item) => ListTile(
                               key: ValueKey(item.id),
-                              leading: Icon(DesignerNavIcons.data(item.iconFamily, item.iconName)),
+                              leading: DesignerNavIcons.icon(item.iconFamily, item.iconName),
                               title: Text(item.label),
                               subtitle: Text(_linkLabel(item.link)),
                               trailing: const Icon(Icons.drag_handle),
@@ -460,7 +464,7 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
 
   Widget _navigationRow(DesignerNavigationItem item, int index) => ListTile(
     dense: false,
-    leading: Icon(DesignerNavIcons.data(item.iconFamily, item.iconName), color: navColorFromHex(item.iconColor)),
+    leading: DesignerNavIcons.icon(item.iconFamily, item.iconName, color: navColorFromHex(item.iconColor)),
     title: Text(item.label, style: const TextStyle(color: _navText, fontWeight: FontWeight.w600)),
     subtitle: Text(_linkLabel(item.link), style: const TextStyle(color: Colors.black54, fontSize: 12)),
     trailing: reordering ? const Icon(Icons.drag_handle) : const Icon(Icons.chevron_right),
@@ -627,7 +631,7 @@ class _DesignerNavigationItemPageState extends State<DesignerNavigationItemPage>
               onTap: () => _pickIcon(active: false),
             ),
             ListTile(
-              leading: Icon(DesignerNavIcons.data(item.activeIconFamily, item.activeIconName), color: navColorFromHex(item.activeIconColor)),
+              leading: DesignerNavIcons.icon(item.activeIconFamily, item.activeIconName, color: navColorFromHex(item.activeIconColor)),
               title: const Text('Active Icon'),
               subtitle: Text('${item.activeIconFamily} · ${item.activeIconName}'),
               trailing: const Icon(Icons.chevron_right),
@@ -660,11 +664,11 @@ class _DesignerNavigationItemPageState extends State<DesignerNavigationItemPage>
               decoration: BoxDecoration(color: const Color(0xFFF8F7FA), borderRadius: BorderRadius.circular(16), border: Border.all(color: _navBorder)),
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
                 Column(children: [
-                  Icon(DesignerNavIcons.data(item.iconFamily, item.iconName), color: navColorFromHex(item.iconColor), size: 28),
+                  DesignerNavIcons.icon(item.iconFamily, item.iconName, color: navColorFromHex(item.iconColor), size: 28),
                   Text(item.label, style: const TextStyle(fontSize: 11)),
                 ]),
                 Column(children: [
-                  Icon(DesignerNavIcons.data(item.activeIconFamily, item.activeIconName), color: navColorFromHex(item.activeIconColor), size: 28),
+                  DesignerNavIcons.icon(item.activeIconFamily, item.activeIconName, color: navColorFromHex(item.activeIconColor), size: 28),
                   const Text('Active', style: TextStyle(fontSize: 11)),
                 ]),
               ]),
@@ -794,7 +798,7 @@ class _NavigationIconPickerPageState extends State<_NavigationIconPickerPage> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: selected ? _navPurple : _navBorder),
                     ),
-                    child: Tooltip(message: choice.label, child: Icon(choice.data, color: _navText, size: 25)),
+                    child: Tooltip(message: choice.label, child: (choice.data is FaIconData ? FaIcon(choice.data as FaIconData, color: _navText, size: 25) : Icon(choice.data as IconData, color: _navText, size: 25))),
                   ),
                 );
               },
