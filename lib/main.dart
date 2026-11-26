@@ -16,6 +16,7 @@ import 'woo_store_api.dart';
 import 'notification_service.dart';
 import 'notification_inbox_page.dart';
 import 'glowhit_designer_page.dart';
+import 'designer_layout_contract.dart';
 
 const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
@@ -496,7 +497,7 @@ class _StoreHomeState extends State<StoreHome> {
     final liked = wishlist.any((e) => e['id'] == id);
     return Card(
       clipBehavior: Clip.antiAlias,
-      elevation: elevation.clamp(0, 20).toDouble(),
+      elevation: elevation.clamp(0, 12).toDouble(),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius.clamp(0, 60).toDouble())),
       child: InkWell(
         onTap: () {
@@ -517,7 +518,10 @@ class _StoreHomeState extends State<StoreHome> {
               color: Colors.white,
               child: imageUrl(p).isEmpty
                 ? const Icon(Icons.image_outlined, size: 44, color: Colors.black26)
-                : Image.network(imageUrl(p), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                : Image.network(imageUrl(p), fit: BoxFit.contain,
+                    cacheWidth: (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio / 2).round().clamp(200, 1200),
+                    gaplessPlayback: true,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
             ),
             Positioned(right: 4, top: 4, child: Row(mainAxisSize: MainAxisSize.min, children: [
               IconButton.filledTonal(onPressed: () => setState(() {
@@ -695,6 +699,8 @@ class _StoreHomeState extends State<StoreHome> {
   }
 
   Widget _designerSection(Map<String, dynamic> section) {
+    final imageCacheWidth = (MediaQuery.of(context).size.width *
+        MediaQuery.of(context).devicePixelRatio).round().clamp(320, 2048);
     final nested = section['properties'] is Map
         ? Map<String, dynamic>.from(section['properties'] as Map)
         : <String, dynamic>{};
@@ -709,6 +715,7 @@ class _StoreHomeState extends State<StoreHome> {
     config['designer_component_type'] = type;
     config['visible'] = nested['visible'] ?? config['visible'] ?? config['enabled'] ?? true;
     if (config['visible'] == false) return const SizedBox.shrink();
+    final layoutSpec = DesignerLayoutSpec.fromMap(config);
     final title = (config['title'] ?? '').toString();
     final showTitle = config['show_title'] != false && title.isNotEmpty;
     final background = (config['section_background'] ?? 'transparent').toString();
@@ -733,17 +740,12 @@ class _StoreHomeState extends State<StoreHome> {
         wordSpacing: (config['word_spacing'] as num?)?.toDouble() ?? 0,
       ));
     }
-    final padding = (config['padding_top'] as num?)?.toDouble() ?? 12.0;
-    final paddingLeft = (config['padding_left'] as num?)?.toDouble() ?? 12.0;
-    final paddingRight = (config['padding_right'] as num?)?.toDouble() ?? 12.0;
-    final mainAxisGap = (config['main_axis_spacing'] as num?)?.toDouble() ?? (config['item_gap'] as num?)?.toDouble() ?? 8.0;
-    final crossAxisGap = (config['cross_axis_spacing'] as num?)?.toDouble() ?? (config['item_gap'] as num?)?.toDouble() ?? 8.0;
-    final margin = EdgeInsets.fromLTRB(
-      (config['margin_left'] as num?)?.toDouble() ?? 0,
-      (config['margin_top'] as num?)?.toDouble() ?? 0,
-      (config['margin_right'] as num?)?.toDouble() ?? 0,
-      (config['margin_bottom'] as num?)?.toDouble() ?? 0,
-    );
+    final padding = layoutSpec.padding.top;
+    final paddingLeft = layoutSpec.padding.left;
+    final paddingRight = layoutSpec.padding.right;
+    final mainAxisGap = layoutSpec.mainAxisSpacing;
+    final crossAxisGap = layoutSpec.crossAxisSpacing;
+    final margin = layoutSpec.margin;
 
     if (type == 'ark_live_slider' || type.startsWith('banner_') || config['designer_component_type']?.toString().startsWith('banner_') == true) {
       final key = (config['slider_key'] ?? '').toString();
@@ -759,22 +761,23 @@ class _StoreHomeState extends State<StoreHome> {
           (slide['image_url'] ?? '').toString().trim().isNotEmpty).toList();
 
       Widget renderCarousel(List<Map<String, dynamic>> slides, Map<String, dynamic> settings) {
-        final height = ((settings['height_px'] ?? config['height_px'] ?? config['height'] ?? 180) as num).toDouble();
-        final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
-          (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
-        final maxChildWidth = (config['max_width_px'] as num?)?.toDouble() ?? MediaQuery.of(context).size.width;
-        final carouselFraction = childWidthFactor.clamp(.4, 1.0).toDouble().clamp(
-          .4, (maxChildWidth / MediaQuery.of(context).size.width).clamp(.4, 1.0));
-        final childElevation = ((config['elevation'] ?? config['card_depth']) as num?)?.toDouble() ?? 1;
+        final renderSpec = DesignerLayoutSpec.fromMap(settings.isEmpty ? config : {...config, ...settings});
+        final height = renderSpec.height;
+        final maxChildWidth = renderSpec.maxCrossAxisExtent ?? MediaQuery.of(context).size.width;
+        // Width and viewport fraction are separate Designer controls:
+        // width sizes the carousel shell; view_fraction sizes each slide.
+        final carouselFraction = ((config['card_width'] ?? config['view_fraction']) as num?)
+            ?.toDouble().clamp(.4, 1.0).toDouble() ?? .9;
+        final childElevation = renderSpec.elevation;
         final intervalMs = ((settings['interval_ms'] ?? config['interval_ms'] ?? (((config['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
         final layout = (config['designer_component_type'] ?? config['type'] ?? '').toString();
         final bannerGrid = layout == 'banner_grid';
         final bannerGridLimit = ((config['limit'] as num?)?.toInt() ?? 8).clamp(1, 40);
         final bannerGridSlides = slides.take(bannerGridLimit).toList();
         final bannerStyle = layout == 'banner_list' || layout == 'banner_scroll';
-        final bannerGridColumns = ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 6);
-        final bannerGridAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3.0);
-        final bannerGridRowExtent = (height * (1.2 / bannerGridAspect)).clamp(60, 500).toDouble();
+        final bannerGridColumns = renderSpec.crossAxisCount;
+        final bannerGridAspect = renderSpec.crossAspectRatio.clamp(.4, 3.0);
+        final bannerGridRowExtent = (height.clamp(40, 500) * (1.2 / bannerGridAspect)).clamp(40, 600).toDouble();
         final bannerGridRows = (bannerGridSlides.length / bannerGridColumns).ceil().clamp(1, 40);
         final bannerGridHeight = bannerGridRowExtent * bannerGridRows + mainAxisGap * (bannerGridRows - 1);
         return Align(
@@ -787,7 +790,7 @@ class _StoreHomeState extends State<StoreHome> {
             decoration: BoxDecoration(
           color: backgroundImageUrl.isNotEmpty || background == 'transparent' ? null : _safeColor(background),
           image: backgroundImageUrl.isNotEmpty
-              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
+              ? DecorationImage(image: ResizeImage(NetworkImage(backgroundImageUrl), width: imageCacheWidth), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
               : null,
         ),
             padding: EdgeInsets.fromLTRB(
@@ -798,7 +801,9 @@ class _StoreHomeState extends State<StoreHome> {
             ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (showTitle) Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: EdgeInsets.only(
+                bottom: (config['title_bottom_spacing'] as num?)?.toDouble() ?? 8,
+              ),
               child: Text(title, style: sectionTitleStyle()),
             ),
             bannerGrid
@@ -818,17 +823,17 @@ class _StoreHomeState extends State<StoreHome> {
                         final slide = bannerGridSlides[index];
                         final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
                         return LayoutBuilder(builder: (context, constraints) {
-                          final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, maxChildWidth).toDouble();
+                          final childWidth = renderSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: maxChildWidth);
                           return Align(alignment: Alignment.centerLeft, child: SizedBox(width: childWidth, child: Card(
                             margin: EdgeInsets.zero,
                             elevation: childElevation,
                             clipBehavior: Clip.antiAlias,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(renderSpec.borderRadius.clamp(0, 32).toDouble())),
                             child: InkWell(
                               onTap: () => _openDesignerChildLink(slide),
                               child: url.isEmpty
                                   ? const ColoredBox(color: Color(0xFFEDEAF2), child: Icon(Icons.image_outlined))
-                                  : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                                  : Image.network(url, fit: BoxFit.cover, cacheWidth: imageCacheWidth, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
                             ),
                           )));
                         });
@@ -836,50 +841,117 @@ class _StoreHomeState extends State<StoreHome> {
                     ),
                   )
                 : bannerStyle
-                ? SizedBox(
-                    height: height,
-                    child: ListView(
-                      scrollDirection: config['horizontal'] == false || layout == 'banner_list' ? Axis.vertical : Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      children: slides.map((slide) {
-                        final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
-                        return Padding(
-                          padding: EdgeInsets.symmetric(horizontal: crossAxisGap / 2, vertical: mainAxisGap / 2),
+                ? LayoutBuilder(builder: (context, constraints) {
+                    // Keep the published Banner Scroll child geometry identical
+                    // to Designer preview: size from the inner content viewport,
+                    // not the full device width (which ignores section margin/padding).
+                    final childWidth = renderSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: maxChildWidth);
+                    // Banner List is a full vertical stack; Banner Scroll
+                    // remains a bounded scroll viewport even when vertical.
+                    final verticalList = layout == 'banner_list';
+                    Widget buildBannerChild(Map<String, dynamic> slide) {
+                      final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
+                      return SizedBox(
+                        width: childWidth,
+                        height: height.clamp(40, 500).toDouble(),
+                        child: Card(
+                          margin: EdgeInsets.zero,
+                          color: Colors.white,
+                          elevation: childElevation.clamp(0, 12).toDouble(),
+                          clipBehavior: Clip.antiAlias,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(renderSpec.borderRadius.clamp(0, 32).toDouble()),
+                          ),
                           child: InkWell(
                             onTap: () => _openDesignerChildLink(slide),
-                            child: SizedBox(
-                              width: (MediaQuery.of(context).size.width * childWidthFactor).clamp(40, maxChildWidth).toDouble(),
-                              height: height,
-                              child: Card(
-                                margin: EdgeInsets.zero,
-                                elevation: childElevation,
-                                clipBehavior: Clip.antiAlias,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
-                                ),
-                                child: Image.network(url, fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
-                              ),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                url.isEmpty
+                                    ? const ColoredBox(
+                                        color: Color(0xFFEDEAF2),
+                                        child: Icon(Icons.image_outlined),
+                                      )
+                                    : Image.network(
+                                        url,
+                                        fit: BoxFit.cover,
+                                        cacheWidth: imageCacheWidth,
+                                        gaplessPlayback: true,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(Icons.broken_image_outlined),
+                                      ),
+                                if ((slide['title'] ?? '').toString().isNotEmpty)
+                                  Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                      color: Colors.black.withValues(alpha: .52),
+                                      child: Text(
+                                        slide['title'].toString(),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                        );
-                      }).toList(),
-                    ),
-                  )
-                : ArkDesignerBannerCarousel(
-                    slides: slides,
-                    height: height,
-                    radius: (config['corner_radius'] as num?)?.toDouble() ?? 16,
-                    autoplay: config['autoplay'] != false,
-                    interval: Duration(milliseconds: intervalMs.clamp(1000, 30000)),
-                    pauseOnInteraction: config['pause_on_interaction'] != false,
-                    showDots: config['control'] != false && config['show_dots'] == true,
-                    showArrows: config['control'] != false && config['show_arrows'] == true,
-                    fade: config['transition'] == 'fade',
-                    viewFraction: carouselFraction,
-                    elevation: childElevation,
-                    onSlideTap: _openDesignerChildLink,
-                  ),
+                        ),
+                      );
+                    }
+                    if (verticalList) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: slides.asMap().entries.map((entry) => Padding(
+                          padding: EdgeInsets.only(
+                            bottom: entry.key == slides.length - 1 ? 0 : mainAxisGap,
+                          ),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: buildBannerChild(entry.value),
+                          ),
+                        )).toList(),
+                      );
+                    }
+                    return SizedBox(
+                      height: height.clamp(40, 500).toDouble(),
+                      child: ListView.separated(
+                        scrollDirection: layoutSpec.horizontal ? Axis.horizontal : Axis.vertical,
+                        padding: EdgeInsets.zero,
+                        itemCount: slides.length,
+                        separatorBuilder: (_, __) => renderSpec.horizontal
+                            ? SizedBox(width: crossAxisGap)
+                            : SizedBox(height: mainAxisGap),
+                        itemBuilder: (_, index) => buildBannerChild(slides[index]),
+                      ),
+                    );
+                  })
+                : LayoutBuilder(builder: (context, constraints) {
+                    final carouselWidth = renderSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: maxChildWidth);
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        width: carouselWidth,
+                        height: height,
+                        child: ArkDesignerBannerCarousel(
+                          slides: slides,
+                          height: height,
+                          radius: renderSpec.borderRadius.clamp(0, 32).toDouble(),
+                          autoplay: config['autoplay'] != false,
+                          interval: Duration(milliseconds: intervalMs.clamp(1000, 30000)),
+                          pauseOnInteraction: config['pause_on_interaction'] != false,
+                          showDots: config['control'] != false && config['show_dots'] == true,
+                          showArrows: config['control'] != false && config['show_arrows'] == true,
+                          fade: config['transition'] == 'fade',
+                          viewFraction: carouselFraction,
+                          elevation: childElevation.clamp(0, 12).toDouble(),
+                          onSlideTap: _openDesignerChildLink,
+                        ),
+                      ),
+                    );
+                  }),
               ]),
           ),
         );
@@ -921,32 +993,36 @@ class _StoreHomeState extends State<StoreHome> {
         final parent = (category['parent'] as num?)?.toInt() ?? 0;
         return parent == parentId;
       }).toList();
-      final limit = (config['limit'] as num?)?.toInt() ?? 8;
+      final limit = (config['limit'] as num?)?.toInt() ?? layoutSpec.fixedGridViewCount;
       rows = rows.take(limit.clamp(1, 100)).toList();
       if (rows.isEmpty) return const SizedBox.shrink();
-      final cardRadius = (config['corner_radius'] as num?)?.toDouble() ?? 12;
-      final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 150;
-      final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
-        (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
-      final categoryCardWidth = (((config['max_width_px'] as num?)?.toDouble() ?? 180) * childWidthFactor)
-          .clamp(40, MediaQuery.of(context).size.width).toDouble();
-      final categoryAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .9).clamp(.4, 2.5);
+      final cardRadius = layoutSpec.borderRadius.clamp(0, 28).toDouble();
+      final cardHeight = layoutSpec.height;
+      final childWidthFactor = layoutSpec.widthFactor;
+      final categoryCardWidth = layoutSpec.maxCrossAxisExtent ?? 180;
+      final categoryAspect = layoutSpec.crossAspectRatio.clamp(.4, 2.5);
       final categoryRowExtent = (cardHeight * (.9 / categoryAspect)).clamp(40, 600).toDouble();
       final cards = rows.map((category) {
         final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
         final card = Card(
           clipBehavior: Clip.antiAlias,
-          elevation: ((config['elevation'] ?? config['card_depth']) as num?)?.toDouble() ?? 1,
+          elevation: layoutSpec.elevation.clamp(0, 12).toDouble(),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(cardRadius)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Expanded(
               child: image.isNotEmpty
-                  ? Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.category_outlined)))
+                  ? Image.network(image, fit: BoxFit.cover, cacheWidth: imageCacheWidth, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.category_outlined)))
                   : const Center(child: Icon(Icons.category_outlined, size: 34)),
             ),
             Padding(
               padding: const EdgeInsets.all(7),
-              child: Text((category['name'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+              child: Text(
+                (category['name'] ?? '').toString(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              ),
             ),
           ]),
         );
@@ -958,7 +1034,7 @@ class _StoreHomeState extends State<StoreHome> {
         decoration: BoxDecoration(
           color: backgroundImageUrl.isNotEmpty || background == 'transparent' ? null : _safeColor(background),
           image: backgroundImageUrl.isNotEmpty
-              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
+              ? DecorationImage(image: ResizeImage(NetworkImage(backgroundImageUrl), width: imageCacheWidth), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
               : null,
         ),
         padding: EdgeInsets.fromLTRB(
@@ -969,31 +1045,38 @@ class _StoreHomeState extends State<StoreHome> {
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (showTitle) Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            padding: EdgeInsets.only(
+              bottom: (config['title_bottom_spacing'] as num?)?.toDouble() ?? 8,
+            ),
             child: Text(title, style: sectionTitleStyle()),
           ),
           if (layout.contains('list_tile'))
             Column(children: rows.map((category) => ListTile(
               contentPadding: EdgeInsets.zero,
               leading: category['image'] is Map && ((category['image'] as Map)['src'] ?? '').toString().isNotEmpty
-                  ? SizedBox(width: 52, height: 52, child: Image.network((category['image'] as Map)['src'].toString(), fit: BoxFit.cover))
+                  ? SizedBox(width: 52, height: 52, child: Image.network((category['image'] as Map)['src'].toString(), fit: BoxFit.cover, cacheWidth: imageCacheWidth, gaplessPlayback: true))
                   : const Icon(Icons.category_outlined),
               title: Text((category['name'] ?? '').toString()),
             )).toList())
           else if (layout.contains('list'))
-            Column(children: cards.map((card) => Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(width: categoryCardWidth, height: cardHeight, child: card),
+            Column(children: cards.asMap().entries.map((entry) => Padding(
+              padding: EdgeInsets.only(bottom: entry.key == cards.length - 1 ? 0 : mainAxisGap),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(width: categoryCardWidth * childWidthFactor, height: cardHeight, child: entry.value),
+              ),
             )).toList())
           else if (layout.contains('slider') || layout.contains('scroll'))
             SizedBox(
               height: cardHeight,
               child: ListView.separated(
-                scrollDirection: config['horizontal'] == false ? Axis.vertical : Axis.horizontal,
+                scrollDirection: layoutSpec.horizontal ? Axis.horizontal : Axis.vertical,
                 itemCount: cards.length,
-                separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
+                separatorBuilder: (_, __) => layoutSpec.horizontal
+                    ? SizedBox(width: crossAxisGap)
+                    : SizedBox(height: mainAxisGap),
                 itemBuilder: (_, index) => SizedBox(
-                  width: categoryCardWidth,
+                  width: categoryCardWidth * childWidthFactor,
                   height: cardHeight,
                   child: cards[index],
                 ),
@@ -1005,14 +1088,14 @@ class _StoreHomeState extends State<StoreHome> {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: cards.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 6),
+                crossAxisCount: layoutSpec.crossAxisCount,
                 crossAxisSpacing: crossAxisGap,
                 mainAxisSpacing: mainAxisGap,
                 mainAxisExtent: categoryRowExtent,
               ),
               itemBuilder: (_, index) => LayoutBuilder(
                 builder: (context, constraints) {
-                  final childWidth = constraints.maxWidth.clamp(40, categoryCardWidth).toDouble();
+                  final childWidth = layoutSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: categoryCardWidth);
                   return Align(
                     alignment: Alignment.centerLeft,
                     child: SizedBox(width: childWidth, height: categoryRowExtent, child: cards[index]),
@@ -1028,17 +1111,15 @@ class _StoreHomeState extends State<StoreHome> {
       final rows = _designerProducts(config);
       if (rows.isEmpty) return const SizedBox.shrink();
       final layout = (config['layout_variant'] ?? config['designer_component_type'] ?? type).toString().toLowerCase();
-      final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
-        (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
-      final cardWidth = (((config['max_width_px'] as num?)?.toDouble() ?? 174) * childWidthFactor)
-          .clamp(40, MediaQuery.of(context).size.width).toDouble();
-      final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 260;
-      final productAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .66).clamp(.4, 2.5);
+      final childWidthFactor = layoutSpec.widthFactor;
+      final cardWidth = layoutSpec.maxCrossAxisExtent ?? 174;
+      final cardHeight = layoutSpec.height;
+      final productAspect = layoutSpec.crossAspectRatio.clamp(.4, 2.5);
       final productRowExtent = (cardHeight * (.66 / productAspect)).clamp(40, 700).toDouble();
-      final cardRadius = (config['corner_radius'] as num?)?.toDouble() ?? 12;
-      final cardElevation = (config['card_depth'] as num?)?.toDouble() ?? 1;
+      final cardRadius = layoutSpec.borderRadius.clamp(0, 32).toDouble();
+      final cardElevation = layoutSpec.elevation;
       final cards = rows.map((product) => SizedBox(
-        width: cardWidth,
+        width: cardWidth * childWidthFactor,
         height: cardHeight,
         child: productCard(product, radius: cardRadius, elevation: cardElevation),
       )).toList();
@@ -1048,7 +1129,7 @@ class _StoreHomeState extends State<StoreHome> {
         decoration: BoxDecoration(
           color: backgroundImageUrl.isNotEmpty || background == 'transparent' ? null : _safeColor(background),
           image: backgroundImageUrl.isNotEmpty
-              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
+              ? DecorationImage(image: ResizeImage(NetworkImage(backgroundImageUrl), width: imageCacheWidth), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
               : null,
         ),
         padding: EdgeInsets.fromLTRB(
@@ -1066,19 +1147,24 @@ class _StoreHomeState extends State<StoreHome> {
             SizedBox(
               height: cardHeight,
               child: ListView.separated(
-                scrollDirection: config['horizontal'] == false ? Axis.vertical : Axis.horizontal,
+                scrollDirection: layoutSpec.horizontal ? Axis.horizontal : Axis.vertical,
                 itemCount: cards.length,
-                separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
+                separatorBuilder: (_, __) => layoutSpec.horizontal
+                  ? SizedBox(width: crossAxisGap)
+                  : SizedBox(height: mainAxisGap),
                 itemBuilder: (_, index) => cards[index],
               ),
             )
           else if (layout.contains('list'))
-            Column(children: rows.map((product) => Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                width: cardWidth,
-                height: cardHeight,
-                child: productCard(product, radius: cardRadius, elevation: cardElevation),
+            Column(children: rows.asMap().entries.map((entry) => Padding(
+              padding: EdgeInsets.only(bottom: entry.key == rows.length - 1 ? 0 : mainAxisGap),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: cardWidth * childWidthFactor,
+                  height: cardHeight,
+                  child: productCard(entry.value, radius: cardRadius, elevation: cardElevation),
+                ),
               ),
             )).toList())
           else
@@ -1087,14 +1173,14 @@ class _StoreHomeState extends State<StoreHome> {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: rows.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 6),
+                crossAxisCount: layoutSpec.crossAxisCount,
                 mainAxisExtent: productRowExtent,
                 crossAxisSpacing: crossAxisGap,
                 mainAxisSpacing: mainAxisGap,
               ),
               itemBuilder: (_, index) => LayoutBuilder(
                 builder: (context, constraints) {
-                  final childWidth = constraints.maxWidth.clamp(40, cardWidth).toDouble();
+                  final childWidth = layoutSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: cardWidth);
                   return Align(
                     alignment: Alignment.centerLeft,
                     child: SizedBox(
@@ -1355,7 +1441,7 @@ class RecentlyViewedPage extends StatelessWidget {
             return Card(clipBehavior: Clip.antiAlias, child: InkWell(
               onTap: () => onOpen(item),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(child: SizedBox(width: double.infinity, child: image.isEmpty ? const Icon(Icons.shopping_bag_outlined, size: 42) : Image.network(image, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)))),
+                Expanded(child: SizedBox(width: double.infinity, child: image.isEmpty ? const Icon(Icons.shopping_bag_outlined, size: 42) : Image.network(image, fit: BoxFit.contain, cacheWidth: (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio / 2).round().clamp(200, 1200), gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)))),
                 Padding(padding: const EdgeInsets.fromLTRB(10, 6, 10, 2), child: Text((item['name'] ?? 'Product').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700))),
                 Padding(padding: const EdgeInsets.fromLTRB(10, 2, 10, 10), child: Text(amount, style: const TextStyle(color: purple, fontWeight: FontWeight.w800))),
               ]),

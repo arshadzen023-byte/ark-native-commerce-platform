@@ -54,6 +54,26 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _precacheVisibleSlides();
+  }
+
+  void _precacheVisibleSlides() {
+    final width = (MediaQuery.of(context).size.width *
+        MediaQuery.of(context).devicePixelRatio).round().clamp(320, 2048);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final slide in widget.slides) {
+        final url = (slide['image_url'] ?? slide['source_url'] ?? slide['url'] ?? '').toString().trim();
+        if (url.isNotEmpty) {
+          precacheImage(ResizeImage(NetworkImage(url), width: width), context);
+        }
+      }
+    });
+  }
+
+  @override
   void didUpdateWidget(covariant ArkDesignerBannerCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.autoplay != widget.autoplay ||
@@ -62,6 +82,13 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
         oldWidget.pauseOnInteraction != widget.pauseOnInteraction) {
       _startTimer();
     }
+    final oldImageSet = oldWidget.slides
+        .map((slide) => (slide['image_url'] ?? slide['source_url'] ?? slide['url'] ?? '').toString())
+        .join('|');
+    final newImageSet = widget.slides
+        .map((slide) => (slide['image_url'] ?? slide['source_url'] ?? slide['url'] ?? '').toString())
+        .join('|');
+    if (oldImageSet != newImageSet) _precacheVisibleSlides();
     if (oldWidget.viewFraction != widget.viewFraction) {
       final next = PageController(
         initialPage: _index,
@@ -132,7 +159,12 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
           child: Stack(fit: StackFit.expand, children: [
             image.isEmpty
                 ? const ColoredBox(color: Color(0xFFECE8F3))
-                : Image.network(image, fit: BoxFit.cover,
+                : Image.network(
+                    image,
+                    fit: BoxFit.cover,
+                    cacheWidth: (MediaQuery.of(context).size.width *
+                        MediaQuery.of(context).devicePixelRatio).round().clamp(320, 2048),
+                    gaplessPlayback: true,
                     errorBuilder: (_, __, ___) => const ColoredBox(
                       color: Color(0xFFECE8F3),
                       child: Center(child: Icon(Icons.broken_image_outlined)),

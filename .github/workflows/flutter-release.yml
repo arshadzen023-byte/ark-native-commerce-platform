@@ -168,8 +168,23 @@ jobs:
         run: flutter analyze --no-fatal-infos
       - name: Run widget tests
         run: flutter test
-      - name: Build release APK
-        run: flutter build apk --release
+      - name: Build release APK (retry transient Maven rate limits)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4; do
+            echo "Building release APK (attempt $attempt/4)"
+            if flutter build apk --release; then
+              test -s build/app/outputs/flutter-apk/app-release.apk
+              echo "Verified release APK artifact"
+              exit 0
+            fi
+            if [[ "$attempt" -eq 4 ]]; then
+              echo "::error::Release APK build failed after 4 attempts"
+              exit 1
+            fi
+            sleep $((attempt * 30))
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: glowhit-v1.0.14-qr-saved-addresses

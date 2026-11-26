@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'customer_account_page.dart';
 import 'designer_banner_carousel.dart';
+import 'designer_layout_contract.dart';
 
 // Match the dark, purple-accented native Designer reference supplied by the user.
 const _designerPurple = Color(0xFF7650B8);
@@ -143,6 +144,21 @@ class DesignerComponent {
 
   Map<String, dynamic> toPublishedSection() {
     final values = Map<String, dynamic>.from(properties);
+    // Resolve all Dimension aliases once, then emit one canonical value for
+    // every legacy key consumed by the WordPress sanitizer and older APKs.
+    // This prevents Designer Preview / Published Home from reading different
+    // values when a component contains both canonical and compatibility keys.
+    final layoutSpec = DesignerLayoutSpec.fromMap(values);
+    values.addAll(layoutSpec.canonicalAliases());
+    const integerLayoutKeys = <String>[
+      'padding_top', 'padding_bottom', 'padding_left', 'padding_right',
+      'margin_top', 'margin_bottom', 'margin_left', 'margin_right',
+      'title_bottom_spacing',
+    ];
+    for (final key in integerLayoutKeys) {
+      final value = values[key];
+      if (value is num) values[key] = value.round();
+    }
     final prefix = type.toLowerCase();
     final variant = layout.toLowerCase()
         .replaceFirst('$prefix ', '')
@@ -172,7 +188,7 @@ class DesignerComponent {
       storedType = (values['original_section_type'] ?? values['type'] ?? designerType).toString();
     }
 
-    final width = (values['width'] as num?)?.toDouble() ?? 1.0;
+    final width = layoutSpec.widthFactor;
     final showAllCategories = values['show_all_categories'] == true;
     final rawSource = (values['source'] ?? 'latest').toString();
     final publishedSource = switch (rawSource) {
@@ -225,17 +241,9 @@ class DesignerComponent {
       'visible': enabled && values['visible'] != false,
       'section_background': values['background_color'] ?? values['section_background'] ?? '#FFFFFF',
       'text_color': values['title_color'] ?? values['text_color'] ?? '#24212B',
-      'height_px': values['height'] ?? values['height_px'] ?? 180,
+      ...layoutSpec.canonicalAliases(),
       'width': width,
       'width_pct': width * 100,
-      'max_width_px': values['max_cross_axis_extent'] ?? values['max_width_px'] ?? 300,
-      'main_axis_spacing': values['main_axis_spacing'] ?? 10,
-      'cross_axis_spacing': values['cross_axis_spacing'] ?? 10,
-      'item_gap': values['cross_axis_spacing'] ?? values['item_gap'] ?? 10,
-      'corner_radius': values['border_radius'] ?? values['corner_radius'] ?? 16,
-      'columns': values['cross_axis_count'] ?? values['columns'] ?? 2,
-      'card_aspect_ratio': values['cross_aspect_ratio'] ?? values['card_aspect_ratio'] ?? 1,
-      'card_depth': values['elevation'] ?? values['card_depth'] ?? 1,
       'limit': type == 'Category' && showAllCategories
           ? 100
           : (values['fixed_grid_view_count'] ?? values['limit'] ?? 8),
@@ -390,7 +398,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     properties['height'] = normalized['height_px'] ?? normalized['height'] ?? 180;
     properties['width'] = (normalized['width'] as num?)?.toDouble() ??
         (((normalized['width_pct'] as num?)?.toDouble() ?? 100) / 100);
-    properties['max_cross_axis_extent'] = normalized['max_width_px'] ?? 300;
+    properties['max_cross_axis_extent'] = normalized['max_width_px'] ?? normalized['max_cross_axis_extent'] ?? 300;
     properties['main_axis_spacing'] = normalized['main_axis_spacing'] ?? normalized['item_gap'] ?? 10;
     properties['cross_axis_spacing'] = normalized['cross_axis_spacing'] ?? normalized['item_gap'] ?? 10;
     properties['border_radius'] = normalized['corner_radius'] ?? 16;
@@ -570,6 +578,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   }
 
   Future<void> _persist({bool publish = false}) async {
+    if (saving || publishing) return;
     setState(() { saving = !publish; publishing = publish; error = null; });
     try {
       final now = DateTime.now().toUtc().toIso8601String();
@@ -613,9 +622,15 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
 
         Map<String, dynamic> acceptedConfig = Map<String, dynamic>.from(publishedConfig);
         if (publish) {
-          final serverValue = response['published_config'];
+          final serverValue = response['published_config'] ??
+              response['config'] ??
+              (response['data'] is Map ? (response['data'] as Map)['published_config'] : null);
           if (serverValue is! Map || serverValue['pages'] is! Map) {
-            throw Exception('WordPress did not return the server-published JSON. Update ARK Native API Bridge to 2.2.3.');
+            throw Exception(
+              'WordPress saved the request but returned an incompatible response. '
+              'The active ARK Native API Bridge publish endpoint must return the saved Home JSON. '
+              'Check that only one ARK Native API Bridge is active and that version 2.2.5 is the active copy.',
+            );
           }
           final serverConfig = Map<String, dynamic>.from(serverValue);
           final serverPages = Map<String, dynamic>.from(serverConfig['pages'] as Map);
@@ -672,6 +687,93 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               !submittedHomeIds.every(publishedHomeIds.contains)) {
             throw Exception('WordPress published Home did not retain every submitted component ID.');
           }
+          // Verify the layout/style values that must survive WordPress
+          // sanitization. This prevents a green Publish result when the server
+          // silently resets a component's dimensions or visual properties.
+          const propertyKeys = <String>[
+            'width', 'width_pct', 'height', 'height_px', 'min_height_px',
+            'max_width_px', 'max_cross_axis_extent', 'main_axis_spacing',
+            'cross_axis_spacing', 'item_gap', 'corner_radius', 'border_radius',
+            'columns', 'cross_axis_count', 'cross_aspect_ratio',
+            'card_aspect_ratio', 'card_depth', 'elevation', 'card_image_fit',
+            'margin_top', 'margin_bottom', 'margin_left', 'margin_right',
+            'padding_top', 'padding_bottom', 'padding_left', 'padding_right',
+            'title_bottom_spacing',
+            'section_background', 'text_color', 'title_color', 'title_background_color',
+            'card_background', 'background_image_url', 'background_image_fit',
+            'background_image_alignment', 'background_image_position',
+            'background_position', 'background_size', 'background_repeat',
+            'font_family', 'title_font_size', 'title_font_weight', 'italic',
+            'letter_spacing', 'word_spacing', 'text_style',
+          ];
+          // Compatibility aliases (for example item_gap) may be normalized by
+          // WordPress from their canonical field. Verify canonical design
+          // properties and their aliases against the same effective value.
+          const aliasGroups = <String, List<String>>{
+            'main_axis_spacing': ['main_axis_spacing'],
+            'cross_axis_spacing': ['cross_axis_spacing', 'item_gap'],
+            'height_px': ['height_px', 'height'],
+            'max_width_px': ['max_width_px', 'max_cross_axis_extent'],
+            'corner_radius': ['corner_radius', 'border_radius'],
+            'columns': ['columns', 'cross_axis_count'],
+            'card_aspect_ratio': ['card_aspect_ratio', 'cross_aspect_ratio'],
+            'card_depth': ['card_depth', 'elevation'],
+            'width': ['width', 'width_pct'],
+          };
+          for (final page in _pages) {
+            final pageKey = _wordpressPageKey(page);
+            final requestedPage = configPages[pageKey];
+            final savedPage = serverPages[pageKey];
+            final requestedSections = requestedPage is Map && requestedPage['sections'] is List
+                ? requestedPage['sections'] as List
+                : const <dynamic>[];
+            final savedSections = savedPage is Map && savedPage['sections'] is List
+                ? savedPage['sections'] as List
+                : const <dynamic>[];
+            final savedById = <String, Map>{};
+            for (final section in savedSections.whereType<Map>()) {
+              savedById[(section['id'] ?? '').toString()] = section;
+            }
+            for (final requested in requestedSections.whereType<Map>()) {
+              final id = (requested['id'] ?? '').toString();
+              final saved = savedById[id];
+              if (saved == null) continue;
+              final requestedProperties = requested['properties'] is Map
+                  ? Map<String, dynamic>.from(requested['properties'] as Map)
+                  : <String, dynamic>{};
+              final savedProperties = saved['properties'] is Map
+                  ? Map<String, dynamic>.from(saved['properties'] as Map)
+                  : <String, dynamic>{};
+              for (final key in propertyKeys) {
+                if (!requested.containsKey(key) && !requestedProperties.containsKey(key)) continue;
+                final before = requested[key] ?? requestedProperties[key];
+                final after = saved[key] ?? savedProperties[key];
+                if (before == null && after == null) continue;
+                if (after == null) {
+                  throw Exception('WordPress did not preserve "$key" for component "' +
+                      (requested['title'] ?? id).toString() + '" on page "' + page + '".');
+                }
+                final numEqual = before is num && after is num
+                    ? (before.toDouble() - after.toDouble()).abs() < 0.01
+                    : false;
+                // These aliases are redundant fields that the WordPress
+                // sanitizer may round or regenerate. They must not veto a
+                // publish when the canonical value is unchanged.
+                final isAlias = aliasGroups.values.any(
+                  (aliases) => aliases.skip(1).contains(key),
+                );
+                final effectiveBefore = before is num ? before.toDouble() : before;
+                final effectiveAfter = after is num ? after.toDouble() : after;
+                final equal = numEqual || jsonEncode(effectiveBefore) == jsonEncode(effectiveAfter);
+                if (!equal && !isAlias) {
+                  throw Exception('WordPress changed "$key" for component "' +
+                      (requested['title'] ?? id).toString() + '" on page "' + page +
+                      '" (Designer: ' + before.toString() + ', published: ' + after.toString() + ').');
+                }
+              }
+            }
+          }
+
           acceptedConfig = serverConfig;
           await prefs.setString('glowhit_published_designer_config', jsonEncode(acceptedConfig));
         }
@@ -679,16 +781,27 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         await prefs.setString('glowhit_designer_last_server_sync', DateTime.now().toUtc().toIso8601String());
       } catch (e) {
         // The device draft remains recoverable, but do not claim that the server saved it.
-        if (mounted) setState(() => error = publish
-            ? 'Local draft saved, but Publish was not confirmed: ' + _friendlyDesignerError(e)
-            : 'Local draft saved, but server sync was not confirmed: ' + _friendlyDesignerError(e));
+        if (mounted) {
+          final message = publish
+              ? 'Local draft saved, but Publish was not confirmed: ' + _friendlyDesignerError(e)
+              : 'Local draft saved, but server sync was not confirmed: ' + _friendlyDesignerError(e);
+          setState(() => error = message);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(message),
+            duration: const Duration(seconds: 6),
+          ));
+        }
         return;
       }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(publish ? 'Published configuration synced to WordPress.' : 'Draft synced to WordPress.'),
       ));
     } catch (e) {
-      if (mounted) setState(() => error = _friendlyDesignerError(e));
+      if (mounted) {
+        final message = _friendlyDesignerError(e);
+        setState(() => error = message);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
     } finally {
       if (mounted) setState(() { saving = false; publishing = false; });
     }
@@ -1055,6 +1168,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
 
 
   Widget _componentVisual(DesignerComponent component, {bool compact = false, VoidCallback? onEdit}) {
+    final imageCacheWidth = (MediaQuery.of(context).size.width *
+        MediaQuery.of(context).devicePixelRatio).round().clamp(320, 2048);
     final properties = component.properties;
     final bg = _color((properties['background_color'] ?? properties['section_background'] ?? '#FFFFFF').toString());
     final titleColor = _color((properties['title_color'] ?? properties['text_color'] ?? '#24212B').toString());
@@ -1069,26 +1184,23 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     if (imageChildren.isEmpty && fallbackImage.isNotEmpty) {
       imageChildren.add({'image_url': fallbackImage, 'title': component.title, 'active': true});
     }
-    final height = ((properties['height'] ?? properties['height_px']) as num?)?.toDouble() ?? 180;
-    final columns = ((properties['cross_axis_count'] ?? properties['columns']) as num?)?.toInt() ?? 2;
-    final gap = ((properties['cross_axis_spacing'] ?? properties['item_gap']) as num?)?.toDouble() ?? 8;
-    final mainGap = ((properties['main_axis_spacing'] ?? properties['item_gap']) as num?)?.toDouble() ?? gap;
-    final radius = ((properties['border_radius'] ?? properties['corner_radius']) as num?)?.toDouble() ?? 14;
-    // Dimension values describe child items, never the outer section/card.
-    final childWidthFactor = ((properties['width'] as num?)?.toDouble() ?? 1).clamp(.25, 1.0).toDouble();
-    final maxChildWidth = ((properties['max_cross_axis_extent'] as num?)?.toDouble() ?? 600).clamp(40, 1000).toDouble();
-    final margin = EdgeInsets.fromLTRB(
-      ((properties['margin_left'] as num?)?.toDouble() ?? 0),
-      ((properties['margin_top'] as num?)?.toDouble() ?? 0),
-      ((properties['margin_right'] as num?)?.toDouble() ?? 0),
-      ((properties['margin_bottom'] as num?)?.toDouble() ?? 0),
+    final layoutSpec = DesignerLayoutSpec.fromMap(
+      properties,
+      defaultMaxCrossAxisExtent: component.type == 'Category'
+          ? 180
+          : component.type == 'Product'
+              ? 174
+              : null,
     );
-    final padding = EdgeInsets.fromLTRB(
-      ((properties['padding_left'] as num?)?.toDouble() ?? 12),
-      ((properties['padding_top'] as num?)?.toDouble() ?? 12),
-      ((properties['padding_right'] as num?)?.toDouble() ?? 12),
-      ((properties['padding_bottom'] as num?)?.toDouble() ?? 12),
-    );
+    final height = layoutSpec.height;
+    final columns = layoutSpec.crossAxisCount;
+    final gap = layoutSpec.crossAxisSpacing;
+    final mainGap = layoutSpec.mainAxisSpacing;
+    final radius = layoutSpec.borderRadius;
+    final childElevation = layoutSpec.elevation;
+    final maxChildWidth = layoutSpec.maxCrossAxisExtent ?? (component.type == 'Category' ? 180 : component.type == 'Product' ? 174 : double.infinity);
+    final margin = layoutSpec.margin;
+    final padding = layoutSpec.padding;
     final isBanner = component.type == 'Banner';
     final isProduct = component.type == 'Product';
     final isCategory = component.type == 'Category';
@@ -1096,7 +1208,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final isSlider = layout.contains('slider');
     final isScroll = layout.contains('scroll') || isSlider;
     final isList = layout.contains('list');
-    final previewLimit = ((properties['fixed_grid_view_count'] as num?)?.toInt() ?? 8).clamp(1, 40).toInt();
+    final previewLimit = layoutSpec.fixedGridViewCount;
     final productSource = (properties['source'] ?? 'latest').toString();
     final sourceId = ((properties['source_id'] ?? properties['category_id'] ?? properties['tag_id']) as num?)?.toInt() ?? 0;
     final productItems = previewProducts.where((product) {
@@ -1121,22 +1233,29 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     // matches; the Designer preview must show the same selection as Home.
     final visibleProductItems = productItems.take(previewLimit).toList();
     final parentCategoryId = ((properties['parent_category_id'] ?? properties['category_id']) as num?)?.toInt() ?? 0;
+    final categoryPreviewLimit = properties['show_all_categories'] == true ? 100 : previewLimit;
     final categoryItems = previewCategories.where((category) {
       if (properties['show_all_categories'] == true || parentCategoryId <= 0) return true;
       return (category['parent'] as num?)?.toInt() == parentCategoryId;
-    }).take(previewLimit).toList();
+    }).take(categoryPreviewLimit).toList();
 
     Widget imageTile(Map<String, dynamic> child, {double? tileWidth}) {
       final url = (child['image_url'] ?? child['source_url'] ?? child['url'] ?? '').toString();
       final image = url.isEmpty
           ? Container(color: titleColor.withValues(alpha: .08), child: const Icon(Icons.image_outlined))
-          : Image.network(url, width: double.infinity, height: double.infinity, fit: BoxFit.cover,
+          : Image.network(url, width: double.infinity, height: double.infinity, fit: BoxFit.cover, cacheWidth: imageCacheWidth, gaplessPlayback: true,
               errorBuilder: (_, __, ___) => Container(color: titleColor.withValues(alpha: .08), child: const Icon(Icons.broken_image_outlined)));
       return SizedBox(
         width: tileWidth,
         height: height.clamp(40, 500).toDouble(),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(radius.clamp(0, 32).toDouble()),
+        child: Card(
+          margin: EdgeInsets.zero,
+          color: _designerSurface,
+          elevation: childElevation.clamp(0, 12).toDouble(),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius.clamp(0, 32).toDouble()),
+          ),
           child: Stack(fit: StackFit.expand, children: [
             image,
             if ((child['title'] ?? '').toString().isNotEmpty)
@@ -1170,20 +1289,72 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           margin: EdgeInsets.zero,
           color: _designerSurface,
           clipBehavior: Clip.antiAlias,
-          elevation: ((properties['elevation'] as num?)?.toDouble() ?? 1).clamp(0, 12).toDouble(),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius.clamp(0, 28).toDouble())),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(child: SizedBox(width: double.infinity,
-              child: imageUrl.isEmpty
-                ? Container(color: _designerField, child: const Icon(Icons.shopping_bag_outlined, size: 34))
-                : Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Container(color: _designerField, child: const Icon(Icons.broken_image_outlined))))),
-            Padding(padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
-              child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Color(0xFF24212B), fontSize: 12, fontWeight: FontWeight.w600))),
-            Padding(padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
-              child: Text(amount, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: _designerPurple, fontSize: 13, fontWeight: FontWeight.w800))),
-          ]),
+          elevation: childElevation.clamp(0, 12).toDouble(),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius.clamp(0, 60).toDouble())),
+          child: InkWell(
+            onTap: onEdit,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: Stack(fit: StackFit.expand, children: [
+                Container(
+                  color: Colors.white,
+                  child: imageUrl.isEmpty
+                    ? const Icon(Icons.shopping_bag_outlined, size: 34)
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        cacheWidth: imageCacheWidth,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: _designerField,
+                          child: const Icon(Icons.broken_image_outlined),
+                        ),
+                      ),
+                ),
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton.filledTonal(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.favorite_border),
+                    ),
+                    IconButton.filledTonal(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.share_outlined),
+                    ),
+                  ]),
+                ),
+              ])),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(9, 7, 9, 2),
+                child: Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF24212B), fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 9),
+                child: Text(
+                  amount,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: _designerPurple, fontSize: 14, fontWeight: FontWeight.w800),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(7, 2, 7, 7),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonal(
+                    onPressed: onEdit,
+                    child: const Text('ADD TO CART', style: TextStyle(fontSize: 10)),
+                  ),
+                ),
+              ),
+            ]),
+          ),
         ),
       );
     }
@@ -1198,12 +1369,12 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           margin: EdgeInsets.zero,
           color: _designerSurface,
           clipBehavior: Clip.antiAlias,
-          elevation: ((properties['elevation'] as num?)?.toDouble() ?? 1).clamp(0, 12).toDouble(),
+          elevation: childElevation.clamp(0, 12).toDouble(),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius.clamp(0, 28).toDouble())),
           child: Column(children: [
             Expanded(child: SizedBox(width: double.infinity, child: url.isEmpty
               ? const Icon(Icons.category_outlined, size: 32)
-              : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.category_outlined)))),
+              : Image.network(url, fit: BoxFit.cover, cacheWidth: imageCacheWidth, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.category_outlined)))),
             Padding(padding: const EdgeInsets.all(7), child: Text((category['name'] ?? 'Category').toString(),
               maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
@@ -1217,7 +1388,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       final slides = imageChildren.isEmpty ? <Map<String, dynamic>>[{'image_url': '', 'title': ''}] : imageChildren;
       if (isSlider) {
         content = LayoutBuilder(builder: (context, constraints) {
-          final childWidth = constraints.maxWidth * childWidthFactor;
+          final childWidth = layoutSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: maxChildWidth);
           return Align(alignment: Alignment.centerLeft, child: SizedBox(
             width: childWidth,
             height: height.clamp(40, 500).toDouble(),
@@ -1232,20 +1403,32 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           showArrows: properties['arrows'] == true && properties['control'] != false,
           fade: properties['fade'] == true,
           viewFraction: ((properties['view_fraction'] as num?)?.toDouble() ?? .9).clamp(.4, 1).toDouble(),
-          elevation: ((properties['elevation'] as num?)?.toDouble() ?? 1).clamp(0, 20).toDouble(),
+          elevation: childElevation.clamp(0, 20).toDouble(),
           onTap: onEdit,
         )));
         });
       } else if (isScroll) {
-        content = LayoutBuilder(builder: (context, constraints) => SizedBox(height: height.clamp(40, 500).toDouble(), child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: slides.length,
-          separatorBuilder: (_, __) => SizedBox(width: gap),
-          itemBuilder: (_, index) => imageTile(slides[index], tileWidth: ((constraints.maxWidth - 48) * childWidthFactor).clamp(40, maxChildWidth).toDouble()),
-        )));
+        content = LayoutBuilder(builder: (context, constraints) => SizedBox(
+          height: height.clamp(40, 500).toDouble(),
+          child: ListView.separated(
+            scrollDirection: layoutSpec.horizontal ? Axis.horizontal : Axis.vertical,
+            itemCount: slides.length,
+            separatorBuilder: (_, __) => layoutSpec.horizontal
+                ? SizedBox(width: gap)
+                : SizedBox(height: mainGap),
+            itemBuilder: (_, index) => imageTile(
+              slides[index],
+              tileWidth: layoutSpec.childWidthFor(
+                constraints.maxWidth,
+                fallbackMaxCrossAxisExtent: maxChildWidth,
+              ),
+            ),
+          ),
+        ));
       } else if (isList) {
         content = LayoutBuilder(builder: (context, constraints) => SizedBox(
-          height: (height.clamp(40, 500) * slides.length).clamp(40, 7200).toDouble(),
+          height: (height.clamp(40, 500) * slides.length +
+              mainGap * (slides.length > 0 ? slides.length - 1 : 0)).clamp(40, 7200).toDouble(),
           child: ListView.separated(
             physics: const NeverScrollableScrollPhysics(),
             itemCount: slides.length,
@@ -1253,7 +1436,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             itemBuilder: (_, index) => Align(
               alignment: Alignment.centerLeft,
               child: SizedBox(
-                width: constraints.maxWidth * childWidthFactor,
+                width: layoutSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: maxChildWidth),
                 height: height.clamp(40, 500).toDouble(),
                 child: imageTile(slides[index]),
               ),
@@ -1262,7 +1445,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         ));
       } else {
         final shown = slides.take(previewLimit).toList();
-        final bannerAspect = ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3).toDouble();
+        final bannerAspect = layoutSpec.crossAspectRatio.clamp(.4, 3).toDouble();
         final bannerChildHeight = (height * (1.2 / bannerAspect)).clamp(40, 600).toDouble();
         content = GridView.builder(
           shrinkWrap: true,
@@ -1276,7 +1459,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           ),
           itemBuilder: (_, index) => LayoutBuilder(
             builder: (context, constraints) {
-              final childWidth = constraints.maxWidth * childWidthFactor;
+              final childWidth = layoutSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: maxChildWidth);
               return Align(
                 alignment: Alignment.centerLeft,
                 child: SizedBox(
@@ -1292,9 +1475,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     } else if (isProduct || isCategory) {
       final count = isProduct ? visibleProductItems.length : categoryItems.length;
       final cardHeight = height.clamp(40, 500).toDouble();
-      final gridAspect = ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? (isProduct ? .66 : .9)).clamp(.4, 2.5).toDouble();
+      final gridAspect = layoutSpec.crossAspectRatio;
       final gridChildHeight = (cardHeight * ((isProduct ? .66 : .9) / gridAspect)).clamp(40, 700).toDouble();
-      final cardWidth = ((properties['max_cross_axis_extent'] as num?)?.toDouble() ?? 180).clamp(40, 600).toDouble();
+      final cardWidth = layoutSpec.maxCrossAxisExtent ?? (isProduct ? 174 : 180);
       Widget tile(int index, {double? width}) => isProduct
           ? productTile(visibleProductItems[index], tileWidth: width)
           : categoryTile(categoryItems[index], tileWidth: width);
@@ -1303,9 +1486,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           final cellWidth = constraints.maxWidth.isFinite
               ? constraints.maxWidth
               : cardWidth;
-          final childWidth = (cellWidth * childWidthFactor)
-              .clamp(40, cardWidth)
-              .toDouble();
+          final childWidth = layoutSpec.childWidthFor(cellWidth, fallbackMaxCrossAxisExtent: cardWidth);
           return Align(
             alignment: Alignment.centerLeft,
             child: SizedBox(
@@ -1322,22 +1503,48 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           style: TextStyle(color: titleColor.withValues(alpha: .7), fontSize: 12))));
       } else if (isScroll) {
         content = SizedBox(height: cardHeight, child: ListView.separated(
-          scrollDirection: properties['horizontal'] == false ? Axis.vertical : Axis.horizontal,
+          scrollDirection: layoutSpec.horizontal ? Axis.horizontal : Axis.vertical,
           itemCount: count,
-          separatorBuilder: (_, __) => SizedBox(width: gap),
-          itemBuilder: (_, index) => tile(index, width: cardWidth * childWidthFactor),
+          separatorBuilder: (_, __) => layoutSpec.horizontal ? SizedBox(width: gap) : SizedBox(height: mainGap),
+          itemBuilder: (_, index) => tile(index, width: layoutSpec.childWidthFor(cardWidth, fallbackMaxCrossAxisExtent: maxChildWidth)),
         ));
+      } else if (isCategory && layout.contains('list_tile')) {
+        content = Column(
+          children: categoryItems.map((category) {
+            final image = category['image'] is Map
+                ? Map<String, dynamic>.from(category['image'] as Map)
+                : <String, dynamic>{};
+            final url = (image['src'] ?? '').toString();
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: url.isNotEmpty
+                  ? SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: Image.network(
+                        url,
+                        fit: BoxFit.cover,
+                        cacheWidth: imageCacheWidth,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.category_outlined),
+                      ),
+                    )
+                  : const Icon(Icons.category_outlined),
+              title: Text((category['name'] ?? '').toString()),
+            );
+          }).toList(),
+        );
       } else if (isList) {
-        content = SizedBox(height: (cardHeight * count).clamp(cardHeight, 900).toDouble(), child: ListView.separated(
+        content = SizedBox(height: (cardHeight * count + mainGap * (count > 0 ? count - 1 : 0)).clamp(cardHeight, 900).toDouble(), child: ListView.separated(
           physics: const NeverScrollableScrollPhysics(),
           itemCount: count,
           separatorBuilder: (_, __) => SizedBox(height: mainGap),
           itemBuilder: (_, index) => Align(
             alignment: Alignment.centerLeft,
             child: SizedBox(
-              width: cardWidth * childWidthFactor,
+              width: layoutSpec.childWidthFor(cardWidth, fallbackMaxCrossAxisExtent: maxChildWidth),
               height: cardHeight,
-              child: tile(index, width: cardWidth * childWidthFactor),
+              child: tile(index, width: layoutSpec.childWidthFor(cardWidth, fallbackMaxCrossAxisExtent: maxChildWidth)),
             ),
           ),
         ));
@@ -1571,6 +1778,15 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     )));
   }
 
+  Future<void> _openDesignerSettings() async {
+    await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => _DesignerSettingsPage(
+      saving: saving,
+      publishing: publishing,
+      onSaveDraft: () => _persist(),
+      onPublish: () => _persist(publish: true),
+    )));
+  }
+
   Widget _designerMenu() => PopupMenuButton<String>(
     icon: const Icon(Icons.menu_rounded),
     tooltip: 'Designer menu',
@@ -1578,11 +1794,14 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       if (value == 'reorder') _openReorder();
       if (value == 'templates') _openTemplates();
       if (value == 'my_templates') _openMyTemplates();
+      if (value == 'settings') _openDesignerSettings();
     },
     itemBuilder: (_) => const [
       PopupMenuItem(value: 'reorder', child: ListTile(leading: Icon(Icons.reorder), title: Text('Reorder Components'), dense: true)),
       PopupMenuItem(value: 'templates', child: ListTile(leading: Icon(Icons.dashboard_customize), title: Text('Templates'), dense: true)),
       PopupMenuItem(value: 'my_templates', child: ListTile(leading: Icon(Icons.collections_bookmark), title: Text('My Templates'), dense: true)),
+      PopupMenuDivider(),
+      PopupMenuItem(value: 'settings', child: ListTile(leading: Icon(Icons.settings_outlined), title: Text('Settings'), dense: true)),
     ],
   );
 
@@ -1604,17 +1823,10 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         title: const Text('ARK Designer', style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           _designerMenu(),
-          PopupMenuButton<String>(
+          IconButton(
             tooltip: 'Designer settings',
             icon: const Icon(Icons.tune_rounded),
-            onSelected: (value) {
-              if (value == 'save') _persist();
-              if (value == 'publish') _persist(publish: true);
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'save', child: ListTile(leading: Icon(Icons.save_outlined), title: Text('Save Draft'), dense: true)),
-              PopupMenuItem(value: 'publish', child: ListTile(leading: Icon(Icons.publish_rounded), title: Text('Publish JSON'), dense: true)),
-            ],
+            onPressed: _openDesignerSettings,
           ),
         ],
       ),
@@ -1647,30 +1859,161 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                   },
                 ),
         ),
-        if (saving || publishing) LinearProgressIndicator(value: null, color: _designerPurple),
         SafeArea(top: false, child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 7, 12, 10),
-          child: Row(children: [
-            Expanded(child: OutlinedButton.icon(
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
               onPressed: saving || publishing ? null : _showComponentPicker,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Add'),
-            )),
-            const SizedBox(width: 8),
-            Expanded(child: OutlinedButton.icon(
-              onPressed: saving || publishing ? null : () => _persist(),
-              icon: const Icon(Icons.save_outlined),
-              label: const Text('Save Draft'),
-            )),
-            const SizedBox(width: 8),
-            Expanded(child: FilledButton.icon(
-              onPressed: saving || publishing ? null : () => _persist(publish: true),
-              icon: const Icon(Icons.publish_rounded),
-              label: const Text('Publish'),
-            )),
-          ]),
+              label: const Text('Add component'),
+            ),
+          ),
         )),
       ]),
+      ),
+    );
+  }
+}
+
+class _DesignerSettingsPage extends StatefulWidget {
+  const _DesignerSettingsPage({
+    required this.saving,
+    required this.publishing,
+    required this.onSaveDraft,
+    required this.onPublish,
+  });
+  final bool saving;
+  final bool publishing;
+  final Future<void> Function() onSaveDraft;
+  final Future<void> Function() onPublish;
+
+  @override
+  State<_DesignerSettingsPage> createState() => _DesignerSettingsPageState();
+}
+
+class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
+  bool busy = false;
+  bool publishingAction = false;
+
+  Future<void> _run(Future<void> Function() action, {required bool publish}) async {
+    if (busy) return;
+    setState(() { busy = true; publishingAction = publish; });
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() { busy = false; publishingAction = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final working = busy || widget.saving || widget.publishing;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Designer Settings')),
+      body: Stack(
+        children: [
+          ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Publish & Sync', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 6),
+                    const Text('Save your current design as a draft or publish the configuration to the connected WordPress store.'),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: working ? null : () => _run(widget.onSaveDraft, publish: false),
+                        icon: const Icon(Icons.save_outlined),
+                        label: const Text('Save Draft'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: working ? null : () => _run(widget.onPublish, publish: true),
+                        icon: const Icon(Icons.publish_rounded),
+                        label: const Text('Publish JSON'),
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  leading: const Icon(Icons.phone_android_rounded),
+                  title: const Text('App Settings', style: TextStyle(fontWeight: FontWeight.w700)),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const _DesignerAppSettingsPage(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (working)
+            Positioned.fill(
+              child: ColoredBox(
+                color: Colors.black26,
+                child: Center(
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(width: 42, height: 42, child: CircularProgressIndicator(strokeWidth: 4)),
+                          const SizedBox(height: 14),
+                          Text(publishingAction || widget.publishing ? 'Publishing…' : 'Saving draft…'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DesignerAppSettingsPage extends StatelessWidget {
+  const _DesignerAppSettingsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: ThemeData.light().copyWith(
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF24212B),
+          elevation: 0,
+        ),
+      ),
+      child: Scaffold(
+        key: const ValueKey('designer-app-settings-page'),
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF24212B),
+          title: const Text('App Settings'),
+        ),
+        body: const ColoredBox(
+          color: Colors.white,
+          child: SizedBox.expand(),
+        ),
       ),
     );
   }
@@ -1797,8 +2140,12 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           value: value,
           min: min,
           max: max,
+          // Pixel dimensions, spacing and elevation are integer-valued in the
+          // WordPress schema. Prevent fractional values that PHP sanitizes
+          // (for example card_depth 13.30 -> 13) before Publish verification.
+          divisions: decimals == 0 ? (max - min).round().clamp(1, 1000) : null,
           activeColor: _designerPurple,
-          onChanged: (next) => _change(key, next),
+          onChanged: (next) => _change(key, decimals == 0 ? next.roundToDouble() : next),
         ),
       ]),
     );
