@@ -575,7 +575,8 @@ class _DesignerNavigationItemPageState extends State<DesignerNavigationItemPage>
 
   @override
   Widget build(BuildContext context) {
-    final requiresUrl = const ['page', 'webview', 'posts', 'bookings', 'contact_form_7'].contains(item.link);
+    final requiresNativePage = item.link == 'page';
+    final requiresUrl = const ['webview', 'posts', 'bookings', 'contact_form_7'].contains(item.link);
     return Theme(
       data: ThemeData.light().copyWith(
         scaffoldBackgroundColor: Colors.white,
@@ -654,6 +655,19 @@ class _DesignerNavigationItemPageState extends State<DesignerNavigationItemPage>
               trailing: const Icon(Icons.chevron_right),
               onTap: _chooseLink,
             ),
+            if (requiresNativePage)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: TextField(
+                  controller: urlController,
+                  decoration: const InputDecoration(
+                    labelText: 'Native Page Key',
+                    hintText: 'custom_about',
+                    helperText: 'Enter the custom page key created in ARK Designer Pages.',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
             if (requiresUrl)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
