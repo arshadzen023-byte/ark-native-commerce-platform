@@ -1408,8 +1408,11 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                                       'right'
                                   ? TextAlign.right
                                   : TextAlign.left,
-                          style: TextStyle(
+                          style: _designerFontStyle(
+                            (properties['font_family'] ?? 'Roboto').toString(),
+                            TextStyle(
                             color: titleColor,
+                            backgroundColor: _color((properties['title_background_color'] ?? '#00000000').toString()),
                             fontSize: compact
                                 ? 12
                                 : ((properties['title_font_size'] as num?)
@@ -1438,7 +1441,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                                 (properties['word_spacing'] as num?)
                                         ?.toDouble() ??
                                     0,
-                          ),
+                          )),
                         ),
                       ),
                     ),
@@ -2474,7 +2477,9 @@ class _DesignerTextStylePageState extends State<_DesignerTextStylePage> {
               child: Text(
                 'Sample Text',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: _designerFontStyle(
+                  (values['font_family'] ?? 'Roboto').toString(),
+                  TextStyle(
                   color: textColor,
                   backgroundColor: background,
                   fontSize: fontSize,
@@ -2484,7 +2489,7 @@ class _DesignerTextStylePageState extends State<_DesignerTextStylePage> {
                   fontFamily: (values['font_family'] ?? 'Roboto').toString(),
                   letterSpacing: (values['letter_spacing'] as num?)?.toDouble() ?? 0,
                   wordSpacing: (values['word_spacing'] as num?)?.toDouble() ?? 0,
-                ),
+                )),
               ),
             ),
             const SizedBox(height: 20),
