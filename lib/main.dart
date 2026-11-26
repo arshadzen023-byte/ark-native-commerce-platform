@@ -748,7 +748,7 @@ class _StoreHomeState extends State<StoreHome> {
                     child: GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: slides.length,
+                      itemCount: bannerGridSlides.length,
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: bannerGridColumns,
                         crossAxisSpacing: crossAxisGap,
@@ -756,9 +756,11 @@ class _StoreHomeState extends State<StoreHome> {
                         mainAxisExtent: bannerGridRowExtent,
                       ),
                       itemBuilder: (_, index) {
-                        final slide = slides[index];
+                        final slide = bannerGridSlides[index];
                         final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
-                        return InkWell(
+                        return LayoutBuilder(builder: (context, constraints) {
+                          final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, maxChildWidth).toDouble();
+                          return Align(alignment: Alignment.centerLeft, child: SizedBox(width: childWidth, child: InkWell(
                           onTap: () => _openDesignerChildLink(slide),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
@@ -766,7 +768,8 @@ class _StoreHomeState extends State<StoreHome> {
                                 ? const ColoredBox(color: Color(0xFFEDEAF2), child: Icon(Icons.image_outlined))
                                 : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
                           ),
-                        );
+                        ));
+                        });
                       },
                     ),
                   )
