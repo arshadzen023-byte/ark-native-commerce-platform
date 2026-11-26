@@ -680,12 +680,13 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             'max_width_px', 'max_cross_axis_extent', 'main_axis_spacing',
             'cross_axis_spacing', 'item_gap', 'corner_radius', 'border_radius',
             'columns', 'cross_axis_count', 'cross_aspect_ratio',
-            'card_aspect_ratio', 'card_radius', 'card_depth', 'elevation',
-            'card_width', 'card_image_fit', 'section_background', 'text_color',
+            'card_aspect_ratio', 'card_depth', 'elevation', 'card_image_fit',
+            'section_background', 'text_color', 'title_color', 'title_background_color',
             'card_background', 'background_image_url', 'background_image_fit',
-            'background_image_position', 'background_position', 'background_size',
-            'background_repeat', 'font_family', 'font_size', 'font_weight',
-            'italic', 'letter_spacing', 'word_spacing', 'text_style',
+            'background_image_alignment', 'background_image_position',
+            'background_position', 'background_size', 'background_repeat',
+            'font_family', 'title_font_size', 'title_font_weight', 'italic',
+            'letter_spacing', 'word_spacing', 'text_style',
           ];
           for (final page in _pages) {
             final pageKey = _wordpressPageKey(page);
