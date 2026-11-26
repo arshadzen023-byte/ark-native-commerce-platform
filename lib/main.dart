@@ -715,11 +715,13 @@ class _StoreHomeState extends State<StoreHome> {
         final intervalMs = ((settings['interval_ms'] ?? config['interval_ms'] ?? (((config['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
         final layout = (config['designer_component_type'] ?? config['type'] ?? '').toString();
         final bannerGrid = layout == 'banner_grid';
+        final bannerGridLimit = ((config['limit'] as num?)?.toInt() ?? 8).clamp(1, 40);
+        final bannerGridSlides = slides.take(bannerGridLimit).toList();
         final bannerStyle = layout == 'banner_list' || layout == 'banner_scroll';
         final bannerGridColumns = ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4);
         final bannerGridAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3.0);
         final bannerGridRowExtent = (height * (1.2 / bannerGridAspect)).clamp(60, 500).toDouble();
-        final bannerGridRows = (slides.length / bannerGridColumns).ceil().clamp(1, 10);
+        final bannerGridRows = (bannerGridSlides.length / bannerGridColumns).ceil().clamp(1, 40);
         final bannerGridHeight = bannerGridRowExtent * bannerGridRows + mainAxisGap * (bannerGridRows - 1);
         return Align(
           alignment: Alignment.center,
