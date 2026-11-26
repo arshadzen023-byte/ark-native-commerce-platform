@@ -688,6 +688,19 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             'font_family', 'title_font_size', 'title_font_weight', 'italic',
             'letter_spacing', 'word_spacing', 'text_style',
           ];
+          // Compatibility aliases (for example item_gap) may be normalized by
+          // WordPress from their canonical field. Verify canonical design
+          // properties and their aliases against the same effective value.
+          const aliasGroups = <String, List<String>>{
+            'main_axis_spacing': ['main_axis_spacing'],
+            'cross_axis_spacing': ['cross_axis_spacing', 'item_gap'],
+            'height_px': ['height_px', 'height'],
+            'max_width_px': ['max_width_px', 'max_cross_axis_extent'],
+            'corner_radius': ['corner_radius', 'border_radius'],
+            'columns': ['columns', 'cross_axis_count'],
+            'card_aspect_ratio': ['card_aspect_ratio', 'cross_aspect_ratio'],
+            'card_depth': ['card_depth', 'elevation'],
+          };
           for (final page in _pages) {
             final pageKey = _wordpressPageKey(page);
             final requestedPage = configPages[pageKey];
