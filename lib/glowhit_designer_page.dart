@@ -1234,10 +1234,11 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     // matches; the Designer preview must show the same selection as Home.
     final visibleProductItems = productItems.take(previewLimit).toList();
     final parentCategoryId = ((properties['parent_category_id'] ?? properties['category_id']) as num?)?.toInt() ?? 0;
+    final categoryPreviewLimit = properties['show_all_categories'] == true ? 100 : previewLimit;
     final categoryItems = previewCategories.where((category) {
       if (properties['show_all_categories'] == true || parentCategoryId <= 0) return true;
       return (category['parent'] as num?)?.toInt() == parentCategoryId;
-    }).take(previewLimit).toList();
+    }).take(categoryPreviewLimit).toList();
 
     Widget imageTile(Map<String, dynamic> child, {double? tileWidth}) {
       final url = (child['image_url'] ?? child['source_url'] ?? child['url'] ?? '').toString();
@@ -1315,14 +1316,12 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                   top: 4,
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     IconButton.filledTonal(
-                      visualDensity: VisualDensity.compact,
                       onPressed: onEdit,
-                      icon: const Icon(Icons.favorite_border, size: 17),
+                      icon: const Icon(Icons.favorite_border),
                     ),
                     IconButton.filledTonal(
-                      visualDensity: VisualDensity.compact,
                       onPressed: onEdit,
-                      icon: const Icon(Icons.share_outlined, size: 17),
+                      icon: const Icon(Icons.share_outlined),
                     ),
                   ]),
                 ),
@@ -1342,7 +1341,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                   amount,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: _designerPurple, fontWeight: FontWeight.w800),
+                  style: const TextStyle(color: _designerPurple, fontSize: 14, fontWeight: FontWeight.w800),
                 ),
               ),
               Padding(
