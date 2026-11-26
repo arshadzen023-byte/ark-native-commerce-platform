@@ -1,7 +1,7 @@
 name: glowhit_shopping
 description: GlowHit native WooCommerce shopping app
 publish_to: none
-version: 1.0.19+99
+version: 1.0.20+100
 environment:
   sdk: ">=3.3.0 <4.0.0"
 dependencies:
