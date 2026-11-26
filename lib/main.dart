@@ -958,7 +958,7 @@ class _StoreHomeState extends State<StoreHome> {
         decoration: BoxDecoration(
           color: backgroundImageUrl.isNotEmpty || background == 'transparent' ? null : _safeColor(background),
           image: backgroundImageUrl.isNotEmpty
-              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: BoxFit.cover)
+              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
               : null,
         ),
         padding: EdgeInsets.fromLTRB(
@@ -1048,7 +1048,7 @@ class _StoreHomeState extends State<StoreHome> {
         decoration: BoxDecoration(
           color: backgroundImageUrl.isNotEmpty || background == 'transparent' ? null : _safeColor(background),
           image: backgroundImageUrl.isNotEmpty
-              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: BoxFit.cover)
+              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
               : null,
         ),
         padding: EdgeInsets.fromLTRB(
