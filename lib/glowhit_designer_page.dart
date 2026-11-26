@@ -647,10 +647,14 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               'Update the ARK Native Commerce Bridge publish/read endpoint to preserve the navigation_bar JSON before publishing this feature.',
             );
           }
-          final requestedNavigationJson = jsonEncode(navigationConfig.toJson());
-          final savedNavigationJson = jsonEncode(DesignerNavigationConfig.fromJson(savedNavigation).toJson());
-          if (requestedNavigationJson != savedNavigationJson) {
-            throw Exception('WordPress changed the Navigation Bar settings during publish. The published navigation JSON does not match the Designer preview.');
+          final publishedNavigation = DesignerNavigationConfig.fromJson(savedNavigation);
+          final navigationDifferences = navigationConfig.differencesFrom(publishedNavigation);
+          if (navigationDifferences.isNotEmpty) {
+            throw Exception(
+              'WordPress did not preserve the Navigation Bar settings. '
+              'Changed fields: ${navigationDifferences.join('; ')}. '
+              'Update the active ARK Native Commerce Bridge so its publish and read endpoints save and return every navigation_bar field.',
+            );
           }
 
           // Verify every component ID from the requested snapshot survived the
