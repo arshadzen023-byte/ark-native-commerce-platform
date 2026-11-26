@@ -2067,10 +2067,6 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
             onChanged: (value) => _change('parent_category_id', int.tryParse(value) ?? 0),
           ),
         ],
-        if (item.layout.toLowerCase().contains('grid') ||
-            item.layout.toLowerCase().contains('slider') ||
-            item.layout.toLowerCase().contains('scroll'))
-          _backgroundImageSettings(),
         if (item.type == 'Product') ...[
           DropdownButtonFormField<String>(
             initialValue: (item.properties['source'] ?? 'featured').toString(),
@@ -2109,6 +2105,10 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
         ],
       ]),
       _childrenPanel(),
+      if (item.layout.toLowerCase().contains('grid') ||
+          item.layout.toLowerCase().contains('slider') ||
+          item.layout.toLowerCase().contains('scroll'))
+        _backgroundImageSettings(),
     ],
   );
 
