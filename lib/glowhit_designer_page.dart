@@ -1887,8 +1887,12 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           value: value,
           min: min,
           max: max,
+          // Pixel dimensions, spacing and elevation are integer-valued in the
+          // WordPress schema. Prevent fractional values that PHP sanitizes
+          // (for example card_depth 13.30 -> 13) before Publish verification.
+          divisions: decimals == 0 ? (max - min).round().clamp(1, 1000) : null,
           activeColor: _designerPurple,
-          onChanged: (next) => _change(key, next),
+          onChanged: (next) => _change(key, decimals == 0 ? next.roundToDouble() : next),
         ),
       ]),
     );
