@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'designer_banner_carousel.dart';
 import 'product_details_page.dart';
@@ -18,6 +19,14 @@ import 'glowhit_designer_page.dart';
 
 const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
+
+TextStyle _designerFontStyle(String family, TextStyle base) {
+  try {
+    return GoogleFonts.getFont(family, textStyle: base);
+  } catch (_) {
+    return base.copyWith(fontFamily: family);
+  }
+}
 
 Future<http.Response> request(Uri uri, {String method = 'GET', Map<String, String>? headers, String? body}) async {
   const waits = [Duration(milliseconds: 350), Duration(milliseconds: 900), Duration(milliseconds: 1600)];
@@ -686,7 +695,9 @@ class _StoreHomeState extends State<StoreHome> {
     TextStyle sectionTitleStyle() {
       final weight = (config['title_font_weight'] ?? 'bold').toString();
       final titleBackground = (config['title_background_color'] ?? '').toString();
-      return TextStyle(
+      return _designerFontStyle(
+        (config['font_family'] ?? 'Roboto').toString(),
+        TextStyle(
         color: _safeColor(textColor),
         backgroundColor: titleBackground.isEmpty || titleBackground == '#00000000'
             ? null
@@ -698,7 +709,7 @@ class _StoreHomeState extends State<StoreHome> {
         fontFamily: (config['font_family'] ?? 'Roboto').toString(),
         letterSpacing: (config['letter_spacing'] as num?)?.toDouble() ?? 0,
         wordSpacing: (config['word_spacing'] as num?)?.toDouble() ?? 0,
-      );
+      ));
     }
     final padding = (config['padding_top'] as num?)?.toDouble() ?? 12.0;
     final paddingLeft = (config['padding_left'] as num?)?.toDouble() ?? 12.0;
