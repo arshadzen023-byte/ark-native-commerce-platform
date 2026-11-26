@@ -890,11 +890,13 @@ class _StoreHomeState extends State<StoreHome> {
                     if (verticalList) {
                       return Column(
                         mainAxisSize: MainAxisSize.min,
-                        children: slides.map((slide) => Padding(
-                          padding: EdgeInsets.only(bottom: mainAxisGap),
+                        children: slides.asMap().entries.map((entry) => Padding(
+                          padding: EdgeInsets.only(
+                            bottom: entry.key == slides.length - 1 ? 0 : mainAxisGap,
+                          ),
                           child: Align(
                             alignment: Alignment.centerLeft,
-                            child: buildBannerChild(slide),
+                            child: buildBannerChild(entry.value),
                           ),
                         )).toList(),
                       );
@@ -1036,9 +1038,12 @@ class _StoreHomeState extends State<StoreHome> {
               title: Text((category['name'] ?? '').toString()),
             )).toList())
           else if (layout.contains('list'))
-            Column(children: cards.map((card) => Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(width: categoryCardWidth * childWidthFactor, height: cardHeight, child: card),
+            Column(children: cards.asMap().entries.map((entry) => Padding(
+              padding: EdgeInsets.only(bottom: entry.key == cards.length - 1 ? 0 : mainAxisGap),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(width: categoryCardWidth * childWidthFactor, height: cardHeight, child: entry.value),
+              ),
             )).toList())
           else if (layout.contains('slider') || layout.contains('scroll'))
             SizedBox(
@@ -1132,12 +1137,15 @@ class _StoreHomeState extends State<StoreHome> {
               ),
             )
           else if (layout.contains('list'))
-            Column(children: rows.map((product) => Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                width: cardWidth * childWidthFactor,
-                height: cardHeight,
-                child: productCard(product, radius: cardRadius, elevation: cardElevation),
+            Column(children: rows.asMap().entries.map((entry) => Padding(
+              padding: EdgeInsets.only(bottom: entry.key == rows.length - 1 ? 0 : mainAxisGap),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: cardWidth * childWidthFactor,
+                  height: cardHeight,
+                  child: productCard(entry.value, radius: cardRadius, elevation: cardElevation),
+                ),
               ),
             )).toList())
           else
