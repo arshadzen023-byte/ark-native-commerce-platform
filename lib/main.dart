@@ -456,12 +456,17 @@ class _StoreHomeState extends State<StoreHome> {
     )));
   }
 
-  Widget productCard(Map<String, dynamic> p) {
+  Widget productCard(
+    Map<String, dynamic> p, {
+    double radius = 12,
+    double elevation = 0.5,
+  }) {
     final id = (p['id'] as num?)?.toInt() ?? 0;
     final liked = wishlist.any((e) => e['id'] == id);
     return Card(
       clipBehavior: Clip.antiAlias,
-      elevation: 0.5,
+      elevation: elevation.clamp(0, 20).toDouble(),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius.clamp(0, 60).toDouble())),
       child: InkWell(
         onTap: () {
           _rememberRecentlyViewed(p);
@@ -682,8 +687,6 @@ class _StoreHomeState extends State<StoreHome> {
     final paddingRight = (config['padding_right'] as num?)?.toDouble() ?? 12.0;
     final mainAxisGap = (config['main_axis_spacing'] as num?)?.toDouble() ?? (config['item_gap'] as num?)?.toDouble() ?? 8.0;
     final crossAxisGap = (config['cross_axis_spacing'] as num?)?.toDouble() ?? (config['item_gap'] as num?)?.toDouble() ?? 8.0;
-    final widthFactor = ((config['width'] as num?)?.toDouble() ??
-      (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
     final margin = EdgeInsets.fromLTRB(
       (config['margin_left'] as num?)?.toDouble() ?? 0,
       (config['margin_top'] as num?)?.toDouble() ?? 0,
@@ -858,7 +861,7 @@ class _StoreHomeState extends State<StoreHome> {
         final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
         final card = Card(
           clipBehavior: Clip.antiAlias,
-          elevation: (config['card_depth'] as num?)?.toDouble() ?? 1,
+          elevation: ((config['elevation'] ?? config['card_depth']) as num?)?.toDouble() ?? 1,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(cardRadius)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Expanded(
@@ -970,10 +973,13 @@ class _StoreHomeState extends State<StoreHome> {
               ),
             )
           else if (layout.contains('list'))
-            Column(children: rows.map((product) => SizedBox(
-              width: double.infinity,
-              height: cardHeight,
-              child: productCard(product),
+            Column(children: rows.map((product) => Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: cardWidth,
+                height: cardHeight,
+                child: productCard(product, radius: cardRadius, elevation: cardElevation),
+              ),
             )).toList())
           else
             GridView.builder(
