@@ -826,10 +826,17 @@ class _StoreHomeState extends State<StoreHome> {
                           child: InkWell(
                             onTap: () => _openDesignerChildLink(slide),
                             child: SizedBox(
-                              width: (config['width_pct'] as num?)?.toDouble() == null ? 260 : MediaQuery.of(context).size.width * ((config['width_pct'] as num).toDouble() / 100),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
-                                child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                              width: (MediaQuery.of(context).size.width * childWidthFactor).clamp(40, maxChildWidth).toDouble(),
+                              height: height,
+                              child: Card(
+                                margin: EdgeInsets.zero,
+                                elevation: childElevation,
+                                clipBehavior: Clip.antiAlias,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
+                                ),
+                                child: Image.network(url, fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
                               ),
                             ),
                           ),
