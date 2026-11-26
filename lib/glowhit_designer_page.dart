@@ -1183,7 +1183,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       final cardHeight = height.clamp(40, 500).toDouble();
       final gridAspect = ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? (isProduct ? .66 : .9)).clamp(.4, 2.5).toDouble();
       final gridChildHeight = (cardHeight * ((isProduct ? .66 : .9) / gridAspect)).clamp(40, 700).toDouble();
-      final cardWidth = ((properties['max_cross_axis_extent'] as num?)?.toDouble() ?? 180).clamp(40, 600).toDouble() * childWidthFactor;
+      final cardWidth = ((properties['max_cross_axis_extent'] as num?)?.toDouble() ?? 180).clamp(40, 600).toDouble();
       Widget tile(int index, {double? width}) => isProduct
           ? productTile(visibleProductItems[index], tileWidth: width)
           : categoryTile(categoryItems[index], tileWidth: width);
@@ -1211,17 +1211,24 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           style: TextStyle(color: titleColor.withValues(alpha: .7), fontSize: 12))));
       } else if (isScroll) {
         content = SizedBox(height: cardHeight, child: ListView.separated(
-          scrollDirection: Axis.horizontal,
+          scrollDirection: properties['horizontal'] == false ? Axis.vertical : Axis.horizontal,
           itemCount: count,
           separatorBuilder: (_, __) => SizedBox(width: gap),
-          itemBuilder: (_, index) => tile(index, width: cardWidth),
+          itemBuilder: (_, index) => tile(index, width: cardWidth * childWidthFactor),
         ));
       } else if (isList) {
         content = SizedBox(height: (cardHeight * count).clamp(cardHeight, 900).toDouble(), child: ListView.separated(
           physics: const NeverScrollableScrollPhysics(),
           itemCount: count,
           separatorBuilder: (_, __) => SizedBox(height: mainGap),
-          itemBuilder: (_, index) => SizedBox(height: cardHeight, child: tile(index)),
+          itemBuilder: (_, index) => Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: cardWidth * childWidthFactor,
+              height: cardHeight,
+              child: tile(index, width: cardWidth * childWidthFactor),
+            ),
+          ),
         ));
       } else {
         final visibleCount = count.clamp(1, 40).toInt();
