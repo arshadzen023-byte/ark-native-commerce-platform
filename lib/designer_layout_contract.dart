@@ -90,11 +90,11 @@ class DesignerLayoutSpec {
 
     final maxExtent = _firstNumber(
       values,
-      const ['max_cross_axis_extent', 'max_width_px'],
+      const ['max_width_px', 'max_cross_axis_extent'],
     );
 
     return DesignerLayoutSpec(
-      height: _number(values, const ['height', 'height_px'], 180),
+      height: _number(values, const ['height_px', 'height'], 180),
       widthFactor: widthFactor,
       maxCrossAxisExtent: maxExtent ?? defaultMaxCrossAxisExtent,
       mainAxisSpacing: _number(
@@ -109,24 +109,24 @@ class DesignerLayoutSpec {
       ),
       borderRadius: _number(
         values,
-        const ['border_radius', 'corner_radius'],
+        const ['corner_radius', 'border_radius'],
         16,
       ),
       horizontal: values['horizontal'] != false,
       crossAxisCount: _integer(
         values,
-        const ['cross_axis_count', 'columns'],
+        const ['columns', 'cross_axis_count'],
         2,
       ).clamp(1, 6).toInt(),
       crossAspectRatio: _number(
         values,
-        const ['cross_aspect_ratio', 'card_aspect_ratio'],
+        const ['card_aspect_ratio', 'cross_aspect_ratio'],
         1,
       ),
-      elevation: _number(values, const ['elevation', 'card_depth'], 1),
+      elevation: _number(values, const ['card_depth', 'elevation'], 1),
       fixedGridViewCount: _integer(
         values,
-        const ['fixed_grid_view_count', 'limit'],
+        const ['limit', 'fixed_grid_view_count'],
         8,
       ).clamp(1, 40).toInt(),
       margin: margin,
