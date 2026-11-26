@@ -19,7 +19,7 @@ Color navColorFromHex(dynamic value, {Color fallback = Colors.white}) {
 }
 
 String navColorToHex(Color color) =>
-    '#${color.value.toRadixString(16).padLeft(8, '0').toUpperCase()}';
+    '#${(color.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
 class DesignerNavigationItem {
   DesignerNavigationItem({
@@ -31,10 +31,10 @@ class DesignerNavigationItem {
     this.iconName = 'home_outlined',
     this.activeIconFamily = 'Material',
     this.activeIconName = 'home',
-    this.iconColor = '#FF77717F',
-    this.activeIconColor = '#FF5B3A9E',
-    this.itemBackgroundColor = '#FFFFFFFF',
-    this.activeBackgroundColor = '#FFEDE7F8',
+    this.iconColor = '#77717F',
+    this.activeIconColor = '#5B3A9E',
+    this.itemBackgroundColor = '#FFFFFF',
+    this.activeBackgroundColor = '#EDE7F8',
   });
 
   final String id;
@@ -75,10 +75,10 @@ class DesignerNavigationItem {
         iconName: (json['icon'] ?? 'home_outlined').toString(),
         activeIconFamily: (json['active_icon_family'] ?? json['icon_family'] ?? 'Material').toString(),
         activeIconName: (json['active_icon'] ?? json['icon'] ?? 'home').toString(),
-        iconColor: (json['icon_color'] ?? '#FF77717F').toString(),
-        activeIconColor: (json['active_icon_color'] ?? '#FF5B3A9E').toString(),
-        itemBackgroundColor: (json['background_color'] ?? '#FFFFFFFF').toString(),
-        activeBackgroundColor: (json['active_background_color'] ?? '#FFEDE7F8').toString(),
+        iconColor: (json['icon_color'] ?? '#77717F').toString(),
+        activeIconColor: (json['active_icon_color'] ?? '#5B3A9E').toString(),
+        itemBackgroundColor: (json['background_color'] ?? '#FFFFFF').toString(),
+        activeBackgroundColor: (json['active_background_color'] ?? '#EDE7F8').toString(),
       );
 }
 
@@ -86,9 +86,9 @@ class DesignerNavigationConfig {
   DesignerNavigationConfig({
     List<DesignerNavigationItem>? items,
     this.type = 'fixed',
-    this.backgroundColor = '#FFFFFFFF',
-    this.selectedColor = '#FF5B3A9E',
-    this.unselectedColor = '#FF77717F',
+    this.backgroundColor = '#FFFFFF',
+    this.selectedColor = '#5B3A9E',
+    this.unselectedColor = '#77717F',
     this.showLabels = true,
     this.elevation = 8,
   }) : items = items ?? defaultItems();
@@ -130,9 +130,9 @@ class DesignerNavigationConfig {
     return DesignerNavigationConfig(
       items: items.isEmpty ? defaultItems() : items,
       type: (json['type'] ?? 'fixed').toString() == 'shifting' ? 'shifting' : 'fixed',
-      backgroundColor: (json['background_color'] ?? '#FFFFFFFF').toString(),
-      selectedColor: (json['selected_color'] ?? '#FF5B3A9E').toString(),
-      unselectedColor: (json['unselected_color'] ?? '#FF77717F').toString(),
+      backgroundColor: (json['background_color'] ?? '#FFFFFF').toString(),
+      selectedColor: (json['selected_color'] ?? '#5B3A9E').toString(),
+      unselectedColor: (json['unselected_color'] ?? '#77717F').toString(),
       showLabels: json['show_labels'] != false,
       elevation: (json['elevation'] as num?)?.toDouble() ?? 8,
     );
@@ -823,10 +823,10 @@ class _NavigationColorDialog extends StatefulWidget {
 class _NavigationColorDialogState extends State<_NavigationColorDialog> {
   late final TextEditingController controller = TextEditingController(text: widget.initial);
   static const colors = [
-    '#FFFFFFFF', '#FFF7F7F7', '#FF111111', '#FF5B3A9E', '#FF7650B8',
-    '#FF1976D2', '#FF00897B', '#FF43A047', '#FFFFA000', '#FFE53935',
-    '#FF3949AB', '#FF8E24AA', '#FF546E7A', '#FF241D33', '#FFEDE7F8',
-    '#FFE3F2FD', '#FFE8F5E9', '#FFFFF3E0', '#FFFCE4EC', '#FFF3E5F5',
+    '#FFFFFF', '#F7F7F7', '#111111', '#5B3A9E', '#7650B8',
+    '#1976D2', '#00897B', '#43A047', '#FFA000', '#E53935',
+    '#3949AB', '#8E24AA', '#546E7A', '#241D33', '#EDE7F8',
+    '#E3F2FD', '#E8F5E9', '#FFF3E0', '#FCE4EC', '#F3E5F5',
   ];
 
   @override
@@ -843,14 +843,14 @@ class _NavigationColorDialogState extends State<_NavigationColorDialog> {
           child: Container(width: 34, height: 34, decoration: BoxDecoration(color: navColorFromHex(hex), shape: BoxShape.circle, border: Border.all(color: _navBorder, width: 1.2))),
         )).toList()),
         const SizedBox(height: 14),
-        TextField(controller: controller, decoration: const InputDecoration(labelText: 'HEX Color', hintText: '#FFFFFFFF', border: OutlineInputBorder())),
+        TextField(controller: controller, decoration: const InputDecoration(labelText: 'HEX Color', hintText: '#FFFFFF', border: OutlineInputBorder())),
       ]),
     ),
     actions: [
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
       FilledButton(onPressed: () {
         final value = controller.text.trim();
-        if (value.length == 7 || value.length == 9) Navigator.pop(context, value);
+        if (value.length == 7) Navigator.pop(context, value);
       }, child: const Text('Apply')),
     ],
   );
