@@ -94,7 +94,12 @@ jobs:
 
           gradle.write_text(content, encoding="utf-8")
           verified = gradle.read_text(encoding="utf-8")
-          if "coreLibraryDesugaringEnabled" not in verified or "desugar_jdk_libs:2.1.5" not in verified:
+          desugaring_enabled = (
+              "isCoreLibraryDesugaringEnabled = true" in verified
+              or "coreLibraryDesugaringEnabled true" in verified
+              or "coreLibraryDesugaringEnabled = true" in verified
+          )
+          if not desugaring_enabled or "desugar_jdk_libs:2.1.5" not in verified:
               raise SystemExit("Core library desugaring configuration verification failed")
           print(f"Verified core library desugaring in {gradle}")
           PY
