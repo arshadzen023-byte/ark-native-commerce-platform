@@ -205,7 +205,24 @@ class NavIconChoice {
 }
 
 class DesignerNavIcons {
-  static const families = ['Material', 'Cupertino', 'Font Awesome', 'Remix Icons', 'FluentUI'];
+  static const families = ['All', 'Material', 'Cupertino', 'Font Awesome', 'Remix Icons', 'FluentUI'];
+
+  static const categories = ['All', 'Nature', 'Transport', 'Water', 'Weather', 'E-commerce', 'Social', 'Buildings', 'Digital', 'Internet'];
+
+  static String categoryFor(NavIconChoice choice) {
+    final value = ('${choice.name} ${choice.label}').toLowerCase();
+    bool has(List<String> words) => words.any(value.contains);
+    if (has(['water', 'wave', 'pool', 'beach', 'drop', 'ferry'])) return 'Water';
+    if (has(['flight', 'plane', 'train', 'railway', 'metro', 'subway', 'bus', 'car', 'boat', 'ship', 'truck', 'shuttle', 'motorcycle', 'bicycle', 'bike', 'sailing', 'ev_station', 'fuel'])) return 'Transport';
+    if (has(['cloud', 'sun', 'moon', 'weather', 'thunder', 'snow', 'wind', 'air', 'night', 'sky', 'rain', 'storm'])) return 'Weather';
+    if (has(['nature', 'leaf', 'tree', 'park', 'forest', 'grass', 'eco', 'pet', 'agriculture', 'flower', 'plant'])) return 'Nature';
+    if (has(['shopping', 'cart', 'bag', 'basket', 'store', 'mall', 'inventory', 'delivery', 'payment', 'credit', 'wallet', 'rupee', 'currency', 'price', 'sale', 'discount', 'gift', 'qr', 'loyalty', 'point_of_sale'])) return 'E-commerce';
+    if (has(['instagram', 'facebook', 'whatsapp', 'youtube', 'telegram', 'linkedin', 'pinterest', 'reddit', 'snapchat', 'discord', 'github', 'tiktok', 'share', 'group', 'chat', 'email', 'call', 'video', 'camera', 'image', 'movie', 'music', 'podcast', 'news', 'rss', 'forum', 'contact'])) return 'Social';
+    if (has(['wifi', 'router', 'internet', 'globe', 'network', 'language', 'public', 'web', 'browser'])) return 'Internet';
+    if (has(['smartphone', 'computer', 'laptop', 'device', 'memory', 'hub', 'database', 'code', 'terminal', 'security', 'lock', 'key', 'server', 'analytics', 'chart', 'dashboard', 'settings', 'cloud_upload', 'cloud_download'])) return 'Digital';
+    if (has(['home', 'house', 'apartment', 'building', 'business', 'bank', 'hotel', 'restaurant', 'cafe', 'school', 'hospital', 'church', 'factory', 'warehouse', 'city', 'location', 'map', 'office', 'work'])) return 'Buildings';
+    return 'All';
+  }
 
   static final List<NavIconChoice> all = [
     const NavIconChoice('Material', 'home_outlined', 'Home', Icons.home_outlined),
@@ -226,7 +243,6 @@ class DesignerNavIcons {
     const NavIconChoice('Material', 'article_outlined', 'Posts', Icons.article_outlined),
     const NavIconChoice('Material', 'contact_support_outlined', 'Contact', Icons.contact_support_outlined),
     const NavIconChoice('Material', 'notifications_none', 'Notifications', Icons.notifications_none),
-    const NavIconChoice('Material', 'menu', 'Menu', Icons.menu),
     const NavIconChoice('Material', 'more_horiz', 'More', Icons.more_horiz),
 
     // Transport
@@ -383,7 +399,6 @@ class DesignerNavIcons {
     const NavIconChoice('Cupertino', 'doc_text', 'Document', CupertinoIcons.doc_text),
     const NavIconChoice('Cupertino', 'list_bullet', 'List', CupertinoIcons.list_bullet),
     const NavIconChoice('Cupertino', 'plus', 'Add', CupertinoIcons.plus),
-    const NavIconChoice('Cupertino', 'line_3_horizontal', 'Menu', CupertinoIcons.line_horizontal_3),
     NavIconChoice('Font Awesome', 'house', 'House', FontAwesomeIcons.house),
     NavIconChoice('Font Awesome', 'houseSolid', 'House Solid', FontAwesomeIcons.house),
     NavIconChoice('Font Awesome', 'heart', 'Heart', FontAwesomeIcons.heart),
@@ -396,7 +411,6 @@ class DesignerNavIcons {
     NavIconChoice('Font Awesome', 'store', 'Store', FontAwesomeIcons.store),
     NavIconChoice('Font Awesome', 'fileLines', 'Posts', FontAwesomeIcons.fileLines),
     NavIconChoice('Font Awesome', 'bell', 'Bell', FontAwesomeIcons.bell),
-    NavIconChoice('Font Awesome', 'bars', 'Menu', FontAwesomeIcons.bars),
     NavIconChoice('Font Awesome', 'plus', 'Add', FontAwesomeIcons.plus),
     NavIconChoice('Font Awesome', 'userCircle', 'User Circle', FontAwesomeIcons.circleUser),
 
@@ -425,7 +439,6 @@ class DesignerNavIcons {
     const NavIconChoice('Remix Icons', 'calendar_line', 'Calendar', RemixIcons.calendar_line),
     const NavIconChoice('Remix Icons', 'file_list_3_line', 'Orders', RemixIcons.file_list_3_line),
     const NavIconChoice('Remix Icons', 'store_2_line', 'Store', RemixIcons.store_2_line),
-    const NavIconChoice('Remix Icons', 'menu_line', 'Menu', RemixIcons.menu_line),
     const NavIconChoice('Remix Icons', 'add_line', 'Add', RemixIcons.add_line),
     const NavIconChoice('FluentUI', 'home_24_regular', 'Home', FluentIcons.home_24_regular),
     const NavIconChoice('FluentUI', 'home_24_filled', 'Home Filled', FluentIcons.home_24_filled),
@@ -562,7 +575,7 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
         backgroundColor: Colors.white,
         floatingActionButton: Padding(
           // Keep the add action clear of the fixed Live Preview navigation bar.
-          padding: const EdgeInsets.only(bottom: 58),
+          padding: const EdgeInsets.only(bottom: 72),
           child: FloatingActionButton(
             tooltip: 'Add New Navigation Button',
             onPressed: _addItem,
@@ -1008,7 +1021,8 @@ class _NavigationIconPickerPage extends StatefulWidget {
 }
 
 class _NavigationIconPickerPageState extends State<_NavigationIconPickerPage> {
-  late String family = widget.initialFamily;
+  late String family = 'All';
+  String category = 'All';
   final search = TextEditingController();
 
   @override
@@ -1017,10 +1031,15 @@ class _NavigationIconPickerPageState extends State<_NavigationIconPickerPage> {
   @override
   Widget build(BuildContext context) {
     final query = search.text.toLowerCase().trim();
-    final choices = DesignerNavIcons.all.where((choice) =>
-      choice.family == family &&
-      (query.isEmpty || choice.label.toLowerCase().contains(query) || choice.name.toLowerCase().contains(query))
-    ).toList();
+    final choices = DesignerNavIcons.all.where((choice) {
+      final familyMatches = family == 'All' || choice.family == family;
+      final categoryMatches = category == 'All' || DesignerNavIcons.categoryFor(choice) == category;
+      final queryMatches = query.isEmpty ||
+          choice.label.toLowerCase().contains(query) ||
+          choice.name.toLowerCase().contains(query) ||
+          choice.family.toLowerCase().contains(query);
+      return familyMatches && categoryMatches && queryMatches;
+    }).toList();
     return Theme(
       data: ThemeData.light().copyWith(scaffoldBackgroundColor: Colors.white, appBarTheme: const AppBarTheme(backgroundColor: Colors.white, foregroundColor: _navText, elevation: 0)),
       child: Scaffold(
@@ -1028,13 +1047,13 @@ class _NavigationIconPickerPageState extends State<_NavigationIconPickerPage> {
         appBar: AppBar(title: const Text('Icons')),
         body: Column(children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
             child: TextField(
               controller: search,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.search),
-                hintText: 'Search icon',
+                hintText: 'Search 200+ icons',
                 filled: true,
                 fillColor: const Color(0xFFF4F2F7),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
@@ -1042,38 +1061,62 @@ class _NavigationIconPickerPageState extends State<_NavigationIconPickerPage> {
             ),
           ),
           SizedBox(
-            height: 52,
+            height: 42,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              children: DesignerNavIcons.categories.map((name) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: ChoiceChip(
+                  label: Text(name),
+                  selected: category == name,
+                  onSelected: (_) => setState(() => category = name),
+                ),
+              )).toList(),
+            ),
+          ),
+          SizedBox(
+            height: 48,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               children: DesignerNavIcons.families.map((name) => Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: ChoiceChip(label: Text(name), selected: family == name, onSelected: (_) => setState(() => family = name)),
+                child: ChoiceChip(
+                  label: Text(name),
+                  selected: family == name,
+                  onSelected: (_) => setState(() => family = name),
+                ),
               )).toList(),
             ),
           ),
           Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.all(12),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, crossAxisSpacing: 8, mainAxisSpacing: 8),
-              itemCount: choices.length,
-              itemBuilder: (_, index) {
-                final choice = choices[index];
-                final selected = choice.family == widget.initialFamily && choice.name == widget.initialName;
-                return InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () => Navigator.pop(context, choice),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: selected ? const Color(0xFFEDE7F8) : const Color(0xFFFAF9FC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: selected ? _navPurple : _navBorder),
-                    ),
-                    child: Tooltip(message: choice.label, child: (choice.data is FaIconData ? FaIcon(choice.data as FaIconData, color: _navText, size: 25) : Icon(choice.data as IconData, color: _navText, size: 25))),
+            child: choices.isEmpty
+                ? const Center(child: Text('No icons found. Try another category or search.'))
+                : GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, crossAxisSpacing: 8, mainAxisSpacing: 8),
+                    itemCount: choices.length,
+                    itemBuilder: (_, index) {
+                      final choice = choices[index];
+                      final selected = choice.family == widget.initialFamily && choice.name == widget.initialName;
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => Navigator.pop(context, choice),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: selected ? const Color(0xFFEDE7F8) : const Color(0xFFFAF9FC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: selected ? _navPurple : _navBorder),
+                          ),
+                          child: Tooltip(
+                            message: '${choice.label} • ${choice.family}',
+                            child: DesignerNavIcons.icon(choice.family, choice.name, color: _navText, size: 25),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ]),
       ),
