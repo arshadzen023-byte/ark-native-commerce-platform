@@ -909,13 +909,6 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           .where((entry) => (entry['mime_type'] ?? '').toString().startsWith('image/'))
           .where((entry) => (entry['source_url'] ?? '').toString().trim().isNotEmpty)
           .toList();
-      if (rows.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No images found in the WordPress Media Library.')),
-        );
-        return null;
-      }
-
       final searchController = TextEditingController();
       final selected = await showModalBottomSheet<Map<String, dynamic>>(
         context: context,
