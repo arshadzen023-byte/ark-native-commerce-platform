@@ -614,9 +614,15 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
 
         Map<String, dynamic> acceptedConfig = Map<String, dynamic>.from(publishedConfig);
         if (publish) {
-          final serverValue = response['published_config'];
+          final serverValue = response['published_config'] ??
+              response['config'] ??
+              (response['data'] is Map ? (response['data'] as Map)['published_config'] : null);
           if (serverValue is! Map || serverValue['pages'] is! Map) {
-            throw Exception('WordPress saved the request but did not return its published configuration. Install ARK Native API Bridge 2.2.5 and ARK App Designer 1.17.5, then retry Publish.');
+            throw Exception(
+              'WordPress saved the request but returned an incompatible response. '
+              'The active ARK Native API Bridge publish endpoint must return the saved Home JSON. '
+              'Check that only one ARK Native API Bridge is active and that version 2.2.5 is the active copy.',
+            );
           }
           final serverConfig = Map<String, dynamic>.from(serverValue);
           final serverPages = Map<String, dynamic>.from(serverConfig['pages'] as Map);
