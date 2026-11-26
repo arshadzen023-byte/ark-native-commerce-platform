@@ -22,6 +22,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Cache Gradle dependencies
+        uses: gradle/actions/setup-gradle@v4
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -131,7 +133,33 @@ jobs:
       - name: Flutter widget and unit tests
         run: flutter test --reporter expanded
       - name: Build release APK
-        run: flutter build apk --release
+        shell: bash
+        run: |
+          set -o pipefail
+          for attempt in 1 2 3 4; do
+            log_file="$(mktemp)"
+            if flutter build apk --release 2>&1 | tee "$log_file"; then
+              rm -f "$log_file"
+              exit 0
+            fi
+            if grep -Eqi '429|Too Many Requests|Gradle threw an error while downloading artifacts|Could not GET.*(maven|gradle)' "$log_file"; then
+              if [ "$attempt" -lt 4 ]; then
+                delay=$((attempt * 30))
+                echo "Dependency repository rate-limited the build. Retrying in ${delay}s (attempt $((attempt + 1))/4)."
+                rm -f "$log_file"
+                sleep "$delay"
+              else
+                echo "Dependency repository remained rate-limited after 4 attempts."
+                rm -f "$log_file"
+                exit 1
+              fi
+            else
+              echo "Build failed for a non-rate-limit reason; not retrying."
+              rm -f "$log_file"
+              exit 1
+            fi
+          done
+          exit 1
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
