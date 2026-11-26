@@ -11,7 +11,6 @@ import 'designer_banner_carousel.dart';
 // Match the dark, purple-accented native Designer reference supplied by the user.
 const _designerPurple = Color(0xFF7650B8);
 const _designerBackground = Color(0xFFF7F7FA);
-const _designerPreviewBackground = Color(0xFF101014);
 const _designerSurface = Color(0xFFFFFFFF);
 const _designerText = Color(0xFF24212B);
 const _designerField = Color(0xFFF1EFF5);
@@ -1472,7 +1471,6 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
   final _description = TextEditingController();
   bool _addingChild = false;
   bool _savingNow = false;
-  DateTime? _lastSaveAt;
   DesignerComponent get item => widget.component;
 
   Future<void> _saveOnce() async {
@@ -1480,7 +1478,6 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     _savingNow = true;
     try {
       await widget.onSave();
-      _lastSaveAt = DateTime.now();
     } finally {
       _savingNow = false;
     }
