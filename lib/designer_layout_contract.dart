@@ -117,7 +117,7 @@ class DesignerLayoutSpec {
         values,
         const ['cross_axis_count', 'columns'],
         2,
-      ).clamp(1, 6),
+      ).clamp(1, 6).toInt(),
       crossAspectRatio: _number(
         values,
         const ['cross_aspect_ratio', 'card_aspect_ratio'],
@@ -128,7 +128,7 @@ class DesignerLayoutSpec {
         values,
         const ['fixed_grid_view_count', 'limit'],
         8,
-      ).clamp(1, 40),
+      ).clamp(1, 40).toInt(),
       margin: margin,
       padding: padding,
     );
@@ -145,7 +145,7 @@ class DesignerLayoutSpec {
         : (maxCrossAxisExtent ?? fallbackMaxCrossAxisExtent ?? 0);
     final proposed = safeAvailable * widthFactor;
     final maximum = maxCrossAxisExtent ?? fallbackMaxCrossAxisExtent ?? safeAvailable;
-    return math.min(math.min(proposed, maximum), safeAvailable);
+    return math.min(math.min(proposed, maximum), safeAvailable).toDouble();
   }
 
   /// Emits paired legacy aliases with one exact effective value.
