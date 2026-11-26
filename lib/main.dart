@@ -711,7 +711,6 @@ class _StoreHomeState extends State<StoreHome> {
         final height = ((settings['height_px'] ?? config['height_px'] ?? config['height'] ?? 180) as num).toDouble();
         final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
           (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
-        final maxChildWidth = (config['max_width_px'] as num?)?.toDouble() ?? MediaQuery.of(context).size.width;
         final intervalMs = ((settings['interval_ms'] ?? config['interval_ms'] ?? (((config['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
         final layout = (config['designer_component_type'] ?? config['type'] ?? '').toString();
         final bannerGrid = layout == 'banner_grid';
@@ -759,7 +758,7 @@ class _StoreHomeState extends State<StoreHome> {
                         final slide = bannerGridSlides[index];
                         final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
                         return LayoutBuilder(builder: (context, constraints) {
-                          final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, maxChildWidth).toDouble();
+                          final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, MediaQuery.of(context).size.width).toDouble();
                           return Align(alignment: Alignment.centerLeft, child: SizedBox(width: childWidth, child: InkWell(
                           onTap: () => _openDesignerChildLink(slide),
                           child: ClipRRect(
