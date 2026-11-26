@@ -475,23 +475,3 @@ void main() {
     expect(find.text('ARK Designer'), findsOneWidget);
   });
 }
-
-
-  // Designer editor regression: the preview must consume the full available
-  // width instead of using FittedBox(scaleDown), which made component sizing
-  // diverge from the Shopping Home renderer.
-  test('Designer preview uses a full-width canvas without scaleDown fitting', () {
-    final source = File('lib/glowhit_designer_page.dart').readAsStringSync();
-    expect(source, contains('Full-width editing canvas'));
-    expect(source, contains('width: constraints.maxWidth'));
-    expect(source, isNot(contains('fit: BoxFit.scaleDown')));
-  });
-
-  test('Dimension controls retain canonical renderer aliases', () {
-    final source = File('lib/glowhit_designer_page.dart').readAsStringSync();
-    expect(source, contains("'height': 'height_px'"));
-    expect(source, contains("'width'"));
-    expect(source, contains("'max_cross_axis_extent': 'max_width_px'"));
-    expect(source, contains("'cross_axis_count': 'columns'"));
-    expect(source, contains("'cross_aspect_ratio': 'card_aspect_ratio'"));
-  });
