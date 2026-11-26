@@ -496,7 +496,7 @@ class _StoreHomeState extends State<StoreHome> {
     final liked = wishlist.any((e) => e['id'] == id);
     return Card(
       clipBehavior: Clip.antiAlias,
-      elevation: elevation.clamp(0, 20).toDouble(),
+      elevation: elevation.clamp(0, 12).toDouble(),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius.clamp(0, 60).toDouble())),
       child: InkWell(
         onTap: () {
@@ -979,7 +979,7 @@ class _StoreHomeState extends State<StoreHome> {
       final limit = (config['limit'] as num?)?.toInt() ?? 8;
       rows = rows.take(limit.clamp(1, 100)).toList();
       if (rows.isEmpty) return const SizedBox.shrink();
-      final cardRadius = (((config['corner_radius'] ?? config['border_radius']) as num?)?.toDouble() ?? 12).clamp(0, 32).toDouble();
+      final cardRadius = (((config['corner_radius'] ?? config['border_radius']) as num?)?.toDouble() ?? 12).clamp(0, 28).toDouble();
       final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 150;
       final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
         (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
@@ -991,7 +991,7 @@ class _StoreHomeState extends State<StoreHome> {
         final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
         final card = Card(
           clipBehavior: Clip.antiAlias,
-          elevation: ((config['elevation'] ?? config['card_depth']) as num?)?.toDouble() ?? 1,
+          elevation: (((config['elevation'] ?? config['card_depth']) as num?)?.toDouble() ?? 1).clamp(0, 12).toDouble(),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(cardRadius)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Expanded(
