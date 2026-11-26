@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import 'customer_account_page.dart';
 import 'designer_banner_carousel.dart';
@@ -800,6 +802,67 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     return Icon(icon, color: _designerPurple, size: size);
   }
 
+  Future<Map<String, dynamic>?> _uploadGalleryMedia() async {
+    try {
+      final picked = await ImagePicker().pickMedia(
+        imageQuality: 95,
+      );
+      if (picked == null) return null;
+      final mime = (picked.mimeType ?? '').toLowerCase();
+      if (mime.isNotEmpty && !mime.startsWith('image/')) {
+        throw Exception('Please select an image file (JPG, PNG, WEBP or GIF).');
+      }
+      final bytes = await picked.readAsBytes();
+      if (bytes.isEmpty || bytes.length > 15 * 1024 * 1024) {
+        throw Exception('Image must be smaller than 15 MB.');
+      }
+      final base = Uri.parse('https://pluginstore.shop');
+      Future<http.Response> send(Uri uri) async {
+        final request = http.MultipartRequest('POST', uri)
+          ..headers['Accept'] = 'application/json'
+          ..headers['Authorization'] = 'Bearer ${widget.token}'
+          ..files.add(http.MultipartFile.fromBytes(
+            'file',
+            bytes,
+            filename: picked.name,
+          ));
+        final streamed = await request.send().timeout(const Duration(seconds: 60));
+        return http.Response.fromStream(streamed);
+      }
+      var response = await send(base.resolve('wp-json/ark-native/v1/designer/media'));
+      if (response.statusCode == 404 || response.statusCode == 405) {
+        response = await send(base.replace(
+          path: '/',
+          queryParameters: {'rest_route': '/ark-native/v1/designer/media'},
+        ));
+      }
+      dynamic decoded;
+      try {
+        decoded = jsonDecode(response.body);
+      } catch (_) {
+        throw Exception('WordPress returned an invalid upload response (HTTP ${response.statusCode}).');
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300 || decoded is! Map) {
+        final message = decoded is Map ? (decoded['message'] ?? decoded['code']) : null;
+        throw Exception(message?.toString() ?? 'Image upload failed (HTTP ${response.statusCode}).');
+      }
+      final media = Map<String, dynamic>.from(decoded);
+      media['source_url'] = (media['source_url'] ?? media['url'] ?? '').toString();
+      media['mime_type'] = (media['mime_type'] ?? mime).toString();
+      if (media['source_url'].toString().isEmpty) {
+        throw Exception('WordPress uploaded the file but returned no Media URL.');
+      }
+      return media;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gallery upload failed: $error')),
+        );
+      }
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>?> _chooseMedia() async {
     try {
       final response = await ArkCustomerApi(widget.token).request(
@@ -880,6 +943,20 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                       prefixIcon: Icon(Icons.search),
                       hintText: 'Search images',
                       filled: true,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                      label: const Text('Upload image from phone Gallery'),
+                      onPressed: () async {
+                        final uploaded = await _uploadGalleryMedia();
+                        if (uploaded != null && ctx.mounted) Navigator.pop(ctx, uploaded);
+                      },
                     ),
                   ),
                 ),
