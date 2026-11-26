@@ -768,8 +768,10 @@ class _StoreHomeState extends State<StoreHome> {
         final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
           (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
         final maxChildWidth = ((config['max_cross_axis_extent'] ?? config['max_width_px']) as num?)?.toDouble() ?? MediaQuery.of(context).size.width;
-        final carouselFraction = childWidthFactor.clamp(.4, 1.0).toDouble().clamp(
-          .4, (maxChildWidth / MediaQuery.of(context).size.width).clamp(.4, 1.0));
+        // Width and viewport fraction are separate Designer controls:
+        // width sizes the carousel shell; view_fraction sizes each slide.
+        final carouselFraction = ((config['card_width'] ?? config['view_fraction']) as num?)
+            ?.toDouble().clamp(.4, 1.0) ?? .9;
         final childElevation = ((config['elevation'] ?? config['card_depth']) as num?)?.toDouble() ?? 1;
         final intervalMs = ((settings['interval_ms'] ?? config['interval_ms'] ?? (((config['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
         final layout = (config['designer_component_type'] ?? config['type'] ?? '').toString();
@@ -803,7 +805,9 @@ class _StoreHomeState extends State<StoreHome> {
             ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (showTitle) Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: EdgeInsets.only(
+                bottom: (config['title_bottom_spacing'] as num?)?.toDouble() ?? 8,
+              ),
               child: Text(title, style: sectionTitleStyle()),
             ),
             bannerGrid
@@ -904,20 +908,31 @@ class _StoreHomeState extends State<StoreHome> {
                       ),
                     );
                   })
-                : ArkDesignerBannerCarousel(
-                    slides: slides,
-                    height: height,
-                    radius: (config['corner_radius'] as num?)?.toDouble() ?? 16,
-                    autoplay: config['autoplay'] != false,
-                    interval: Duration(milliseconds: intervalMs.clamp(1000, 30000)),
-                    pauseOnInteraction: config['pause_on_interaction'] != false,
-                    showDots: config['control'] != false && config['show_dots'] == true,
-                    showArrows: config['control'] != false && config['show_arrows'] == true,
-                    fade: config['transition'] == 'fade',
-                    viewFraction: carouselFraction,
-                    elevation: childElevation,
-                    onSlideTap: _openDesignerChildLink,
-                  ),
+                : LayoutBuilder(builder: (context, constraints) {
+                    final carouselWidth = (constraints.maxWidth * childWidthFactor)
+                        .clamp(40.0, maxChildWidth).toDouble();
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        width: carouselWidth,
+                        height: height,
+                        child: ArkDesignerBannerCarousel(
+                          slides: slides,
+                          height: height,
+                          radius: ((config['corner_radius'] as num?)?.toDouble() ?? 16).clamp(0, 32).toDouble(),
+                          autoplay: config['autoplay'] != false,
+                          interval: Duration(milliseconds: intervalMs.clamp(1000, 30000)),
+                          pauseOnInteraction: config['pause_on_interaction'] != false,
+                          showDots: config['control'] != false && config['show_dots'] == true,
+                          showArrows: config['control'] != false && config['show_arrows'] == true,
+                          fade: config['transition'] == 'fade',
+                          viewFraction: carouselFraction,
+                          elevation: childElevation.clamp(0, 12).toDouble(),
+                          onSlideTap: _openDesignerChildLink,
+                        ),
+                      ),
+                    );
+                  }),
               ]),
           ),
         );
@@ -962,7 +977,7 @@ class _StoreHomeState extends State<StoreHome> {
       final limit = (config['limit'] as num?)?.toInt() ?? 8;
       rows = rows.take(limit.clamp(1, 100)).toList();
       if (rows.isEmpty) return const SizedBox.shrink();
-      final cardRadius = ((config['corner_radius'] ?? config['border_radius']) as num?)?.toDouble() ?? 12;
+      final cardRadius = (((config['corner_radius'] ?? config['border_radius']) as num?)?.toDouble() ?? 12).clamp(0, 32).toDouble();
       final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 150;
       final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
         (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
