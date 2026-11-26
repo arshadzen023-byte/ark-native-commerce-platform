@@ -1088,6 +1088,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           margin: EdgeInsets.zero,
           color: _designerSurface,
           clipBehavior: Clip.antiAlias,
+          elevation: ((properties['elevation'] as num?)?.toDouble() ?? 1).clamp(0, 12).toDouble(),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius.clamp(0, 28).toDouble())),
           child: Column(children: [
             Expanded(child: SizedBox(width: double.infinity, child: url.isEmpty
@@ -1132,11 +1133,21 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           itemBuilder: (_, index) => imageTile(slides[index], tileWidth: (constraints.maxWidth - 48) * childWidthFactor),
         )));
       } else if (isList) {
-        content = SizedBox(height: (height.clamp(40, 500) * slides.length).clamp(40, 7200).toDouble(), child: ListView.separated(
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: slides.length,
-          separatorBuilder: (_, __) => SizedBox(height: mainGap),
-          itemBuilder: (_, index) => Align(alignment: Alignment.centerLeft, child: SizedBox(width: (MediaQuery.of(context).size.width - 48) * childWidthFactor, height: height.clamp(40, 500).toDouble(), child: imageTile(slides[index]))),
+        content = LayoutBuilder(builder: (context, constraints) => SizedBox(
+          height: (height.clamp(40, 500) * slides.length).clamp(40, 7200).toDouble(),
+          child: ListView.separated(
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: slides.length,
+            separatorBuilder: (_, __) => SizedBox(height: mainGap),
+            itemBuilder: (_, index) => Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: constraints.maxWidth * childWidthFactor,
+                height: height.clamp(40, 500).toDouble(),
+                child: imageTile(slides[index]),
+              ),
+            ),
+          ),
         ));
       } else {
         final shown = slides.take(previewLimit).toList();
@@ -1150,7 +1161,19 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             mainAxisSpacing: mainGap.toDouble(),
             mainAxisExtent: height.clamp(40, 500).toDouble(),
           ),
-          itemBuilder: (_, index) => imageTile(shown[index]),
+          itemBuilder: (_, index) => LayoutBuilder(
+            builder: (context, constraints) {
+              final childWidth = constraints.maxWidth * childWidthFactor;
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: childWidth,
+                  height: height.clamp(40, 500).toDouble(),
+                  child: imageTile(shown[index]),
+                ),
+              );
+            },
+          ),
         );
       }
     } else if (isProduct || isCategory) {
