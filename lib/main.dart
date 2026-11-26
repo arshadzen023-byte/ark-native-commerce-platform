@@ -763,7 +763,6 @@ class _StoreHomeState extends State<StoreHome> {
       Widget renderCarousel(List<Map<String, dynamic>> slides, Map<String, dynamic> settings) {
         final renderSpec = DesignerLayoutSpec.fromMap(settings.isEmpty ? config : {...config, ...settings});
         final height = renderSpec.height;
-        final childWidthFactor = renderSpec.widthFactor;
         final maxChildWidth = renderSpec.maxCrossAxisExtent ?? MediaQuery.of(context).size.width;
         // Width and viewport fraction are separate Designer controls:
         // width sizes the carousel shell; view_fraction sizes each slide.
@@ -919,7 +918,7 @@ class _StoreHomeState extends State<StoreHome> {
                     return SizedBox(
                       height: height.clamp(40, 500).toDouble(),
                       child: ListView.separated(
-                        scrollDirection: renderSpec.horizontal ? Axis.horizontal : Axis.vertical,
+                        scrollDirection: layoutSpec.horizontal ? Axis.horizontal : Axis.vertical,
                         padding: EdgeInsets.zero,
                         itemCount: slides.length,
                         separatorBuilder: (_, __) => renderSpec.horizontal
@@ -1007,7 +1006,7 @@ class _StoreHomeState extends State<StoreHome> {
         final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
         final card = Card(
           clipBehavior: Clip.antiAlias,
-          elevation: (((config['elevation'] ?? config['card_depth']) as num?)?.toDouble() ?? 1).clamp(0, 12).toDouble(),
+          elevation: layoutSpec.elevation.clamp(0, 12).toDouble(),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(cardRadius)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Expanded(
