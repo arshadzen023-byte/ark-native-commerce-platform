@@ -875,7 +875,7 @@ class _StoreHomeState extends State<StoreHome> {
             ),
           ]),
         );
-        return SizedBox(width: categoryCardWidth, height: cardHeight, child: card);
+        return card;
       }).toList();
       return Container(
         width: (MediaQuery.of(context).size.width - margin.horizontal).clamp(0, MediaQuery.of(context).size.width).toDouble(),
@@ -912,7 +912,11 @@ class _StoreHomeState extends State<StoreHome> {
                 scrollDirection: Axis.horizontal,
                 itemCount: cards.length,
                 separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
-                itemBuilder: (_, index) => cards[index],
+                itemBuilder: (_, index) => SizedBox(
+                  width: categoryCardWidth,
+                  height: cardHeight,
+                  child: cards[index],
+                ),
               ),
             )
           else
