@@ -1289,20 +1289,74 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           margin: EdgeInsets.zero,
           color: _designerSurface,
           clipBehavior: Clip.antiAlias,
-          elevation: ((properties['elevation'] as num?)?.toDouble() ?? 1).clamp(0, 12).toDouble(),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius.clamp(0, 28).toDouble())),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(child: SizedBox(width: double.infinity,
-              child: imageUrl.isEmpty
-                ? Container(color: _designerField, child: const Icon(Icons.shopping_bag_outlined, size: 34))
-                : Image.network(imageUrl, fit: BoxFit.contain, cacheWidth: imageCacheWidth, gaplessPlayback: true, errorBuilder: (_, __, ___) => Container(color: _designerField, child: const Icon(Icons.broken_image_outlined))))),
-            Padding(padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
-              child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Color(0xFF24212B), fontSize: 12, fontWeight: FontWeight.w600))),
-            Padding(padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
-              child: Text(amount, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: _designerPurple, fontSize: 13, fontWeight: FontWeight.w800))),
-          ]),
+          elevation: childElevation.clamp(0, 12).toDouble(),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius.clamp(0, 60).toDouble())),
+          child: InkWell(
+            onTap: onEdit,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: Stack(fit: StackFit.expand, children: [
+                Container(
+                  color: Colors.white,
+                  child: imageUrl.isEmpty
+                    ? const Icon(Icons.shopping_bag_outlined, size: 34)
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        cacheWidth: imageCacheWidth,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: _designerField,
+                          child: const Icon(Icons.broken_image_outlined),
+                        ),
+                      ),
+                ),
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton.filledTonal(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.favorite_border, size: 17),
+                    ),
+                    IconButton.filledTonal(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.share_outlined, size: 17),
+                    ),
+                  ]),
+                ),
+              ])),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(9, 7, 9, 2),
+                child: Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF24212B), fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 9),
+                child: Text(
+                  amount,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: _designerPurple, fontWeight: FontWeight.w800),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(7, 2, 7, 7),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonal(
+                    onPressed: onEdit,
+                    child: const Text('ADD TO CART', style: TextStyle(fontSize: 10)),
+                  ),
+                ),
+              ),
+            ]),
+          ),
         ),
       );
     }
@@ -1317,7 +1371,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           margin: EdgeInsets.zero,
           color: _designerSurface,
           clipBehavior: Clip.antiAlias,
-          elevation: ((properties['elevation'] as num?)?.toDouble() ?? 1).clamp(0, 12).toDouble(),
+          elevation: childElevation.clamp(0, 12).toDouble(),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius.clamp(0, 28).toDouble())),
           child: Column(children: [
             Expanded(child: SizedBox(width: double.infinity, child: url.isEmpty
@@ -1356,12 +1410,23 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         )));
         });
       } else if (isScroll) {
-        content = LayoutBuilder(builder: (context, constraints) => SizedBox(height: height.clamp(40, 500).toDouble(), child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: slides.length,
-          separatorBuilder: (_, __) => properties['horizontal'] == false ? SizedBox(height: mainGap) : SizedBox(width: gap),
-          itemBuilder: (_, index) => imageTile(slides[index], tileWidth: (constraints.maxWidth * childWidthFactor).clamp(40, maxChildWidth).toDouble()),
-        )));
+        content = LayoutBuilder(builder: (context, constraints) => SizedBox(
+          height: height.clamp(40, 500).toDouble(),
+          child: ListView.separated(
+            scrollDirection: layoutSpec.horizontal ? Axis.horizontal : Axis.vertical,
+            itemCount: slides.length,
+            separatorBuilder: (_, __) => layoutSpec.horizontal
+                ? SizedBox(width: gap)
+                : SizedBox(height: mainGap),
+            itemBuilder: (_, index) => imageTile(
+              slides[index],
+              tileWidth: layoutSpec.childWidthFor(
+                constraints.maxWidth,
+                fallbackMaxCrossAxisExtent: maxChildWidth,
+              ),
+            ),
+          ),
+        ));
       } else if (isList) {
         content = LayoutBuilder(builder: (context, constraints) => SizedBox(
           height: (height.clamp(40, 500) * slides.length +
@@ -1382,7 +1447,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         ));
       } else {
         final shown = slides.take(previewLimit).toList();
-        final bannerAspect = ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3).toDouble();
+        final bannerAspect = layoutSpec.crossAspectRatio.clamp(.4, 3).toDouble();
         final bannerChildHeight = (height * (1.2 / bannerAspect)).clamp(40, 600).toDouble();
         content = GridView.builder(
           shrinkWrap: true,
@@ -1412,9 +1477,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     } else if (isProduct || isCategory) {
       final count = isProduct ? visibleProductItems.length : categoryItems.length;
       final cardHeight = height.clamp(40, 500).toDouble();
-      final gridAspect = ((properties['cross_aspect_ratio'] ?? properties['card_aspect_ratio']) as num?)?.toDouble() ?? (isProduct ? .66 : .9);
+      final gridAspect = layoutSpec.crossAspectRatio;
       final gridChildHeight = (cardHeight * ((isProduct ? .66 : .9) / gridAspect)).clamp(40, 700).toDouble();
-      final cardWidth = ((properties['max_cross_axis_extent'] ?? properties['max_width_px']) as num?)?.toDouble() ?? (isProduct ? 174 : 180);
+      final cardWidth = layoutSpec.maxCrossAxisExtent ?? (isProduct ? 174 : 180);
       Widget tile(int index, {double? width}) => isProduct
           ? productTile(visibleProductItems[index], tileWidth: width)
           : categoryTile(categoryItems[index], tileWidth: width);
@@ -1423,9 +1488,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           final cellWidth = constraints.maxWidth.isFinite
               ? constraints.maxWidth
               : cardWidth;
-          final childWidth = (cellWidth * childWidthFactor)
-              .clamp(40, cardWidth)
-              .toDouble();
+          final childWidth = layoutSpec.childWidthFor(cellWidth, fallbackMaxCrossAxisExtent: cardWidth);
           return Align(
             alignment: Alignment.centerLeft,
             child: SizedBox(
