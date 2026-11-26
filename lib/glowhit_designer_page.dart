@@ -1198,7 +1198,6 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final mainGap = layoutSpec.mainAxisSpacing;
     final radius = layoutSpec.borderRadius;
     final childElevation = layoutSpec.elevation;
-    final childWidthFactor = layoutSpec.widthFactor;
     final maxChildWidth = layoutSpec.maxCrossAxisExtent ?? (component.type == 'Category' ? 180 : component.type == 'Product' ? 174 : double.infinity);
     final margin = layoutSpec.margin;
     final padding = layoutSpec.padding;
