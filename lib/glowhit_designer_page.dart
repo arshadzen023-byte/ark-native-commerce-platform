@@ -1183,7 +1183,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final radius = ((properties['border_radius'] ?? properties['corner_radius']) as num?)?.toDouble() ?? 14;
     // Dimension values describe child items, never the outer section/card.
     final childWidthFactor = ((properties['width'] as num?)?.toDouble() ?? 1).clamp(.25, 1.0).toDouble();
-    final maxChildWidth = ((properties['max_cross_axis_extent'] as num?)?.toDouble() ?? 600).clamp(40, 1000).toDouble();
+    final maxChildWidth = ((properties['max_cross_axis_extent'] ?? properties['max_width_px']) as num?)?.toDouble() ?? 600;
     final margin = EdgeInsets.fromLTRB(
       ((properties['margin_left'] as num?)?.toDouble() ?? 0),
       ((properties['margin_top'] as num?)?.toDouble() ?? 0),
@@ -1348,7 +1348,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           scrollDirection: Axis.horizontal,
           itemCount: slides.length,
           separatorBuilder: (_, __) => SizedBox(width: gap),
-          itemBuilder: (_, index) => imageTile(slides[index], tileWidth: ((constraints.maxWidth - 48) * childWidthFactor).clamp(40, maxChildWidth).toDouble()),
+          itemBuilder: (_, index) => imageTile(slides[index], tileWidth: (constraints.maxWidth * childWidthFactor).clamp(40, maxChildWidth).toDouble()),
         )));
       } else if (isList) {
         content = LayoutBuilder(builder: (context, constraints) => SizedBox(
@@ -1399,9 +1399,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     } else if (isProduct || isCategory) {
       final count = isProduct ? visibleProductItems.length : categoryItems.length;
       final cardHeight = height.clamp(40, 500).toDouble();
-      final gridAspect = ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? (isProduct ? .66 : .9)).clamp(.4, 2.5).toDouble();
+      final gridAspect = ((properties['cross_aspect_ratio'] ?? properties['card_aspect_ratio']) as num?)?.toDouble() ?? (isProduct ? .66 : .9);
       final gridChildHeight = (cardHeight * ((isProduct ? .66 : .9) / gridAspect)).clamp(40, 700).toDouble();
-      final cardWidth = ((properties['max_cross_axis_extent'] as num?)?.toDouble() ?? 180).clamp(40, 600).toDouble();
+      final cardWidth = ((properties['max_cross_axis_extent'] ?? properties['max_width_px']) as num?)?.toDouble() ?? 180;
       Widget tile(int index, {double? width}) => isProduct
           ? productTile(visibleProductItems[index], tileWidth: width)
           : categoryTile(categoryItems[index], tileWidth: width);
