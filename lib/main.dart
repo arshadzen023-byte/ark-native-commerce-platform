@@ -17,6 +17,7 @@ import 'notification_service.dart';
 import 'notification_inbox_page.dart';
 import 'glowhit_designer_page.dart';
 import 'designer_layout_contract.dart';
+import 'designer_navigation_bar.dart';
 
 const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
@@ -223,6 +224,7 @@ class StoreHome extends StatefulWidget {
 
 class _StoreHomeState extends State<StoreHome> {
   int tab = 0;
+  int selectedNavigationIndex = 0;
   bool loading = false;
   String? error;
   String search = '';
@@ -236,6 +238,7 @@ class _StoreHomeState extends State<StoreHome> {
   Map<String, dynamic> liveCart = {};
   bool cartBusy = false;
   final searchController = TextEditingController();
+  final FocusNode searchFocusNode = FocusNode();
   String? customerToken;
   late final GlowHitPushService push;
   int notificationCount = 0;
@@ -379,7 +382,7 @@ class _StoreHomeState extends State<StoreHome> {
     await _handleNotificationLink(value);
   }
 
-  @override void dispose() { searchController.dispose(); super.dispose(); }
+  @override void dispose() { searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
 
   Future<void> load({String order = 'date', bool sale = false}) async {
     setState(() { loading = true; error = null; });
@@ -1213,7 +1216,7 @@ class _StoreHomeState extends State<StoreHome> {
         : const <Map<String, dynamic>>[];
     final sectionWidgets = sections.map(_designerSection).toList();
     return Column(children: [
-      Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
+      Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(focusNode: searchFocusNode, controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
       Expanded(child: RefreshIndicator(
         onRefresh: _loadDesignerConfig,
         child: ListView(
@@ -1245,6 +1248,117 @@ class _StoreHomeState extends State<StoreHome> {
     else if (products.isEmpty) const Expanded(child: Center(child: Text('No products found. Try another search.')))
     else Expanded(child: GridView.builder(padding: const EdgeInsets.fromLTRB(12, 0, 12, 18), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .66, crossAxisSpacing: 10, mainAxisSpacing: 10), itemCount: products.length, itemBuilder: (_, i) => productCard(products[i]))),
   ]);
+  Future<void> _openNavigationItem(DesignerNavigationItem item, int index) async {
+    if (!mounted) return;
+    setState(() => selectedNavigationIndex = index);
+    final link = item.link.toLowerCase();
+    if (const ['home', 'store'].contains(link)) {
+      setState(() => tab = 0);
+      return;
+    }
+    if (link == 'categories') {
+      setState(() => tab = 1);
+      return;
+    }
+    if (link == 'wishlist') {
+      setState(() => tab = 2);
+      return;
+    }
+    if (link == 'cart') {
+      setState(() => tab = 3);
+      return;
+    }
+    if (link == 'account') {
+      setState(() => tab = 4);
+      return;
+    }
+    if (link == 'search') {
+      setState(() => tab = 0);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) FocusScope.of(context).requestFocus(searchFocusNode);
+      });
+      return;
+    }
+    if (link == 'orders') {
+      if (customerToken == null || customerToken!.isEmpty) {
+        setState(() => tab = 4);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please sign in to view your orders.')),
+        );
+        return;
+      }
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders'),
+      ));
+      return;
+    }
+
+    var target = item.linkValue.trim();
+    if (target.isEmpty) {
+      target = switch (link) {
+        'bookings' => '$storeUrl/bookings/',
+        'posts' => '$storeUrl/blog/',
+        'contact_form_7' => '$storeUrl/contact/',
+        _ => '',
+      };
+    }
+    if (target.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Add a Page URL for "${item.label}" in Navigation Bar settings.')),
+      );
+      return;
+    }
+    final uri = Uri.tryParse(target.contains('://') ? target : '$storeUrl/${target.replaceFirst(RegExp(r'^/+'), '')}');
+    if (uri == null || !const ['http', 'https'].contains(uri.scheme) || uri.host.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This Navigation link is not a valid HTTP or HTTPS URL.')),
+      );
+      return;
+    }
+    if (link == 'page') {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open this page.')));
+      }
+      return;
+    }
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NavigationWebPage(title: item.label, url: uri.toString()),
+    ));
+  }
+
+  Widget _buildDesignerBottomNavigation() {
+    final config = DesignerNavigationConfig.fromJson(designerConfig['navigation_bar']);
+    final items = config.items.take(5).toList();
+    if (items.isEmpty) return const SizedBox.shrink();
+    final safeIndex = selectedNavigationIndex.clamp(0, items.length - 1);
+    return BottomNavigationBar(
+      currentIndex: safeIndex,
+      onTap: (index) => _openNavigationItem(items[index], index),
+      type: config.type == 'shifting' ? BottomNavigationBarType.shifting : BottomNavigationBarType.fixed,
+      backgroundColor: navColorFromHex(config.backgroundColor),
+      selectedItemColor: navColorFromHex(config.selectedColor, fallback: purple),
+      unselectedItemColor: navColorFromHex(config.unselectedColor, fallback: Colors.grey),
+      showSelectedLabels: config.showLabels,
+      showUnselectedLabels: config.showLabels,
+      elevation: config.elevation,
+      items: items.map((item) {
+        final isCart = item.link == 'cart';
+        Widget icon(IconData data, String color) {
+          final child = Icon(data, color: navColorFromHex(color), size: 24);
+          if (!isCart || cartCount <= 0) return child;
+          return Badge(label: Text('$cartCount'), child: child);
+        }
+        return BottomNavigationBarItem(
+          icon: icon(DesignerNavIcons.data(item.iconFamily, item.iconName), item.iconColor),
+          activeIcon: icon(DesignerNavIcons.data(item.activeIconFamily, item.activeIconName), item.activeIconColor),
+          label: item.label,
+          backgroundColor: navColorFromHex(item.activeBackgroundColor),
+        );
+      }).toList(),
+    );
+  }
+
   Widget account() => AccountPanel(onLogin: (token) { setState(() => customerToken = token); push.register(customerJwt: token); }, onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } try { await push.unlinkAccount(); } catch (_) {} final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() { customerToken = null; notificationCount = 0; }); }, token: customerToken, onRecentViewed: _openRecentlyViewed);
   @override Widget build(BuildContext context) {
     final titles = ['Shopping', 'Categories', 'Wishlist', 'Cart', 'Account'];
@@ -1266,13 +1380,7 @@ class _StoreHomeState extends State<StoreHome> {
           if (notificationCount > 0) Positioned(right: -2, top: -2, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5))))),
         ]),
       ),
-    ]), body: SafeArea(child: page), bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v), destinations: [
-      const NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-      const NavigationDestination(icon: Icon(Icons.grid_view), label: 'Categories'),
-      const NavigationDestination(icon: Icon(Icons.favorite_border), label: 'Wishlist'),
-      NavigationDestination(icon: Badge(label: Text('$cartCount'), child: const Icon(Icons.shopping_bag_outlined)), label: 'Cart'),
-      const NavigationDestination(icon: Icon(Icons.person_outline), label: 'Account'),
-    ]));
+    ]), body: SafeArea(child: page), bottomNavigationBar: _buildDesignerBottomNavigation());
   }
 }
 
