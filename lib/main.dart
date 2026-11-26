@@ -20,6 +20,28 @@ import 'glowhit_designer_page.dart';
 const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
 
+Alignment _designerBackgroundAlignment(dynamic value) {
+  switch ((value ?? 'center').toString().toLowerCase()) {
+    case 'top_left': return Alignment.topLeft;
+    case 'top_center': return Alignment.topCenter;
+    case 'top_right': return Alignment.topRight;
+    case 'center_left': return Alignment.centerLeft;
+    case 'center_right': return Alignment.centerRight;
+    case 'bottom_left': return Alignment.bottomLeft;
+    case 'bottom_center': return Alignment.bottomCenter;
+    case 'bottom_right': return Alignment.bottomRight;
+    default: return Alignment.center;
+  }
+}
+BoxFit _designerBackgroundFit(dynamic value) {
+  switch ((value ?? 'cover').toString().toLowerCase()) {
+    case 'contain': return BoxFit.contain;
+    case 'fill': return BoxFit.fill;
+    case 'fit_width': return BoxFit.fitWidth;
+    case 'fit_height': return BoxFit.fitHeight;
+    default: return BoxFit.cover;
+  }
+}
 TextStyle _designerFontStyle(String family, TextStyle base) {
   try {
     return GoogleFonts.getFont(family, textStyle: base);
@@ -765,7 +787,7 @@ class _StoreHomeState extends State<StoreHome> {
             decoration: BoxDecoration(
           color: backgroundImageUrl.isNotEmpty || background == 'transparent' ? null : _safeColor(background),
           image: backgroundImageUrl.isNotEmpty
-              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: BoxFit.cover)
+              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
               : null,
         ),
             padding: EdgeInsets.fromLTRB(
