@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'customer_account_page.dart';
 import 'designer_banner_carousel.dart';
@@ -17,6 +18,14 @@ const _designerText = Color(0xFF24212B);
 const _designerField = Color(0xFFF1EFF5);
 const _designerMuted = Color(0xFF77717F);
 const _designerBorder = Color(0xFFE4E0EA);
+
+TextStyle _designerFontStyle(String family, TextStyle base) {
+  try {
+    return GoogleFonts.getFont(family, textStyle: base);
+  } catch (_) {
+    return base.copyWith(fontFamily: family);
+  }
+}
 
 /// Restores published Home components when a legacy native draft contains
 /// only a banner. The edited banner replaces the matching live banner, while
@@ -1353,7 +1362,15 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             margin: margin,
             padding: padding,
             decoration: BoxDecoration(
-              color: bg,
+              color: (properties['background_image_url'] ?? '').toString().isNotEmpty
+                  ? Colors.transparent
+                  : bg,
+              image: (properties['background_image_url'] ?? '').toString().isNotEmpty
+                  ? DecorationImage(
+                      image: NetworkImage(properties['background_image_url'].toString()),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
               // Section shell remains neutral; radius and elevation belong to child cards.
               borderRadius: BorderRadius.zero,
               boxShadow: const [],
