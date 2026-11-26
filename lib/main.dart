@@ -681,7 +681,25 @@ class _StoreHomeState extends State<StoreHome> {
     final title = (config['title'] ?? '').toString();
     final showTitle = config['show_title'] != false && title.isNotEmpty;
     final background = (config['section_background'] ?? 'transparent').toString();
-    final textColor = (config['text_color'] ?? '#202733').toString();
+    final backgroundImageUrl = (config['background_image_url'] ?? '').toString().trim();
+    final textColor = (config['text_color'] ?? config['title_color'] ?? '#202733').toString();
+    TextStyle sectionTitleStyle() {
+      final weight = (config['title_font_weight'] ?? 'bold').toString();
+      final titleBackground = (config['title_background_color'] ?? '').toString();
+      return TextStyle(
+        color: _safeColor(textColor),
+        backgroundColor: titleBackground.isEmpty || titleBackground == '#00000000'
+            ? null
+            : _safeColor(titleBackground),
+        fontSize: (config['title_font_size'] as num?)?.toDouble() ?? 18,
+        fontWeight: weight == 'normal' ? FontWeight.normal
+            : weight == 'medium' ? FontWeight.w500 : FontWeight.bold,
+        fontStyle: config['italic'] == true ? FontStyle.italic : FontStyle.normal,
+        fontFamily: (config['font_family'] ?? 'Roboto').toString(),
+        letterSpacing: (config['letter_spacing'] as num?)?.toDouble() ?? 0,
+        wordSpacing: (config['word_spacing'] as num?)?.toDouble() ?? 0,
+      );
+    }
     final padding = (config['padding_top'] as num?)?.toDouble() ?? 12.0;
     final paddingLeft = (config['padding_left'] as num?)?.toDouble() ?? 12.0;
     final paddingRight = (config['padding_right'] as num?)?.toDouble() ?? 12.0;
@@ -729,7 +747,12 @@ class _StoreHomeState extends State<StoreHome> {
             width: (MediaQuery.of(context).size.width - sectionMargin.horizontal)
                 .clamp(0, MediaQuery.of(context).size.width).toDouble(),
             margin: sectionMargin,
-            color: background == 'transparent' ? null : _safeColor(background),
+            decoration: BoxDecoration(
+          color: backgroundImageUrl.isNotEmpty || background == 'transparent' ? null : _safeColor(background),
+          image: backgroundImageUrl.isNotEmpty
+              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: BoxFit.cover)
+              : null,
+        ),
             padding: EdgeInsets.fromLTRB(
               paddingLeft,
               padding,
@@ -739,7 +762,7 @@ class _StoreHomeState extends State<StoreHome> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (showTitle) Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
+              child: Text(title, style: sectionTitleStyle()),
             ),
             bannerGrid
                 ? SizedBox(
@@ -884,7 +907,12 @@ class _StoreHomeState extends State<StoreHome> {
       return Container(
         width: (MediaQuery.of(context).size.width - margin.horizontal).clamp(0, MediaQuery.of(context).size.width).toDouble(),
         margin: margin,
-        color: background == 'transparent' ? null : _safeColor(background),
+        decoration: BoxDecoration(
+          color: backgroundImageUrl.isNotEmpty || background == 'transparent' ? null : _safeColor(background),
+          image: backgroundImageUrl.isNotEmpty
+              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: BoxFit.cover)
+              : null,
+        ),
         padding: EdgeInsets.fromLTRB(
           (config['padding_left'] as num?)?.toDouble() ?? 12,
           padding,
@@ -894,7 +922,7 @@ class _StoreHomeState extends State<StoreHome> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (showTitle) Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
+            child: Text(title, style: sectionTitleStyle()),
           ),
           if (layout.contains('list_tile'))
             Column(children: rows.map((category) => ListTile(
@@ -969,7 +997,12 @@ class _StoreHomeState extends State<StoreHome> {
       return Container(
         width: (MediaQuery.of(context).size.width - margin.horizontal).clamp(0, MediaQuery.of(context).size.width).toDouble(),
         margin: margin,
-        color: background == 'transparent' ? null : _safeColor(background),
+        decoration: BoxDecoration(
+          color: backgroundImageUrl.isNotEmpty || background == 'transparent' ? null : _safeColor(background),
+          image: backgroundImageUrl.isNotEmpty
+              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: BoxFit.cover)
+              : null,
+        ),
         padding: EdgeInsets.fromLTRB(
           paddingLeft,
           padding,
@@ -979,7 +1012,7 @@ class _StoreHomeState extends State<StoreHome> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (showTitle) Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _safeColor(textColor))),
+            child: Text(title, style: sectionTitleStyle()),
           ),
           if (layout.contains('carousel') || layout.contains('slider') || layout.contains('scroll'))
             SizedBox(
