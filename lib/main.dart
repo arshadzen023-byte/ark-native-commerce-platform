@@ -1344,14 +1344,13 @@ class _StoreHomeState extends State<StoreHome> {
       elevation: config.elevation,
       items: items.map((item) {
         final isCart = item.link == 'cart';
-        Widget icon(IconData data, String color) {
-          final child = Icon(data, color: navColorFromHex(color), size: 24);
+        Widget withCartBadge(Widget child) {
           if (!isCart || cartCount <= 0) return child;
           return Badge(label: Text('$cartCount'), child: child);
         }
         return BottomNavigationBarItem(
-          icon: DesignerNavIcons.icon(item.iconFamily, item.iconName, color: navColorFromHex(item.iconColor)),
-          activeIcon: DesignerNavIcons.icon(item.activeIconFamily, item.activeIconName, color: navColorFromHex(item.activeIconColor)),
+          icon: withCartBadge(DesignerNavIcons.icon(item.iconFamily, item.iconName, color: navColorFromHex(item.iconColor))),
+          activeIcon: withCartBadge(DesignerNavIcons.icon(item.activeIconFamily, item.activeIconName, color: navColorFromHex(item.activeIconColor))),
           label: item.label,
           backgroundColor: navColorFromHex(item.activeBackgroundColor),
         );
