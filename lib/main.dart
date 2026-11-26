@@ -517,7 +517,10 @@ class _StoreHomeState extends State<StoreHome> {
               color: Colors.white,
               child: imageUrl(p).isEmpty
                 ? const Icon(Icons.image_outlined, size: 44, color: Colors.black26)
-                : Image.network(imageUrl(p), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                : Image.network(imageUrl(p), fit: BoxFit.contain,
+                    cacheWidth: (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio / 2).round().clamp(200, 1200),
+                    gaplessPlayback: true,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
             ),
             Positioned(right: 4, top: 4, child: Row(mainAxisSize: MainAxisSize.min, children: [
               IconButton.filledTonal(onPressed: () => setState(() {
@@ -993,7 +996,7 @@ class _StoreHomeState extends State<StoreHome> {
         decoration: BoxDecoration(
           color: backgroundImageUrl.isNotEmpty || background == 'transparent' ? null : _safeColor(background),
           image: backgroundImageUrl.isNotEmpty
-              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
+              ? DecorationImage(image: ResizeImage(NetworkImage(backgroundImageUrl), width: imageCacheWidth), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
               : null,
         ),
         padding: EdgeInsets.fromLTRB(
@@ -1026,7 +1029,9 @@ class _StoreHomeState extends State<StoreHome> {
               child: ListView.separated(
                 scrollDirection: config['horizontal'] == false ? Axis.vertical : Axis.horizontal,
                 itemCount: cards.length,
-                separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
+                separatorBuilder: (_, __) => config['horizontal'] == false
+                    ? SizedBox(height: mainAxisGap)
+                    : SizedBox(width: crossAxisGap),
                 itemBuilder: (_, index) => SizedBox(
                   width: categoryCardWidth * childWidthFactor,
                   height: cardHeight,
@@ -1083,7 +1088,7 @@ class _StoreHomeState extends State<StoreHome> {
         decoration: BoxDecoration(
           color: backgroundImageUrl.isNotEmpty || background == 'transparent' ? null : _safeColor(background),
           image: backgroundImageUrl.isNotEmpty
-              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
+              ? DecorationImage(image: ResizeImage(NetworkImage(backgroundImageUrl), width: imageCacheWidth), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
               : null,
         ),
         padding: EdgeInsets.fromLTRB(
@@ -1103,7 +1108,9 @@ class _StoreHomeState extends State<StoreHome> {
               child: ListView.separated(
                 scrollDirection: config['horizontal'] == false ? Axis.vertical : Axis.horizontal,
                 itemCount: cards.length,
-                separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
+                separatorBuilder: (_, __) => config['horizontal'] == false
+                  ? SizedBox(height: mainAxisGap)
+                  : SizedBox(width: crossAxisGap),
                 itemBuilder: (_, index) => cards[index],
               ),
             )
