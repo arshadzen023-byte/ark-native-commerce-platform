@@ -3,11 +3,61 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:glowhit_shopping/glowhit_designer_page.dart';
 import 'package:glowhit_shopping/designer_banner_carousel.dart';
 import 'package:glowhit_shopping/designer_layout_contract.dart';
+import 'package:glowhit_shopping/designer_navigation_bar.dart';
 import 'package:glowhit_shopping/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('Navigation Bar defaults preserve the five native Shopping destinations', () {
+    final config = DesignerNavigationConfig();
+    expect(config.items.map((item) => item.link).toList(),
+      ['home', 'categories', 'wishlist', 'cart', 'account']);
+    expect(config.type, 'fixed');
+    expect(config.items, hasLength(5));
+  });
+
+  test('Navigation Bar JSON preserves order, links, icon packs and colors', () {
+    final config = DesignerNavigationConfig(
+      type: 'shifting',
+      backgroundColor: '#FFFFFFFF',
+      selectedColor: '#FF5B3A9E',
+      unselectedColor: '#FF77717F',
+      items: [
+        DesignerNavigationItem(
+          id: 'wishlist-tab',
+          label: 'Wishlist',
+          link: 'wishlist',
+          iconFamily: 'Remix Icons',
+          iconName: 'heart_line',
+          activeIconFamily: 'Font Awesome',
+          activeIconName: 'heart',
+          iconColor: '#FF77717F',
+          activeIconColor: '#FF5B3A9E',
+        ),
+      ],
+    );
+    final restored = DesignerNavigationConfig.fromJson(config.toJson());
+    expect(restored.type, 'shifting');
+    expect(restored.items.single.id, 'wishlist-tab');
+    expect(restored.items.single.link, 'wishlist');
+    expect(restored.items.single.iconFamily, 'Remix Icons');
+    expect(restored.items.single.activeIconFamily, 'Font Awesome');
+    expect(restored.items.single.activeIconName, 'heart');
+    expect(restored.items.single.iconColor, '#FF77717F');
+  });
+
+  test('Navigation icon packs each provide selectable icons', () {
+    for (final family in DesignerNavIcons.families) {
+      expect(DesignerNavIcons.all.where((icon) => icon.family == family), isNotEmpty);
+    }
+    expect(DesignerNavIcons.find('Material', 'home'), isNotNull);
+    expect(DesignerNavIcons.find('Cupertino', 'house'), isNotNull);
+    expect(DesignerNavIcons.find('Font Awesome', 'house'), isNotNull);
+    expect(DesignerNavIcons.find('Remix Icons', 'home_3_line'), isNotNull);
+    expect(DesignerNavIcons.find('FluentUI', 'home_24_regular'), isNotNull);
+  });
 
   test('GlowHit remains configured for the live WooCommerce store', () {
     expect(storeUrl, 'https://pluginstore.shop');
