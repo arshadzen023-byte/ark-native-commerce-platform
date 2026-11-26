@@ -740,13 +740,17 @@ class _StoreHomeState extends State<StoreHome> {
         final height = ((settings['height_px'] ?? config['height_px'] ?? config['height'] ?? 180) as num).toDouble();
         final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
           (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
+        final maxChildWidth = (config['max_width_px'] as num?)?.toDouble() ?? MediaQuery.of(context).size.width;
+        final carouselFraction = childWidthFactor.clamp(.4, 1.0).toDouble().clamp(
+          .4, (maxChildWidth / MediaQuery.of(context).size.width).clamp(.4, 1.0));
+        final childElevation = ((config['elevation'] ?? config['card_depth']) as num?)?.toDouble() ?? 1;
         final intervalMs = ((settings['interval_ms'] ?? config['interval_ms'] ?? (((config['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
         final layout = (config['designer_component_type'] ?? config['type'] ?? '').toString();
         final bannerGrid = layout == 'banner_grid';
         final bannerGridLimit = ((config['limit'] as num?)?.toInt() ?? 8).clamp(1, 40);
         final bannerGridSlides = slides.take(bannerGridLimit).toList();
         final bannerStyle = layout == 'banner_list' || layout == 'banner_scroll';
-        final bannerGridColumns = ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4);
+        final bannerGridColumns = ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 6);
         final bannerGridAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3.0);
         final bannerGridRowExtent = (height * (1.2 / bannerGridAspect)).clamp(60, 500).toDouble();
         final bannerGridRows = (bannerGridSlides.length / bannerGridColumns).ceil().clamp(1, 40);
@@ -792,16 +796,19 @@ class _StoreHomeState extends State<StoreHome> {
                         final slide = bannerGridSlides[index];
                         final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
                         return LayoutBuilder(builder: (context, constraints) {
-                          final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, MediaQuery.of(context).size.width).toDouble();
-                          return Align(alignment: Alignment.centerLeft, child: SizedBox(width: childWidth, child: InkWell(
-                          onTap: () => _openDesignerChildLink(slide),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16),
-                            child: url.isEmpty
-                                ? const ColoredBox(color: Color(0xFFEDEAF2), child: Icon(Icons.image_outlined))
-                                : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
-                          ),
-                        )));
+                          final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, maxChildWidth).toDouble();
+                          return Align(alignment: Alignment.centerLeft, child: SizedBox(width: childWidth, child: Card(
+                            margin: EdgeInsets.zero,
+                            elevation: childElevation,
+                            clipBehavior: Clip.antiAlias,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16)),
+                            child: InkWell(
+                              onTap: () => _openDesignerChildLink(slide),
+                              child: url.isEmpty
+                                  ? const ColoredBox(color: Color(0xFFEDEAF2), child: Icon(Icons.image_outlined))
+                                  : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                            ),
+                          )));
                         });
                       },
                     ),
@@ -840,7 +847,8 @@ class _StoreHomeState extends State<StoreHome> {
                     showDots: config['control'] != false && config['show_dots'] == true,
                     showArrows: config['control'] != false && config['show_arrows'] == true,
                     fade: config['transition'] == 'fade',
-                    viewFraction: childWidthFactor.clamp(.4, 1).toDouble(),
+                    viewFraction: carouselFraction,
+                    elevation: childElevation,
                     onSlideTap: _openDesignerChildLink,
                   ),
               ]),
