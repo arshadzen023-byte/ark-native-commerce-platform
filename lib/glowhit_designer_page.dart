@@ -1162,6 +1162,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
 
 
   Widget _componentVisual(DesignerComponent component, {bool compact = false, VoidCallback? onEdit}) {
+    final imageCacheWidth = (MediaQuery.of(context).size.width *
+        MediaQuery.of(context).devicePixelRatio).round().clamp(320, 2048);
     final properties = component.properties;
     final bg = _color((properties['background_color'] ?? properties['section_background'] ?? '#FFFFFF').toString());
     final titleColor = _color((properties['title_color'] ?? properties['text_color'] ?? '#24212B').toString());
@@ -1237,7 +1239,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       final url = (child['image_url'] ?? child['source_url'] ?? child['url'] ?? '').toString();
       final image = url.isEmpty
           ? Container(color: titleColor.withValues(alpha: .08), child: const Icon(Icons.image_outlined))
-          : Image.network(url, width: double.infinity, height: double.infinity, fit: BoxFit.cover,
+          : Image.network(url, width: double.infinity, height: double.infinity, fit: BoxFit.cover, cacheWidth: imageCacheWidth, gaplessPlayback: true,
               errorBuilder: (_, __, ___) => Container(color: titleColor.withValues(alpha: .08), child: const Icon(Icons.broken_image_outlined)));
       return SizedBox(
         width: tileWidth,
@@ -1283,7 +1285,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             Expanded(child: SizedBox(width: double.infinity,
               child: imageUrl.isEmpty
                 ? Container(color: _designerField, child: const Icon(Icons.shopping_bag_outlined, size: 34))
-                : Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Container(color: _designerField, child: const Icon(Icons.broken_image_outlined))))),
+                : Image.network(imageUrl, fit: BoxFit.contain, cacheWidth: imageCacheWidth, gaplessPlayback: true, errorBuilder: (_, __, ___) => Container(color: _designerField, child: const Icon(Icons.broken_image_outlined))))),
             Padding(padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
               child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Color(0xFF24212B), fontSize: 12, fontWeight: FontWeight.w600))),
@@ -1310,7 +1312,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           child: Column(children: [
             Expanded(child: SizedBox(width: double.infinity, child: url.isEmpty
               ? const Icon(Icons.category_outlined, size: 32)
-              : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.category_outlined)))),
+              : Image.network(url, fit: BoxFit.cover, cacheWidth: imageCacheWidth, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.category_outlined)))),
             Padding(padding: const EdgeInsets.all(7), child: Text((category['name'] ?? 'Category').toString(),
               maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
