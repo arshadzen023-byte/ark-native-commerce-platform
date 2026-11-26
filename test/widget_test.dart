@@ -93,11 +93,23 @@ void main() {
     expect(find.text('Tap to edit properties'), findsNothing);
     expect(find.text('Banner Slider'), findsNothing);
     expect(find.text('Main promotional banner'), findsWidgets);
-    expect(find.text('Save Draft'), findsOneWidget);
-    expect(find.text('Publish'), findsOneWidget);
-    expect(find.text('Add'), findsOneWidget);
+    expect(find.text('Save Draft'), findsNothing);
+    expect(find.text('Publish'), findsNothing);
+    expect(find.text('Add component'), findsOneWidget);
 
-    await tester.tap(find.text('Add'));
+    // Save and publish actions live on their own Settings page, not in the
+    // fixed bottom action bar, so the component canvas keeps its full width.
+    await tester.tap(find.byTooltip('Designer menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Designer Settings'), findsOneWidget);
+    expect(find.text('Save Draft'), findsOneWidget);
+    expect(find.text('Publish JSON'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add component'));
     await tester.pumpAndSettle();
     expect(find.text('Add component'), findsOneWidget);
     expect(find.text('Banner'), findsWidgets);
