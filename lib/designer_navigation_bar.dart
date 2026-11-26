@@ -255,9 +255,11 @@ class DesignerNavigationBarPage extends StatefulWidget {
     super.key,
     required this.initialConfig,
     required this.onSave,
+    this.availablePages = const [],
   });
   final DesignerNavigationConfig initialConfig;
   final ValueChanged<DesignerNavigationConfig> onSave;
+  final List<Map<String, String>> availablePages;
 
   @override
   State<DesignerNavigationBarPage> createState() => _DesignerNavigationBarPageState();
@@ -309,6 +311,7 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
           selectedIndex = index < 0 ? 0 : index;
           _changed();
         },
+        availablePages: widget.availablePages,
         onDelete: () {
           if (config.items.length <= 1) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -497,10 +500,17 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
 }
 
 class DesignerNavigationItemPage extends StatefulWidget {
-  const DesignerNavigationItemPage({super.key, required this.item, required this.onSave, required this.onDelete});
+  const DesignerNavigationItemPage({
+    super.key,
+    required this.item,
+    required this.onSave,
+    required this.onDelete,
+    this.availablePages = const [],
+  });
   final DesignerNavigationItem item;
   final ValueChanged<DesignerNavigationItem> onSave;
   final VoidCallback onDelete;
+  final List<Map<String, String>> availablePages;
 
   static const linkOptions = <({String value, String label})>[
     (value: 'home', label: 'Home'),
@@ -655,6 +665,26 @@ class _DesignerNavigationItemPageState extends State<DesignerNavigationItemPage>
               trailing: const Icon(Icons.chevron_right),
               onTap: _chooseLink,
             ),
+            if (requiresNativePage && widget.availablePages.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: DropdownButtonFormField<String>(
+                  value: widget.availablePages.any((page) => page['key'] == urlController.text)
+                      ? urlController.text
+                      : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Choose Native Page',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: widget.availablePages.map((page) => DropdownMenuItem<String>(
+                    value: page['key'],
+                    child: Text(page['title'] ?? page['key'] ?? 'Page'),
+                  )).toList(),
+                  onChanged: (value) {
+                    if (value != null) setState(() => urlController.text = value);
+                  },
+                ),
+              ),
             if (requiresNativePage)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -663,7 +693,7 @@ class _DesignerNavigationItemPageState extends State<DesignerNavigationItemPage>
                   decoration: const InputDecoration(
                     labelText: 'Native Page Key',
                     hintText: 'custom_about',
-                    helperText: 'Enter the custom page key created in ARK Designer Pages.',
+                    helperText: 'Select a published custom page above or enter its key.',
                     border: OutlineInputBorder(),
                   ),
                 ),
