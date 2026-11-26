@@ -1050,6 +1050,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final radius = ((properties['border_radius'] ?? properties['corner_radius']) as num?)?.toDouble() ?? 14;
     // Dimension values describe child items, never the outer section/card.
     final childWidthFactor = ((properties['width'] as num?)?.toDouble() ?? 1).clamp(.25, 1.0).toDouble();
+    final maxChildWidth = ((properties['max_cross_axis_extent'] as num?)?.toDouble() ?? 600).clamp(40, 1000).toDouble();
     final margin = EdgeInsets.fromLTRB(
       ((properties['margin_left'] as num?)?.toDouble() ?? 0),
       ((properties['margin_top'] as num?)?.toDouble() ?? 0),
@@ -1196,7 +1197,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             height: height.clamp(40, 500).toDouble(),
             child: ArkDesignerBannerCarousel(
           slides: slides,
-          height: height.clamp(90, 500).toDouble(),
+          height: height.clamp(40, 500).toDouble(),
           radius: radius,
           autoplay: properties['autoplay'] != false,
           interval: Duration(milliseconds: (((properties['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000).round().clamp(1000, 30000).toInt()),
@@ -1214,7 +1215,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           scrollDirection: Axis.horizontal,
           itemCount: slides.length,
           separatorBuilder: (_, __) => SizedBox(width: gap),
-          itemBuilder: (_, index) => imageTile(slides[index], tileWidth: (constraints.maxWidth - 48) * childWidthFactor),
+          itemBuilder: (_, index) => imageTile(slides[index], tileWidth: ((constraints.maxWidth - 48) * childWidthFactor).clamp(40, maxChildWidth).toDouble()),
         )));
       } else if (isList) {
         content = LayoutBuilder(builder: (context, constraints) => SizedBox(
@@ -2290,7 +2291,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                     _slider('Cross Axis Count', 'cross_axis_count', min: 1, max: 6),
                     _slider('Cross Aspect Ratio', 'cross_aspect_ratio', min: .4, max: 2.5),
                     _slider('Elevation', 'elevation', max: 20),
-                    _slider('Fixed Grid View Count', 'fixed_grid_view_count', min: 1, max: 20),
+                    _slider('Fixed Grid View Count', 'fixed_grid_view_count', min: 1, max: 40),
                   ]),
                 ]),
                 _settingsPanel(layouts),
