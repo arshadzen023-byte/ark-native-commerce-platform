@@ -1151,6 +1151,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         ));
       } else {
         final shown = slides.take(previewLimit).toList();
+        final bannerAspect = ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3).toDouble();
+        final bannerChildHeight = (height * (1.2 / bannerAspect)).clamp(40, 600).toDouble();
         content = GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -1159,7 +1161,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             crossAxisCount: columns.clamp(1, 4).toInt(),
             crossAxisSpacing: gap.toDouble(),
             mainAxisSpacing: mainGap.toDouble(),
-            mainAxisExtent: height.clamp(40, 500).toDouble(),
+            mainAxisExtent: bannerChildHeight,
           ),
           itemBuilder: (_, index) => LayoutBuilder(
             builder: (context, constraints) {
@@ -1168,7 +1170,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                 alignment: Alignment.centerLeft,
                 child: SizedBox(
                   width: childWidth,
-                  height: height.clamp(40, 500).toDouble(),
+                  height: bannerChildHeight,
                   child: imageTile(shown[index]),
                 ),
               );
@@ -1179,6 +1181,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     } else if (isProduct || isCategory) {
       final count = isProduct ? visibleProductItems.length : categoryItems.length;
       final cardHeight = height.clamp(40, 500).toDouble();
+      final gridAspect = ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? (isProduct ? .66 : .9)).clamp(.4, 2.5).toDouble();
+      final gridChildHeight = (cardHeight * ((isProduct ? .66 : .9) / gridAspect)).clamp(40, 700).toDouble();
       final cardWidth = ((properties['max_cross_axis_extent'] as num?)?.toDouble() ?? 180).clamp(40, 600).toDouble() * childWidthFactor;
       Widget tile(int index, {double? width}) => isProduct
           ? productTile(visibleProductItems[index], tileWidth: width)
@@ -1195,7 +1199,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             alignment: Alignment.centerLeft,
             child: SizedBox(
               width: childWidth,
-              height: cardHeight,
+              height: gridChildHeight,
               child: tile(index, width: childWidth),
             ),
           );
@@ -1221,7 +1225,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         ));
       } else {
         final visibleCount = count.clamp(1, 40).toInt();
-        content = SizedBox(height: (cardHeight * ((visibleCount / columns.clamp(1, 4).toInt()).ceil()) + mainGap * 2).clamp(cardHeight, 1000).toDouble(), 
+        content = SizedBox(height: (gridChildHeight * ((visibleCount / columns.clamp(1, 6).toInt()).ceil()) + mainGap * 2).clamp(gridChildHeight, 4000).toDouble(), 
           child: GridView.builder(
             physics: const NeverScrollableScrollPhysics(),
             itemCount: visibleCount,
@@ -1229,7 +1233,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               crossAxisCount: columns.clamp(1, 6).toInt(),
               crossAxisSpacing: gap.toDouble(),
               mainAxisSpacing: mainGap.toDouble(),
-              mainAxisExtent: cardHeight,
+              mainAxisExtent: gridChildHeight,
             ),
             itemBuilder: (_, index) => dimensionedGridChild(index),
           ));
