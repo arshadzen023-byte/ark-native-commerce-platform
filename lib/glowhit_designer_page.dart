@@ -19,6 +19,39 @@ const _designerField = Color(0xFFF1EFF5);
 const _designerMuted = Color(0xFF77717F);
 const _designerBorder = Color(0xFFE4E0EA);
 
+Alignment _designerBackgroundAlignment(dynamic value) {
+  switch ((value ?? 'center').toString().toLowerCase()) {
+    case 'top_left': return Alignment.topLeft;
+    case 'top_center': return Alignment.topCenter;
+    case 'top_right': return Alignment.topRight;
+    case 'center_left': return Alignment.centerLeft;
+    case 'center_right': return Alignment.centerRight;
+    case 'bottom_left': return Alignment.bottomLeft;
+    case 'bottom_center': return Alignment.bottomCenter;
+    case 'bottom_right': return Alignment.bottomRight;
+    default: return Alignment.center;
+  }
+}
+BoxFit _designerBackgroundFit(dynamic value) {
+  switch ((value ?? 'cover').toString().toLowerCase()) {
+    case 'contain': return BoxFit.contain;
+    case 'fill': return BoxFit.fill;
+    case 'fit_width': return BoxFit.fitWidth;
+    case 'fit_height': return BoxFit.fitHeight;
+    default: return BoxFit.cover;
+  }
+}
+String _friendlyDesignerError(Object error) {
+  final raw = error.toString().replaceFirst(RegExp(r'^(Exception|StateError):\\s*'), '').trim();
+  final message = raw.toLowerCase();
+  if (message.contains('socketexception') || message.contains('failed host lookup') || message.contains('no route to host')) return 'Cannot connect to pluginstore.shop. Check your internet and hosting connection.';
+  if (message.contains('timeout') || message.contains('timed out')) return 'The server took too long to respond. Please try again.';
+  if (message.contains('401') || message.contains('unauthorized')) return 'Designer session expired. Sign in again with the WordPress administrator account.';
+  if (message.contains('403') || message.contains('forbidden')) return 'This WordPress account does not have permission to use Designer or upload media.';
+  if (message.contains('404') || message.contains('405') || message.contains('no route was found')) return 'Designer API route not found. Confirm ARK Native Commerce Bridge 2.2.4 or newer is active.';
+  if (message.contains('413') || message.contains('15 mb')) return 'Image is too large. Choose an image smaller than 15 MB.';
+  return raw.isEmpty ? 'Something went wrong. Please try again.' : raw;
+}
 TextStyle _designerFontStyle(String family, TextStyle base) {
   try {
     return GoogleFonts.getFont(family, textStyle: base);
@@ -647,15 +680,15 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       } catch (e) {
         // The device draft remains recoverable, but do not claim that the server saved it.
         if (mounted) setState(() => error = publish
-            ? 'Local draft saved. WordPress did not confirm Publish: $e'
-            : 'Local draft saved. WordPress did not confirm the server draft: $e');
+            ? 'Local draft saved, but Publish was not confirmed: ' + _friendlyDesignerError(e)
+            : 'Local draft saved, but server sync was not confirmed: ' + _friendlyDesignerError(e));
         return;
       }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(publish ? 'Published configuration synced to WordPress.' : 'Draft synced to WordPress.'),
       ));
     } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+      if (mounted) setState(() => error = _friendlyDesignerError(e));
     } finally {
       if (mounted) setState(() { saving = false; publishing = false; });
     }
@@ -862,7 +895,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gallery upload failed: $error')),
+          SnackBar(content: Text('Gallery upload failed: ' + _friendlyDesignerError(error))),
         );
       }
       return null;
@@ -1013,7 +1046,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not load WordPress Media Library: $error')),
+          SnackBar(content: Text('Could not load WordPress Media Library: ' + _friendlyDesignerError(error))),
         );
       }
       return null;
@@ -1982,6 +2015,18 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
 
   Widget _backgroundImageSettings() {
     final imageUrl = (item.properties['background_image_url'] ?? '').toString();
+    final alignment = (item.properties['background_image_alignment'] ?? 'center').toString();
+    final fit = (item.properties['background_image_fit'] ?? 'cover').toString();
+    final screenWidth = MediaQuery.of(context).size.width;
+    final marginWidth = ((item.properties['margin_left'] as num?)?.toDouble() ?? 0) + ((item.properties['margin_right'] as num?)?.toDouble() ?? 0);
+    final paddingWidth = ((item.properties['padding_left'] as num?)?.toDouble() ?? 12) + ((item.properties['padding_right'] as num?)?.toDouble() ?? 12);
+    final availableWidth = (screenWidth - marginWidth - paddingWidth).clamp(80, screenWidth);
+    final widthFactor = ((item.properties['width'] as num?)?.toDouble() ?? 1).clamp(.2, 1.0);
+    final maxExtent = (item.properties['max_cross_axis_extent'] as num?)?.toDouble();
+    final cardWidth = (availableWidth * widthFactor).clamp(80, maxExtent ?? availableWidth).toDouble();
+    final cardHeight = ((item.properties['height'] ?? item.properties['height_px']) as num?)?.toDouble() ?? 180;
+    final recommendedWidth = (cardWidth * 2).round();
+    final recommendedHeight = (cardHeight * 2).round();
     return _section('Background Image / GIF', [
       const Text(
         'Set an image or animated GIF behind this component. Child cards remain in front.',
@@ -1992,7 +2037,8 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Image.network(imageUrl, height: 110, width: double.infinity,
-            fit: BoxFit.cover,
+            fit: _designerBackgroundFit(fit),
+            alignment: _designerBackgroundAlignment(alignment),
             errorBuilder: (_, __, ___) => const SizedBox(height: 80,
               child: Center(child: Icon(Icons.broken_image_outlined)))),
         ),
@@ -2025,6 +2071,49 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           ),
         ],
       ]),
+      const SizedBox(height: 10),
+      DropdownButtonFormField<String>(
+        initialValue: const ['top_left','top_center','top_right','center_left','center','center_right','bottom_left','bottom_center','bottom_right'].contains(alignment) ? alignment : 'center',
+        decoration: const InputDecoration(labelText: 'Background Image Position'),
+        items: const [
+          DropdownMenuItem(value: 'top_left', child: Text('Top left')),
+          DropdownMenuItem(value: 'top_center', child: Text('Top center')),
+          DropdownMenuItem(value: 'top_right', child: Text('Top right')),
+          DropdownMenuItem(value: 'center_left', child: Text('Center left')),
+          DropdownMenuItem(value: 'center', child: Text('Center')),
+          DropdownMenuItem(value: 'center_right', child: Text('Center right')),
+          DropdownMenuItem(value: 'bottom_left', child: Text('Bottom left')),
+          DropdownMenuItem(value: 'bottom_center', child: Text('Bottom center')),
+          DropdownMenuItem(value: 'bottom_right', child: Text('Bottom right')),
+        ],
+        onChanged: (value) { if (value != null) _change('background_image_alignment', value); },
+      ),
+      const SizedBox(height: 8),
+      DropdownButtonFormField<String>(
+        initialValue: const ['cover','contain','fill','fit_width','fit_height'].contains(fit) ? fit : 'cover',
+        decoration: const InputDecoration(labelText: 'Background Image Fit'),
+        items: const [
+          DropdownMenuItem(value: 'cover', child: Text('Cover (fill area)')),
+          DropdownMenuItem(value: 'contain', child: Text('Contain (show full image)')),
+          DropdownMenuItem(value: 'fill', child: Text('Stretch to fit')),
+          DropdownMenuItem(value: 'fit_width', child: Text('Fit width')),
+          DropdownMenuItem(value: 'fit_height', child: Text('Fit height')),
+        ],
+        onChanged: (value) { if (value != null) _change('background_image_fit', value); },
+      ),
+      const SizedBox(height: 10),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: _designerField, borderRadius: BorderRadius.circular(10), border: Border.all(color: _designerBorder)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Auto image size suggestion', style: TextStyle(fontWeight: FontWeight.w700, color: _designerPurple)),
+          const SizedBox(height: 4),
+          Text('Estimated card size: ' + cardWidth.round().toString() + ' × ' + cardHeight.round().toString() + ' logical px.'),
+          Text('Recommended upload: ' + recommendedWidth.toString() + ' × ' + recommendedHeight.toString() + ' px (2× resolution).'),
+          const Text('Keep the same aspect ratio to reduce cropping.', style: TextStyle(color: _designerMuted, fontSize: 11)),
+        ]),
+      ),
     ]);
   }
 
