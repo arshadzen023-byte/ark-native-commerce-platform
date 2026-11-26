@@ -1350,8 +1350,8 @@ class _StoreHomeState extends State<StoreHome> {
           return Badge(label: Text('$cartCount'), child: child);
         }
         return BottomNavigationBarItem(
-          icon: icon(DesignerNavIcons.data(item.iconFamily, item.iconName), item.iconColor),
-          activeIcon: icon(DesignerNavIcons.data(item.activeIconFamily, item.activeIconName), item.activeIconColor),
+          icon: DesignerNavIcons.icon(item.iconFamily, item.iconName, color: navColorFromHex(item.iconColor)),
+          activeIcon: DesignerNavIcons.icon(item.activeIconFamily, item.activeIconName, color: navColorFromHex(item.activeIconColor)),
           label: item.label,
           backgroundColor: navColorFromHex(item.activeBackgroundColor),
         );
