@@ -138,6 +138,60 @@ class DesignerNavigationConfig {
     );
   }
 
+
+  /// Describes the exact Navigation Bar fields that WordPress changed or dropped.
+  /// This keeps publish verification strict while making Bridge contract failures
+  /// actionable instead of returning one opaque JSON mismatch.
+  List<String> differencesFrom(DesignerNavigationConfig other) {
+    final differences = <String>[];
+    final requested = toJson();
+    final published = other.toJson();
+    for (final key in const [
+      'type',
+      'background_color',
+      'selected_color',
+      'unselected_color',
+      'show_labels',
+      'elevation',
+    ]) {
+      if (jsonEncode(requested[key]) != jsonEncode(published[key])) {
+        differences.add('$key (Designer: ${requested[key]}, WordPress: ${published[key]})');
+      }
+    }
+    final requestedItems = requested['items'] as List;
+    final publishedItems = published['items'] as List;
+    if (requestedItems.length != publishedItems.length) {
+      differences.add('items count (Designer: ${requestedItems.length}, WordPress: ${publishedItems.length})');
+    }
+    final itemFields = const [
+      'id',
+      'label',
+      'link',
+      'link_value',
+      'icon_family',
+      'icon',
+      'active_icon_family',
+      'active_icon',
+      'icon_color',
+      'active_icon_color',
+      'background_color',
+      'active_background_color',
+    ];
+    final count = requestedItems.length < publishedItems.length
+        ? requestedItems.length
+        : publishedItems.length;
+    for (var index = 0; index < count; index++) {
+      final before = Map<String, dynamic>.from(requestedItems[index] as Map);
+      final after = Map<String, dynamic>.from(publishedItems[index] as Map);
+      for (final key in itemFields) {
+        if (jsonEncode(before[key]) != jsonEncode(after[key])) {
+          differences.add('items[$index].$key (Designer: ${before[key]}, WordPress: ${after[key]})');
+        }
+      }
+    }
+    return differences;
+  }
+
   DesignerNavigationConfig clone() => DesignerNavigationConfig.fromJson(toJson());
 }
 
