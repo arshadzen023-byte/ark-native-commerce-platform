@@ -215,12 +215,15 @@ void main() {
     expect(find.text('Save Draft'), findsOneWidget);
     expect(find.text('Publish JSON'), findsOneWidget);
     expect(find.text('Layout consistency'), findsNothing);
-    // Reveal the final card using the widget's actual scroll position rather
-    // than assuming a fixed drag distance (CI font metrics can differ).
-    final appSettingsTile = find.text('App Settings').last;
-    await tester.ensureVisible(appSettingsTile);
+    // ListView lazily builds off-screen children, so scrollUntilVisible
+    // must be used before looking up the App Settings tile.
+    await tester.scrollUntilVisible(
+      find.text('App Settings'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
-    expect(appSettingsTile, findsOneWidget);
+    expect(find.text('App Settings'), findsOneWidget);
     await tester.tap(find.text('App Settings'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('designer-app-settings-page')), findsOneWidget);
