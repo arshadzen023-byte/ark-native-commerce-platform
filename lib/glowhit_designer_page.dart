@@ -42,7 +42,7 @@ BoxFit _designerBackgroundFit(dynamic value) {
   }
 }
 String _friendlyDesignerError(Object error) {
-  final raw = error.toString().replaceFirst(RegExp(r'^(Exception|StateError):\\s*'), '').trim();
+  final raw = error.toString().replaceFirst(RegExp(r'^(Exception|StateError):\s*'), '').trim();
   final message = raw.toLowerCase();
   if (message.contains('socketexception') || message.contains('failed host lookup') || message.contains('no route to host')) return 'Cannot connect to pluginstore.shop. Check your internet and hosting connection.';
   if (message.contains('timeout') || message.contains('timed out')) return 'The server took too long to respond. Please try again.';
@@ -1869,7 +1869,7 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
             } catch (error) {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Could not open WordPress Media Library: $error')),
+                  SnackBar(content: Text('Could not open WordPress Media Library: ' + _friendlyDesignerError(error))),
                 );
               }
             } finally {
