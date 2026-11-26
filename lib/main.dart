@@ -828,7 +828,7 @@ class _StoreHomeState extends State<StoreHome> {
                             margin: EdgeInsets.zero,
                             elevation: childElevation,
                             clipBehavior: Clip.antiAlias,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular((config['corner_radius'] as num?)?.toDouble() ?? 16)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(renderSpec.borderRadius.clamp(0, 32).toDouble())),
                             child: InkWell(
                               onTap: () => _openDesignerChildLink(slide),
                               child: url.isEmpty
@@ -938,7 +938,7 @@ class _StoreHomeState extends State<StoreHome> {
                         child: ArkDesignerBannerCarousel(
                           slides: slides,
                           height: height,
-                          radius: ((config['corner_radius'] as num?)?.toDouble() ?? 16).clamp(0, 32).toDouble(),
+                          radius: renderSpec.borderRadius.clamp(0, 32).toDouble(),
                           autoplay: config['autoplay'] != false,
                           interval: Duration(milliseconds: intervalMs.clamp(1000, 30000)),
                           pauseOnInteraction: config['pause_on_interaction'] != false,
