@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'customer_account_page.dart';
 import 'designer_banner_carousel.dart';
 import 'designer_layout_contract.dart';
+import 'designer_navigation_bar.dart';
 
 // Match the dark, purple-accented native Designer reference supplied by the user.
 const _designerPurple = Color(0xFF7650B8);
@@ -328,6 +329,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   Map<String, List<DesignerComponent>> pages = {};
   Map<String, dynamic> templates = {};
   Map<String, dynamic> wordpressConfig = <String, dynamic>{};
+  DesignerNavigationConfig navigationConfig = DesignerNavigationConfig();
   final Map<int, Offset> _componentPointerDown = <int, Offset>{};
   late final TextEditingController _titleController = TextEditingController();
   late final TextEditingController _descriptionController = TextEditingController();
@@ -502,6 +504,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                 : <dynamic>[];
             wordpressConfig = Map<String, dynamic>.from(remote)
               ..remove('published_pages');
+          navigationConfig = DesignerNavigationConfig.fromJson(remote['navigation_bar']);
             pages[page] = <DesignerComponent>[];
             for (final section in sections) {
               if (section is Map) {
@@ -532,6 +535,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             if (decoded['templates'] is Map) {
               templates = Map<String, dynamic>.from(decoded['templates'] as Map);
             }
+            navigationConfig = DesignerNavigationConfig.fromJson(decoded['navigation_bar']);
           }
         } catch (_) {
           error = 'Saved draft could not be read. A fresh draft was loaded.';
@@ -587,6 +591,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         'updated_at': now,
         'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
         'templates': templates,
+        'navigation_bar': navigationConfig.toJson(),
       };
       final localJson = const JsonEncoder.withIndent('  ').convert(localData);
       final publishedConfig = Map<String, dynamic>.from(wordpressConfig);
@@ -609,6 +614,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       // not later mistaken for a legacy partial draft and merged back.
       publishedConfig['native_editor_snapshot'] = true;
       publishedConfig['pages'] = configPages;
+      publishedConfig['navigation_bar'] = navigationConfig.toJson();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, localJson);
       try {
@@ -634,6 +640,18 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           }
           final serverConfig = Map<String, dynamic>.from(serverValue);
           final serverPages = Map<String, dynamic>.from(serverConfig['pages'] as Map);
+          final savedNavigation = serverConfig['navigation_bar'];
+          if (savedNavigation is! Map || savedNavigation['items'] is! List) {
+            throw Exception(
+              'WordPress did not return the saved navigation_bar configuration. '
+              'Update the ARK Native Commerce Bridge publish/read endpoint to preserve the navigation_bar JSON before publishing this feature.',
+            );
+          }
+          final requestedNavigationJson = jsonEncode(navigationConfig.toJson());
+          final savedNavigationJson = jsonEncode(DesignerNavigationConfig.fromJson(savedNavigation).toJson());
+          if (requestedNavigationJson != savedNavigationJson) {
+            throw Exception('WordPress changed the Navigation Bar settings during publish. The published navigation JSON does not match the Designer preview.');
+          }
 
           // Verify every component ID from the requested snapshot survived the
           // WordPress sanitizer before the UI displays a Publish-success toast.
@@ -1778,10 +1796,35 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     )));
   }
 
+  Future<void> _saveNavigationLocal(DesignerNavigationConfig value) async {
+    navigationConfig = value.clone();
+    final prefs = await SharedPreferences.getInstance();
+    final localData = <String, dynamic>{
+      'schema': 'ark-glowhit-designer/v1',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
+      'templates': templates,
+      'navigation_bar': navigationConfig.toJson(),
+    };
+    await prefs.setString(_storageKey, const JsonEncoder.withIndent('  ').convert(localData));
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openNavigationBar() async {
+    await Navigator.push<void>(context, MaterialPageRoute(
+      builder: (_) => DesignerNavigationBarPage(
+        initialConfig: navigationConfig,
+        onSave: (value) => _saveNavigationLocal(value),
+      ),
+    ));
+  }
+
   Future<void> _openDesignerSettings() async {
     await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => _DesignerSettingsPage(
       saving: saving,
       publishing: publishing,
+      navigationConfig: navigationConfig,
+      onOpenNavigation: _openNavigationBar,
       onSaveDraft: () => _persist(),
       onPublish: () => _persist(publish: true),
     )));
@@ -1880,11 +1923,15 @@ class _DesignerSettingsPage extends StatefulWidget {
   const _DesignerSettingsPage({
     required this.saving,
     required this.publishing,
+    required this.navigationConfig,
+    required this.onOpenNavigation,
     required this.onSaveDraft,
     required this.onPublish,
   });
   final bool saving;
   final bool publishing;
+  final DesignerNavigationConfig navigationConfig;
+  final VoidCallback onOpenNavigation;
   final Future<void> Function() onSaveDraft;
   final Future<void> Function() onPublish;
 
@@ -1942,6 +1989,18 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
                       ),
                     ),
                   ]),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: const Icon(Icons.bottom_navigation, color: _designerPurple),
+                  title: const Text('Navigation Bar', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text('${navigationConfig.items.length} buttons · ${navigationConfig.type == 'fixed' ? 'Fixed' : 'Shifting'}'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: working ? null : onOpenNavigation,
                 ),
               ),
               const SizedBox(height: 12),
