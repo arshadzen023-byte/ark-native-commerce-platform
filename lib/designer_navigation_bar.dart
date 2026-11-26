@@ -747,7 +747,12 @@ class _DesignerNavigationItemPageState extends State<DesignerNavigationItemPage>
     final value = await Navigator.of(context).push<String>(MaterialPageRoute(
       builder: (_) => _NavigationLinkPickerPage(selected: item.link),
     ));
-    if (value != null) setState(() => item.link = value);
+    if (value != null) {
+      setState(() {
+        if (value != item.link) urlController.clear();
+        item.link = value;
+      });
+    }
   }
 
   String _linkTitle(String value) => DesignerNavigationItemPage.linkOptions
