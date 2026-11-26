@@ -615,7 +615,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         if (publish) {
           final serverValue = response['published_config'];
           if (serverValue is! Map || serverValue['pages'] is! Map) {
-            throw Exception('WordPress did not return the server-published JSON. Update ARK Native API Bridge to 2.2.3.');
+            throw Exception('WordPress saved the request but did not return its published configuration. Install ARK Native API Bridge 2.2.5 and ARK App Designer 1.17.5, then retry Publish.');
           }
           final serverConfig = Map<String, dynamic>.from(serverValue);
           final serverPages = Map<String, dynamic>.from(serverConfig['pages'] as Map);
