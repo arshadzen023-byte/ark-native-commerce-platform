@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'customer_account_page.dart';
 import 'designer_banner_carousel.dart';
+import 'designer_layout_contract.dart';
 
 // Match the dark, purple-accented native Designer reference supplied by the user.
 const _designerPurple = Color(0xFF7650B8);
@@ -143,15 +144,13 @@ class DesignerComponent {
 
   Map<String, dynamic> toPublishedSection() {
     final values = Map<String, dynamic>.from(properties);
-    // Normalize numeric aliases before sending to WordPress. Its sanitizer
-    // stores physical pixel dimensions, spacing and elevation as integers;
-    // keeping fractional editor values here causes a false publish mismatch
-    // and makes the published layout drift from the Designer preview.
+    // Resolve all Dimension aliases once, then emit one canonical value for
+    // every legacy key consumed by the WordPress sanitizer and older APKs.
+    // This prevents Designer Preview / Published Home from reading different
+    // values when a component contains both canonical and compatibility keys.
+    final layoutSpec = DesignerLayoutSpec.fromMap(values);
+    values.addAll(layoutSpec.canonicalAliases());
     const integerLayoutKeys = <String>[
-      'height', 'height_px', 'max_cross_axis_extent', 'max_width_px',
-      'main_axis_spacing', 'cross_axis_spacing', 'item_gap',
-      'border_radius', 'corner_radius', 'elevation', 'card_depth',
-      'cross_axis_count', 'columns', 'fixed_grid_view_count', 'limit',
       'padding_top', 'padding_bottom', 'padding_left', 'padding_right',
       'margin_top', 'margin_bottom', 'margin_left', 'margin_right',
       'title_bottom_spacing',
@@ -160,9 +159,6 @@ class DesignerComponent {
       final value = values[key];
       if (value is num) values[key] = value.round();
     }
-    final effectiveElevation = (values['elevation'] ?? values['card_depth'] ?? 1) as num;
-    values['elevation'] = effectiveElevation.round();
-    values['card_depth'] = effectiveElevation.round();
     final prefix = type.toLowerCase();
     final variant = layout.toLowerCase()
         .replaceFirst('$prefix ', '')
@@ -192,7 +188,7 @@ class DesignerComponent {
       storedType = (values['original_section_type'] ?? values['type'] ?? designerType).toString();
     }
 
-    final width = (values['width'] as num?)?.toDouble() ?? 1.0;
+    final width = layoutSpec.widthFactor;
     final showAllCategories = values['show_all_categories'] == true;
     final rawSource = (values['source'] ?? 'latest').toString();
     final publishedSource = switch (rawSource) {
@@ -245,17 +241,9 @@ class DesignerComponent {
       'visible': enabled && values['visible'] != false,
       'section_background': values['background_color'] ?? values['section_background'] ?? '#FFFFFF',
       'text_color': values['title_color'] ?? values['text_color'] ?? '#24212B',
-      'height_px': values['height'] ?? values['height_px'] ?? 180,
+      ...layoutSpec.canonicalAliases(),
       'width': width,
       'width_pct': width * 100,
-      'max_width_px': values['max_cross_axis_extent'] ?? values['max_width_px'] ?? 300,
-      'main_axis_spacing': values['main_axis_spacing'] ?? 10,
-      'cross_axis_spacing': values['cross_axis_spacing'] ?? 10,
-      'item_gap': values['cross_axis_spacing'] ?? values['item_gap'] ?? 10,
-      'corner_radius': values['border_radius'] ?? values['corner_radius'] ?? 16,
-      'columns': values['cross_axis_count'] ?? values['columns'] ?? 2,
-      'card_aspect_ratio': values['cross_aspect_ratio'] ?? values['card_aspect_ratio'] ?? 1,
-      'card_depth': values['elevation'] ?? values['card_depth'] ?? 1,
       'limit': type == 'Category' && showAllCategories
           ? 100
           : (values['fixed_grid_view_count'] ?? values['limit'] ?? 8),
@@ -1196,26 +1184,24 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     if (imageChildren.isEmpty && fallbackImage.isNotEmpty) {
       imageChildren.add({'image_url': fallbackImage, 'title': component.title, 'active': true});
     }
-    final height = ((properties['height'] ?? properties['height_px']) as num?)?.toDouble() ?? 180;
-    final columns = ((properties['cross_axis_count'] ?? properties['columns']) as num?)?.toInt() ?? 2;
-    final gap = ((properties['cross_axis_spacing'] ?? properties['item_gap']) as num?)?.toDouble() ?? 8;
-    final mainGap = ((properties['main_axis_spacing'] ?? properties['item_gap']) as num?)?.toDouble() ?? gap;
-    final radius = ((properties['border_radius'] ?? properties['corner_radius']) as num?)?.toDouble() ?? 14;
-    // Dimension values describe child items, never the outer section/card.
-    final childWidthFactor = ((properties['width'] as num?)?.toDouble() ?? 1).clamp(.2, 1.0).toDouble();
-    final maxChildWidth = ((properties['max_cross_axis_extent'] ?? properties['max_width_px']) as num?)?.toDouble() ?? (component.type == 'Category' ? 180 : component.type == 'Product' ? 174 : 600);
-    final margin = EdgeInsets.fromLTRB(
-      ((properties['margin_left'] as num?)?.toDouble() ?? 0),
-      ((properties['margin_top'] as num?)?.toDouble() ?? 0),
-      ((properties['margin_right'] as num?)?.toDouble() ?? 0),
-      ((properties['margin_bottom'] as num?)?.toDouble() ?? 0),
+    final layoutSpec = DesignerLayoutSpec.fromMap(
+      properties,
+      defaultMaxCrossAxisExtent: component.type == 'Category'
+          ? 180
+          : component.type == 'Product'
+              ? 174
+              : null,
     );
-    final padding = EdgeInsets.fromLTRB(
-      ((properties['padding_left'] as num?)?.toDouble() ?? 12),
-      ((properties['padding_top'] as num?)?.toDouble() ?? 12),
-      ((properties['padding_right'] as num?)?.toDouble() ?? 12),
-      ((properties['padding_bottom'] as num?)?.toDouble() ?? 12),
-    );
+    final height = layoutSpec.height;
+    final columns = layoutSpec.crossAxisCount;
+    final gap = layoutSpec.crossAxisSpacing;
+    final mainGap = layoutSpec.mainAxisSpacing;
+    final radius = layoutSpec.borderRadius;
+    final childElevation = layoutSpec.elevation;
+    final childWidthFactor = layoutSpec.widthFactor;
+    final maxChildWidth = layoutSpec.maxCrossAxisExtent ?? (component.type == 'Category' ? 180 : component.type == 'Product' ? 174 : double.infinity);
+    final margin = layoutSpec.margin;
+    final padding = layoutSpec.padding;
     final isBanner = component.type == 'Banner';
     final isProduct = component.type == 'Product';
     final isCategory = component.type == 'Category';
@@ -1223,7 +1209,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final isSlider = layout.contains('slider');
     final isScroll = layout.contains('scroll') || isSlider;
     final isList = layout.contains('list');
-    final previewLimit = ((properties['fixed_grid_view_count'] as num?)?.toInt() ?? 8).clamp(1, 40).toInt();
+    final previewLimit = layoutSpec.fixedGridViewCount;
     final productSource = (properties['source'] ?? 'latest').toString();
     final sourceId = ((properties['source_id'] ?? properties['category_id'] ?? properties['tag_id']) as num?)?.toInt() ?? 0;
     final productItems = previewProducts.where((product) {
@@ -1262,8 +1248,14 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       return SizedBox(
         width: tileWidth,
         height: height.clamp(40, 500).toDouble(),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(radius.clamp(0, 32).toDouble()),
+        child: Card(
+          margin: EdgeInsets.zero,
+          color: _designerSurface,
+          elevation: childElevation.clamp(0, 12).toDouble(),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius.clamp(0, 32).toDouble()),
+          ),
           child: Stack(fit: StackFit.expand, children: [
             image,
             if ((child['title'] ?? '').toString().isNotEmpty)
@@ -1344,7 +1336,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       final slides = imageChildren.isEmpty ? <Map<String, dynamic>>[{'image_url': '', 'title': ''}] : imageChildren;
       if (isSlider) {
         content = LayoutBuilder(builder: (context, constraints) {
-          final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, maxChildWidth).toDouble();
+          final childWidth = layoutSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: maxChildWidth);
           return Align(alignment: Alignment.centerLeft, child: SizedBox(
             width: childWidth,
             height: height.clamp(40, 500).toDouble(),
@@ -1381,7 +1373,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             itemBuilder: (_, index) => Align(
               alignment: Alignment.centerLeft,
               child: SizedBox(
-                width: constraints.maxWidth * childWidthFactor,
+                width: layoutSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: maxChildWidth),
                 height: height.clamp(40, 500).toDouble(),
                 child: imageTile(slides[index]),
               ),
@@ -1404,7 +1396,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           ),
           itemBuilder: (_, index) => LayoutBuilder(
             builder: (context, constraints) {
-              final childWidth = constraints.maxWidth * childWidthFactor;
+              final childWidth = layoutSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: maxChildWidth);
               return Align(
                 alignment: Alignment.centerLeft,
                 child: SizedBox(
@@ -1453,7 +1445,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           scrollDirection: properties['horizontal'] == false ? Axis.vertical : Axis.horizontal,
           itemCount: count,
           separatorBuilder: (_, __) => properties['horizontal'] == false ? SizedBox(height: mainGap) : SizedBox(width: gap),
-          itemBuilder: (_, index) => tile(index, width: cardWidth * childWidthFactor),
+          itemBuilder: (_, index) => tile(index, width: layoutSpec.childWidthFor(cardWidth, fallbackMaxCrossAxisExtent: maxChildWidth)),
         ));
       } else if (isCategory && layout.contains('list_tile')) {
         content = Column(
@@ -1489,7 +1481,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           itemBuilder: (_, index) => Align(
             alignment: Alignment.centerLeft,
             child: SizedBox(
-              width: cardWidth * childWidthFactor,
+              width: layoutSpec.childWidthFor(cardWidth, fallbackMaxCrossAxisExtent: maxChildWidth),
               height: cardHeight,
               child: tile(index, width: cardWidth * childWidthFactor),
             ),
