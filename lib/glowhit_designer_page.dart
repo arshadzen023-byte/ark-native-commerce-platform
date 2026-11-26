@@ -398,7 +398,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     properties['height'] = normalized['height_px'] ?? normalized['height'] ?? 180;
     properties['width'] = (normalized['width'] as num?)?.toDouble() ??
         (((normalized['width_pct'] as num?)?.toDouble() ?? 100) / 100);
-    properties['max_cross_axis_extent'] = normalized['max_cross_axis_extent'] ?? normalized['max_width_px'] ?? 300;
+    properties['max_cross_axis_extent'] = normalized['max_width_px'] ?? normalized['max_cross_axis_extent'] ?? 300;
     properties['main_axis_spacing'] = normalized['main_axis_spacing'] ?? normalized['item_gap'] ?? 10;
     properties['cross_axis_spacing'] = normalized['cross_axis_spacing'] ?? normalized['item_gap'] ?? 10;
     properties['border_radius'] = normalized['corner_radius'] ?? 16;
