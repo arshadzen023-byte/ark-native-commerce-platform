@@ -143,6 +143,23 @@ class DesignerComponent {
 
   Map<String, dynamic> toPublishedSection() {
     final values = Map<String, dynamic>.from(properties);
+    // Normalize numeric aliases before sending to WordPress. Its sanitizer
+    // stores physical pixel dimensions, spacing and elevation as integers;
+    // keeping fractional editor values here causes a false publish mismatch
+    // and makes the published layout drift from the Designer preview.
+    const integerLayoutKeys = <String>[
+      'height', 'height_px', 'max_cross_axis_extent', 'max_width_px',
+      'main_axis_spacing', 'cross_axis_spacing', 'item_gap',
+      'border_radius', 'corner_radius', 'elevation', 'card_depth',
+      'cross_axis_count', 'columns', 'fixed_grid_view_count', 'limit',
+    ];
+    for (final key in integerLayoutKeys) {
+      final value = values[key];
+      if (value is num) values[key] = value.round();
+    }
+    final effectiveElevation = (values['elevation'] ?? values['card_depth'] ?? 1) as num;
+    values['elevation'] = effectiveElevation.round();
+    values['card_depth'] = effectiveElevation.round();
     final prefix = type.toLowerCase();
     final variant = layout.toLowerCase()
         .replaceFirst('$prefix ', '')
@@ -390,7 +407,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     properties['height'] = normalized['height_px'] ?? normalized['height'] ?? 180;
     properties['width'] = (normalized['width'] as num?)?.toDouble() ??
         (((normalized['width_pct'] as num?)?.toDouble() ?? 100) / 100);
-    properties['max_cross_axis_extent'] = normalized['max_width_px'] ?? 300;
+    properties['max_cross_axis_extent'] = normalized['max_cross_axis_extent'] ?? normalized['max_width_px'] ?? 300;
     properties['main_axis_spacing'] = normalized['main_axis_spacing'] ?? normalized['item_gap'] ?? 10;
     properties['cross_axis_spacing'] = normalized['cross_axis_spacing'] ?? normalized['item_gap'] ?? 10;
     properties['border_radius'] = normalized['corner_radius'] ?? 16;
@@ -1661,6 +1678,15 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     )));
   }
 
+  Future<void> _openDesignerSettings() async {
+    await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => _DesignerSettingsPage(
+      saving: saving,
+      publishing: publishing,
+      onSaveDraft: () => _persist(),
+      onPublish: () => _persist(publish: true),
+    )));
+  }
+
   Widget _designerMenu() => PopupMenuButton<String>(
     icon: const Icon(Icons.menu_rounded),
     tooltip: 'Designer menu',
@@ -1668,11 +1694,14 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       if (value == 'reorder') _openReorder();
       if (value == 'templates') _openTemplates();
       if (value == 'my_templates') _openMyTemplates();
+      if (value == 'settings') _openDesignerSettings();
     },
     itemBuilder: (_) => const [
       PopupMenuItem(value: 'reorder', child: ListTile(leading: Icon(Icons.reorder), title: Text('Reorder Components'), dense: true)),
       PopupMenuItem(value: 'templates', child: ListTile(leading: Icon(Icons.dashboard_customize), title: Text('Templates'), dense: true)),
       PopupMenuItem(value: 'my_templates', child: ListTile(leading: Icon(Icons.collections_bookmark), title: Text('My Templates'), dense: true)),
+      PopupMenuDivider(),
+      PopupMenuItem(value: 'settings', child: ListTile(leading: Icon(Icons.settings_outlined), title: Text('Settings'), dense: true)),
     ],
   );
 
@@ -1694,17 +1723,10 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         title: const Text('ARK Designer', style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           _designerMenu(),
-          PopupMenuButton<String>(
+          IconButton(
             tooltip: 'Designer settings',
             icon: const Icon(Icons.tune_rounded),
-            onSelected: (value) {
-              if (value == 'save') _persist();
-              if (value == 'publish') _persist(publish: true);
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'save', child: ListTile(leading: Icon(Icons.save_outlined), title: Text('Save Draft'), dense: true)),
-              PopupMenuItem(value: 'publish', child: ListTile(leading: Icon(Icons.publish_rounded), title: Text('Publish JSON'), dense: true)),
-            ],
+            onPressed: _openDesignerSettings,
           ),
         ],
       ),
@@ -1737,30 +1759,125 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                   },
                 ),
         ),
-        if (saving || publishing) LinearProgressIndicator(value: null, color: _designerPurple),
         SafeArea(top: false, child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 7, 12, 10),
-          child: Row(children: [
-            Expanded(child: OutlinedButton.icon(
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
               onPressed: saving || publishing ? null : _showComponentPicker,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Add'),
-            )),
-            const SizedBox(width: 8),
-            Expanded(child: OutlinedButton.icon(
-              onPressed: saving || publishing ? null : () => _persist(),
-              icon: const Icon(Icons.save_outlined),
-              label: const Text('Save Draft'),
-            )),
-            const SizedBox(width: 8),
-            Expanded(child: FilledButton.icon(
-              onPressed: saving || publishing ? null : () => _persist(publish: true),
-              icon: const Icon(Icons.publish_rounded),
-              label: const Text('Publish'),
-            )),
-          ]),
+              label: const Text('Add component'),
+            ),
+          ),
         )),
       ]),
+      ),
+    );
+  }
+}
+
+class _DesignerSettingsPage extends StatefulWidget {
+  const _DesignerSettingsPage({
+    required this.saving,
+    required this.publishing,
+    required this.onSaveDraft,
+    required this.onPublish,
+  });
+  final bool saving;
+  final bool publishing;
+  final Future<void> Function() onSaveDraft;
+  final Future<void> Function() onPublish;
+
+  @override
+  State<_DesignerSettingsPage> createState() => _DesignerSettingsPageState();
+}
+
+class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
+  bool busy = false;
+
+  Future<void> _run(Future<void> Function() action) async {
+    if (busy) return;
+    setState(() => busy = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final working = busy || widget.saving || widget.publishing;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Designer Settings')),
+      body: Stack(
+        children: [
+          ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Publish & Sync', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 6),
+                    const Text('Save your current design as a draft or publish the configuration to the connected WordPress store.'),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: working ? null : () => _run(widget.onSaveDraft),
+                        icon: const Icon(Icons.save_outlined),
+                        label: const Text('Save Draft'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: working ? null : () => _run(widget.onPublish),
+                        icon: const Icon(Icons.publish_rounded),
+                        label: const Text('Publish JSON'),
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Layout consistency', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                    SizedBox(height: 6),
+                    Text('Dimensions, spacing, margins and padding are saved with the component configuration. Publish verification checks that WordPress preserves the submitted values.'),
+                  ]),
+                ),
+              ),
+            ],
+          ),
+          if (working)
+            Positioned.fill(
+              child: ColoredBox(
+                color: Colors.black26,
+                child: Center(
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(width: 42, height: 42, child: CircularProgressIndicator(strokeWidth: 4)),
+                          const SizedBox(height: 14),
+                          Text(widget.publishing ? 'Publishing…' : 'Saving draft…'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
