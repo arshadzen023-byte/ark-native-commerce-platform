@@ -15,6 +15,7 @@ class ArkDesignerBannerCarousel extends StatefulWidget {
     this.showArrows = true,
     this.fade = false,
     this.viewFraction = 1,
+    this.elevation = 0,
     this.onTap,
     this.onSlideTap,
   });
@@ -29,6 +30,7 @@ class ArkDesignerBannerCarousel extends StatefulWidget {
   final bool showArrows;
   final bool fade;
   final double viewFraction;
+  final double elevation;
   final VoidCallback? onTap;
   final ValueChanged<Map<String, dynamic>>? onSlideTap;
 
@@ -120,7 +122,12 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
         final image = (slide['image_url'] ?? slide['source_url'] ?? slide['url'] ?? '').toString();
         final title = (slide['title'] ?? '').toString();
         final radius = BorderRadius.circular(widget.radius);
-        final body = ClipRRect(
+        final body = Card(
+          margin: EdgeInsets.zero,
+          elevation: widget.elevation.clamp(0, 20).toDouble(),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(borderRadius: radius),
+          child: ClipRRect(
           borderRadius: radius,
           child: Stack(fit: StackFit.expand, children: [
             image.isEmpty
@@ -141,7 +148,7 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
                 ),
               ),
           ]),
-        );
+        ));
         return Padding(
           padding: EdgeInsets.symmetric(horizontal: widget.viewFraction < 1 ? 5 : 8),
           child: widget.fade
