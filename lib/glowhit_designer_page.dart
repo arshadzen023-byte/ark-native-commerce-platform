@@ -1207,6 +1207,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           showArrows: properties['arrows'] == true && properties['control'] != false,
           fade: properties['fade'] == true,
           viewFraction: ((properties['view_fraction'] as num?)?.toDouble() ?? .9).clamp(.4, 1).toDouble(),
+          elevation: ((properties['elevation'] as num?)?.toDouble() ?? 1).clamp(0, 20).toDouble(),
           onTap: onEdit,
         )));
         });
