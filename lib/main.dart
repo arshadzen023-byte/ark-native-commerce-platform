@@ -768,7 +768,7 @@ class _StoreHomeState extends State<StoreHome> {
                                 ? const ColoredBox(color: Color(0xFFEDEAF2), child: Icon(Icons.image_outlined))
                                 : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
                           ),
-                        ));
+                        )));
                         });
                       },
                     ),
