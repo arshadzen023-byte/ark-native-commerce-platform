@@ -1139,7 +1139,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           itemBuilder: (_, index) => Align(alignment: Alignment.centerLeft, child: SizedBox(width: (MediaQuery.of(context).size.width - 48) * childWidthFactor, height: height.clamp(40, 500).toDouble(), child: imageTile(slides[index]))),
         ));
       } else {
-        final shown = slides.take(8).toList();
+        final shown = slides.take(previewLimit).toList();
         content = GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -1160,6 +1160,24 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       Widget tile(int index, {double? width}) => isProduct
           ? productTile(visibleProductItems[index], tileWidth: width)
           : categoryTile(categoryItems[index], tileWidth: width);
+      Widget dimensionedGridChild(int index) => LayoutBuilder(
+        builder: (context, constraints) {
+          final cellWidth = constraints.maxWidth.isFinite
+              ? constraints.maxWidth
+              : cardWidth;
+          final childWidth = (cellWidth * childWidthFactor)
+              .clamp(40, cardWidth)
+              .toDouble();
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: childWidth,
+              height: cardHeight,
+              child: tile(index, width: childWidth),
+            ),
+          );
+        },
+      );
       if (count == 0) {
         content = SizedBox(height: cardHeight, child: Center(child: Text(
           isProduct ? 'Loading live products…' : 'Loading live categories…',
@@ -1179,7 +1197,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           itemBuilder: (_, index) => SizedBox(height: cardHeight, child: tile(index)),
         ));
       } else {
-        final visibleCount = count.clamp(1, 8).toInt();
+        final visibleCount = count.clamp(1, 40).toInt();
         content = SizedBox(height: (cardHeight * ((visibleCount / columns.clamp(1, 4).toInt()).ceil()) + mainGap * 2).clamp(cardHeight, 1000).toDouble(), 
           child: GridView.builder(
             physics: const NeverScrollableScrollPhysics(),
@@ -1190,7 +1208,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               mainAxisSpacing: mainGap.toDouble(),
               mainAxisExtent: cardHeight,
             ),
-            itemBuilder: (_, index) => tile(index),
+            itemBuilder: (_, index) => dimensionedGridChild(index),
           ));
       }
     } else {
@@ -1226,12 +1244,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             padding: padding,
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(radius.clamp(0, 36).toDouble()),
-              boxShadow: [
-                if (((properties['elevation'] as num?)?.toDouble() ?? 0) > 0)
-                  BoxShadow(color: Colors.black.withValues(alpha: .12), blurRadius: ((properties['elevation'] as num?)?.toDouble() ?? 1) * 2,
-                    offset: const Offset(0, 3)),
-              ],
+              // Section shell remains neutral; radius and elevation belong to child cards.
+              borderRadius: BorderRadius.zero,
+              boxShadow: const [],
             ),
             // Keep the component at its authored dimensions. When the editor's
             // available viewport is shorter than the component, scroll the preview
