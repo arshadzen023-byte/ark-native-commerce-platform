@@ -48,7 +48,7 @@ jobs:
           kotlin_dsl = gradle.suffix == ".kts"
 
           # Enable desugaring inside the Android compileOptions block.
-          match = re.search(r"(?m)^\\s*compileOptions\\s*\\{", content)
+          match = re.search(r"(?m)^\s*compileOptions\s*\{", content)
           if not match:
               raise SystemExit(f"compileOptions block not found in {gradle}")
           opening = content.find("{", match.start())
@@ -68,12 +68,12 @@ jobs:
           enabled = "isCoreLibraryDesugaringEnabled = true" if kotlin_dsl else "coreLibraryDesugaringEnabled true"
           block = content[opening:closing]
           if "coreLibraryDesugaringEnabled" not in block:
-              content = content[:closing] + "    " + enabled + "\\n" + content[closing:]
+              content = content[:closing] + "    " + enabled + "\n" + content[closing:]
 
           # Add the desugaring runtime dependency once.
           dependency = 'coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")' if kotlin_dsl else "coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'"
           if "desugar_jdk_libs" not in content:
-              dependencies = re.search(r"(?m)^\\s*dependencies\\s*\\{", content)
+              dependencies = re.search(r"(?m)^\s*dependencies\s*\{", content)
               if dependencies:
                   dep_open = content.find("{", dependencies.start())
                   depth = 0
@@ -88,9 +88,9 @@ jobs:
                               break
                   if dep_close < 0:
                       raise SystemExit("Could not parse dependencies block")
-                  content = content[:dep_close] + "    " + dependency + "\\n" + content[dep_close:]
+                  content = content[:dep_close] + "    " + dependency + "\n" + content[dep_close:]
               else:
-                  content += "\\ndependencies {\\n    " + dependency + "\\n}\\n"
+                  content += "\ndependencies {\n    " + dependency + "\n}\n"
 
           gradle.write_text(content, encoding="utf-8")
           verified = gradle.read_text(encoding="utf-8")
