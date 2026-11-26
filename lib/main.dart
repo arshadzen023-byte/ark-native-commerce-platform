@@ -16,6 +16,7 @@ import 'woo_store_api.dart';
 import 'notification_service.dart';
 import 'notification_inbox_page.dart';
 import 'glowhit_designer_page.dart';
+import 'designer_layout_contract.dart';
 
 const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
@@ -714,6 +715,7 @@ class _StoreHomeState extends State<StoreHome> {
     config['designer_component_type'] = type;
     config['visible'] = nested['visible'] ?? config['visible'] ?? config['enabled'] ?? true;
     if (config['visible'] == false) return const SizedBox.shrink();
+    final layoutSpec = DesignerLayoutSpec.fromMap(config);
     final title = (config['title'] ?? '').toString();
     final showTitle = config['show_title'] != false && title.isNotEmpty;
     final background = (config['section_background'] ?? 'transparent').toString();
@@ -738,17 +740,12 @@ class _StoreHomeState extends State<StoreHome> {
         wordSpacing: (config['word_spacing'] as num?)?.toDouble() ?? 0,
       ));
     }
-    final padding = (config['padding_top'] as num?)?.toDouble() ?? 12.0;
-    final paddingLeft = (config['padding_left'] as num?)?.toDouble() ?? 12.0;
-    final paddingRight = (config['padding_right'] as num?)?.toDouble() ?? 12.0;
-    final mainAxisGap = (config['main_axis_spacing'] as num?)?.toDouble() ?? (config['item_gap'] as num?)?.toDouble() ?? 8.0;
-    final crossAxisGap = (config['cross_axis_spacing'] as num?)?.toDouble() ?? (config['item_gap'] as num?)?.toDouble() ?? 8.0;
-    final margin = EdgeInsets.fromLTRB(
-      (config['margin_left'] as num?)?.toDouble() ?? 0,
-      (config['margin_top'] as num?)?.toDouble() ?? 0,
-      (config['margin_right'] as num?)?.toDouble() ?? 0,
-      (config['margin_bottom'] as num?)?.toDouble() ?? 0,
-    );
+    final padding = layoutSpec.padding.top;
+    final paddingLeft = layoutSpec.padding.left;
+    final paddingRight = layoutSpec.padding.right;
+    final mainAxisGap = layoutSpec.mainAxisSpacing;
+    final crossAxisGap = layoutSpec.crossAxisSpacing;
+    final margin = layoutSpec.margin;
 
     if (type == 'ark_live_slider' || type.startsWith('banner_') || config['designer_component_type']?.toString().startsWith('banner_') == true) {
       final key = (config['slider_key'] ?? '').toString();
@@ -764,24 +761,24 @@ class _StoreHomeState extends State<StoreHome> {
           (slide['image_url'] ?? '').toString().trim().isNotEmpty).toList();
 
       Widget renderCarousel(List<Map<String, dynamic>> slides, Map<String, dynamic> settings) {
-        final height = ((settings['height_px'] ?? config['height_px'] ?? config['height'] ?? 180) as num).toDouble();
-        final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
-          (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
-        final maxChildWidth = ((config['max_cross_axis_extent'] ?? config['max_width_px']) as num?)?.toDouble() ?? MediaQuery.of(context).size.width;
+        final renderSpec = DesignerLayoutSpec.fromMap(settings.isEmpty ? config : {...config, ...settings});
+        final height = renderSpec.height;
+        final childWidthFactor = renderSpec.widthFactor;
+        final maxChildWidth = renderSpec.maxCrossAxisExtent ?? MediaQuery.of(context).size.width;
         // Width and viewport fraction are separate Designer controls:
         // width sizes the carousel shell; view_fraction sizes each slide.
         final carouselFraction = ((config['card_width'] ?? config['view_fraction']) as num?)
             ?.toDouble().clamp(.4, 1.0).toDouble() ?? .9;
-        final childElevation = ((config['elevation'] ?? config['card_depth']) as num?)?.toDouble() ?? 1;
+        final childElevation = renderSpec.elevation;
         final intervalMs = ((settings['interval_ms'] ?? config['interval_ms'] ?? (((config['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
         final layout = (config['designer_component_type'] ?? config['type'] ?? '').toString();
         final bannerGrid = layout == 'banner_grid';
         final bannerGridLimit = ((config['limit'] as num?)?.toInt() ?? 8).clamp(1, 40);
         final bannerGridSlides = slides.take(bannerGridLimit).toList();
         final bannerStyle = layout == 'banner_list' || layout == 'banner_scroll';
-        final bannerGridColumns = ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 6);
-        final bannerGridAspect = (((config['card_aspect_ratio'] ?? config['cross_aspect_ratio']) as num?)?.toDouble() ?? 1.2).clamp(.4, 3.0);
-        final bannerGridRowExtent = (height * (1.2 / bannerGridAspect)).clamp(60, 500).toDouble();
+        final bannerGridColumns = renderSpec.crossAxisCount;
+        final bannerGridAspect = renderSpec.crossAspectRatio.clamp(.4, 3.0);
+        final bannerGridRowExtent = (height.clamp(40, 500) * (1.2 / bannerGridAspect)).clamp(40, 600).toDouble();
         final bannerGridRows = (bannerGridSlides.length / bannerGridColumns).ceil().clamp(1, 40);
         final bannerGridHeight = bannerGridRowExtent * bannerGridRows + mainAxisGap * (bannerGridRows - 1);
         return Align(
@@ -827,7 +824,7 @@ class _StoreHomeState extends State<StoreHome> {
                         final slide = bannerGridSlides[index];
                         final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
                         return LayoutBuilder(builder: (context, constraints) {
-                          final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, maxChildWidth).toDouble();
+                          final childWidth = renderSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: maxChildWidth);
                           return Align(alignment: Alignment.centerLeft, child: SizedBox(width: childWidth, child: Card(
                             margin: EdgeInsets.zero,
                             elevation: childElevation,
@@ -849,9 +846,7 @@ class _StoreHomeState extends State<StoreHome> {
                     // Keep the published Banner Scroll child geometry identical
                     // to Designer preview: size from the inner content viewport,
                     // not the full device width (which ignores section margin/padding).
-                    final availableChildWidth = constraints.maxWidth.clamp(40.0, double.infinity);
-                    final childWidth = (availableChildWidth * childWidthFactor)
-                        .clamp(40.0, maxChildWidth).toDouble();
+                    final childWidth = renderSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: maxChildWidth);
                     // Banner List is a full vertical stack; Banner Scroll
                     // remains a bounded scroll viewport even when vertical.
                     final verticalList = layout == 'banner_list';
@@ -859,31 +854,50 @@ class _StoreHomeState extends State<StoreHome> {
                       final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
                       return SizedBox(
                         width: childWidth,
-                        height: height,
-                        child: InkWell(
-                          onTap: () => _openDesignerChildLink(slide),
-                          child: Card(
-                            margin: EdgeInsets.zero,
-                            elevation: childElevation,
-                            clipBehavior: Clip.antiAlias,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                (config['corner_radius'] as num?)?.toDouble() ?? 16,
-                              ),
-                            ),
-                            child: url.isEmpty
-                                ? const ColoredBox(
-                                    color: Color(0xFFEDEAF2),
-                                    child: Icon(Icons.image_outlined),
-                                  )
-                                : Image.network(
-                                    url,
-                                    fit: BoxFit.cover,
-                                    cacheWidth: imageCacheWidth,
-                                    gaplessPlayback: true,
-                                    errorBuilder: (_, __, ___) =>
-                                        const Icon(Icons.broken_image_outlined),
+                        height: height.clamp(40, 500).toDouble(),
+                        child: Card(
+                          margin: EdgeInsets.zero,
+                          color: Colors.white,
+                          elevation: childElevation.clamp(0, 12).toDouble(),
+                          clipBehavior: Clip.antiAlias,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(renderSpec.borderRadius.clamp(0, 32).toDouble()),
+                          ),
+                          child: InkWell(
+                            onTap: () => _openDesignerChildLink(slide),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                url.isEmpty
+                                    ? const ColoredBox(
+                                        color: Color(0xFFEDEAF2),
+                                        child: Icon(Icons.image_outlined),
+                                      )
+                                    : Image.network(
+                                        url,
+                                        fit: BoxFit.cover,
+                                        cacheWidth: imageCacheWidth,
+                                        gaplessPlayback: true,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(Icons.broken_image_outlined),
+                                      ),
+                                if ((slide['title'] ?? '').toString().isNotEmpty)
+                                  Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                      color: Colors.black.withValues(alpha: .52),
+                                      child: Text(
+                                        slide['title'].toString(),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
                                   ),
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -903,21 +917,20 @@ class _StoreHomeState extends State<StoreHome> {
                       );
                     }
                     return SizedBox(
-                      height: height,
+                      height: height.clamp(40, 500).toDouble(),
                       child: ListView.separated(
-                        scrollDirection: config['horizontal'] == false ? Axis.vertical : Axis.horizontal,
+                        scrollDirection: renderSpec.horizontal ? Axis.horizontal : Axis.vertical,
                         padding: EdgeInsets.zero,
                         itemCount: slides.length,
-                        separatorBuilder: (_, __) => config['horizontal'] == false
-                            ? SizedBox(height: mainAxisGap)
-                            : SizedBox(width: crossAxisGap),
+                        separatorBuilder: (_, __) => renderSpec.horizontal
+                            ? SizedBox(width: crossAxisGap)
+                            : SizedBox(height: mainAxisGap),
                         itemBuilder: (_, index) => buildBannerChild(slides[index]),
                       ),
                     );
                   })
                 : LayoutBuilder(builder: (context, constraints) {
-                    final carouselWidth = (constraints.maxWidth * childWidthFactor)
-                        .clamp(40.0, maxChildWidth).toDouble();
+                    final carouselWidth = renderSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: maxChildWidth);
                     return Align(
                       alignment: Alignment.centerLeft,
                       child: SizedBox(
@@ -984,13 +997,11 @@ class _StoreHomeState extends State<StoreHome> {
       final limit = (config['limit'] as num?)?.toInt() ?? 8;
       rows = rows.take(limit.clamp(1, 100)).toList();
       if (rows.isEmpty) return const SizedBox.shrink();
-      final cardRadius = (((config['corner_radius'] ?? config['border_radius']) as num?)?.toDouble() ?? 12).clamp(0, 28).toDouble();
-      final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 150;
-      final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
-        (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
-      final categoryCardWidth = (((config['max_cross_axis_extent'] ?? config['max_width_px']) as num?)?.toDouble() ?? 180)
-          .clamp(40, MediaQuery.of(context).size.width).toDouble();
-      final categoryAspect = (((config['card_aspect_ratio'] ?? config['cross_aspect_ratio']) as num?)?.toDouble() ?? .9).clamp(.4, 2.5);
+      final cardRadius = layoutSpec.borderRadius.clamp(0, 28).toDouble();
+      final cardHeight = layoutSpec.height;
+      final childWidthFactor = layoutSpec.widthFactor;
+      final categoryCardWidth = layoutSpec.maxCrossAxisExtent ?? 180;
+      final categoryAspect = layoutSpec.crossAspectRatio.clamp(.4, 2.5);
       final categoryRowExtent = (cardHeight * (.9 / categoryAspect)).clamp(40, 600).toDouble();
       final cards = rows.map((category) {
         final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
@@ -1052,11 +1063,11 @@ class _StoreHomeState extends State<StoreHome> {
             SizedBox(
               height: cardHeight,
               child: ListView.separated(
-                scrollDirection: config['horizontal'] == false ? Axis.vertical : Axis.horizontal,
+                scrollDirection: renderSpec.horizontal ? Axis.horizontal : Axis.vertical,
                 itemCount: cards.length,
-                separatorBuilder: (_, __) => config['horizontal'] == false
-                    ? SizedBox(height: mainAxisGap)
-                    : SizedBox(width: crossAxisGap),
+                separatorBuilder: (_, __) => layoutSpec.horizontal
+                    ? SizedBox(width: crossAxisGap)
+                    : SizedBox(height: mainAxisGap),
                 itemBuilder: (_, index) => SizedBox(
                   width: categoryCardWidth * childWidthFactor,
                   height: cardHeight,
@@ -1077,7 +1088,7 @@ class _StoreHomeState extends State<StoreHome> {
               ),
               itemBuilder: (_, index) => LayoutBuilder(
                 builder: (context, constraints) {
-                  final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, categoryCardWidth).toDouble();
+                  final childWidth = layoutSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: categoryCardWidth);
                   return Align(
                     alignment: Alignment.centerLeft,
                     child: SizedBox(width: childWidth, height: categoryRowExtent, child: cards[index]),
@@ -1093,15 +1104,13 @@ class _StoreHomeState extends State<StoreHome> {
       final rows = _designerProducts(config);
       if (rows.isEmpty) return const SizedBox.shrink();
       final layout = (config['layout_variant'] ?? config['designer_component_type'] ?? type).toString().toLowerCase();
-      final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
-        (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
-      final cardWidth = (((config['max_cross_axis_extent'] ?? config['max_width_px']) as num?)?.toDouble() ?? 174)
-          .clamp(40, MediaQuery.of(context).size.width).toDouble();
-      final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 260;
-      final productAspect = (((config['card_aspect_ratio'] ?? config['cross_aspect_ratio']) as num?)?.toDouble() ?? .66).clamp(.4, 2.5);
+      final childWidthFactor = layoutSpec.widthFactor;
+      final cardWidth = layoutSpec.maxCrossAxisExtent ?? 174;
+      final cardHeight = layoutSpec.height;
+      final productAspect = layoutSpec.crossAspectRatio.clamp(.4, 2.5);
       final productRowExtent = (cardHeight * (.66 / productAspect)).clamp(40, 700).toDouble();
-      final cardRadius = (((config['corner_radius'] ?? config['border_radius']) as num?)?.toDouble() ?? 12).clamp(0, 32).toDouble();
-      final cardElevation = (config['card_depth'] as num?)?.toDouble() ?? 1;
+      final cardRadius = layoutSpec.borderRadius.clamp(0, 32).toDouble();
+      final cardElevation = layoutSpec.elevation;
       final cards = rows.map((product) => SizedBox(
         width: cardWidth * childWidthFactor,
         height: cardHeight,
@@ -1131,11 +1140,11 @@ class _StoreHomeState extends State<StoreHome> {
             SizedBox(
               height: cardHeight,
               child: ListView.separated(
-                scrollDirection: config['horizontal'] == false ? Axis.vertical : Axis.horizontal,
+                scrollDirection: layoutSpec.horizontal ? Axis.horizontal : Axis.vertical,
                 itemCount: cards.length,
-                separatorBuilder: (_, __) => config['horizontal'] == false
-                  ? SizedBox(height: mainAxisGap)
-                  : SizedBox(width: crossAxisGap),
+                separatorBuilder: (_, __) => layoutSpec.horizontal
+                  ? SizedBox(width: crossAxisGap)
+                  : SizedBox(height: mainAxisGap),
                 itemBuilder: (_, index) => cards[index],
               ),
             )
@@ -1164,7 +1173,7 @@ class _StoreHomeState extends State<StoreHome> {
               ),
               itemBuilder: (_, index) => LayoutBuilder(
                 builder: (context, constraints) {
-                  final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, cardWidth).toDouble();
+                  final childWidth = layoutSpec.childWidthFor(constraints.maxWidth, fallbackMaxCrossAxisExtent: cardWidth);
                   return Align(
                     alignment: Alignment.centerLeft,
                     child: SizedBox(
