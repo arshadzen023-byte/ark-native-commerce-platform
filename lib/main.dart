@@ -1397,7 +1397,7 @@ class RecentlyViewedPage extends StatelessWidget {
             return Card(clipBehavior: Clip.antiAlias, child: InkWell(
               onTap: () => onOpen(item),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(child: SizedBox(width: double.infinity, child: image.isEmpty ? const Icon(Icons.shopping_bag_outlined, size: 42) : Image.network(image, fit: BoxFit.contain, cacheWidth: imageCacheWidth, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)))),
+                Expanded(child: SizedBox(width: double.infinity, child: image.isEmpty ? const Icon(Icons.shopping_bag_outlined, size: 42) : Image.network(image, fit: BoxFit.contain, cacheWidth: (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio / 2).round().clamp(200, 1200), gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)))),
                 Padding(padding: const EdgeInsets.fromLTRB(10, 6, 10, 2), child: Text((item['name'] ?? 'Product').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700))),
                 Padding(padding: const EdgeInsets.fromLTRB(10, 2, 10, 10), child: Text(amount, style: const TextStyle(color: purple, fontWeight: FontWeight.w800))),
               ]),
