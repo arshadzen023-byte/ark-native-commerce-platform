@@ -82,6 +82,13 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
         oldWidget.pauseOnInteraction != widget.pauseOnInteraction) {
       _startTimer();
     }
+    final oldImageSet = oldWidget.slides
+        .map((slide) => (slide['image_url'] ?? slide['source_url'] ?? slide['url'] ?? '').toString())
+        .join('|');
+    final newImageSet = widget.slides
+        .map((slide) => (slide['image_url'] ?? slide['source_url'] ?? slide['url'] ?? '').toString())
+        .join('|');
+    if (oldImageSet != newImageSet) _precacheVisibleSlides();
     if (oldWidget.viewFraction != widget.viewFraction) {
       final next = PageController(
         initialPage: _index,
