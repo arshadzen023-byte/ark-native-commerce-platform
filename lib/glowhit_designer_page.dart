@@ -1876,7 +1876,6 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         foregroundColor: _designerText,
         title: const Text('ARK Designer', style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
-          _designerMenu(),
           IconButton(
             tooltip: 'Designer settings',
             icon: const Icon(Icons.tune_rounded),
