@@ -1016,7 +1016,13 @@ class _StoreHomeState extends State<StoreHome> {
             ),
             Padding(
               padding: const EdgeInsets.all(7),
-              child: Text((category['name'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+              child: Text(
+                (category['name'] ?? '').toString(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              ),
             ),
           ]),
         );
@@ -1167,7 +1173,7 @@ class _StoreHomeState extends State<StoreHome> {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: rows.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 6),
+                crossAxisCount: layoutSpec.crossAxisCount,
                 mainAxisExtent: productRowExtent,
                 crossAxisSpacing: crossAxisGap,
                 mainAxisSpacing: mainAxisGap,
