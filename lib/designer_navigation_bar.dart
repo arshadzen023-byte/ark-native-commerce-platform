@@ -305,6 +305,11 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
           selectedIndex = index < 0 ? 0 : index;
           _changed();
         },
+        onDelete: () {
+          config.items.removeWhere((e) => e.id == item.id);
+          selectedIndex = config.items.isEmpty ? 0 : selectedIndex.clamp(0, config.items.length - 1);
+          _changed();
+        },
       ),
     ));
   }
@@ -479,9 +484,10 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
 }
 
 class DesignerNavigationItemPage extends StatefulWidget {
-  const DesignerNavigationItemPage({super.key, required this.item, required this.onSave});
+  const DesignerNavigationItemPage({super.key, required this.item, required this.onSave, required this.onDelete});
   final DesignerNavigationItem item;
   final ValueChanged<DesignerNavigationItem> onSave;
+  final VoidCallback onDelete;
 
   static const linkOptions = <({String value, String label})>[
     (value: 'home', label: 'Home'),
@@ -567,6 +573,31 @@ class _DesignerNavigationItemPageState extends State<DesignerNavigationItemPage>
         appBar: AppBar(
           title: const Text('Navigation Item'),
           actions: [
+            IconButton(
+              tooltip: 'Delete Navigation Button',
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text('Delete navigation button?'),
+                    content: Text('Remove "${item.label}" from the bottom navigation?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+                      FilledButton(
+                        style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true && mounted) {
+                  widget.onDelete();
+                  Navigator.pop(context);
+                }
+              },
+            ),
             IconButton(onPressed: () {
               item.label = labelController.text.trim().isEmpty ? 'Navigation' : labelController.text.trim();
               item.linkValue = urlController.text.trim();
