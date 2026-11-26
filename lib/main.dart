@@ -852,8 +852,9 @@ class _StoreHomeState extends State<StoreHome> {
                     final availableChildWidth = constraints.maxWidth.clamp(40.0, double.infinity);
                     final childWidth = (availableChildWidth * childWidthFactor)
                         .clamp(40.0, maxChildWidth).toDouble();
-                    final verticalList = layout == 'banner_list' ||
-                        config['horizontal'] == false;
+                    // Banner List is a full vertical stack; Banner Scroll
+                    // remains a bounded scroll viewport even when vertical.
+                    final verticalList = layout == 'banner_list';
                     Widget buildBannerChild(Map<String, dynamic> slide) {
                       final url = (slide['image_url'] ?? slide['source_url'] ?? '').toString();
                       return SizedBox(
