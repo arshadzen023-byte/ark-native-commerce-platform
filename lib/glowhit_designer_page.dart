@@ -1471,7 +1471,20 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
   final _title = TextEditingController();
   final _description = TextEditingController();
   bool _addingChild = false;
+  bool _savingNow = false;
+  DateTime? _lastSaveAt;
   DesignerComponent get item => widget.component;
+
+  Future<void> _saveOnce() async {
+    if (_savingNow) return;
+    _savingNow = true;
+    try {
+      await widget.onSave();
+      _lastSaveAt = DateTime.now();
+    } finally {
+      _savingNow = false;
+    }
+  }
 
   @override
   void initState() {
@@ -1540,11 +1553,28 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     ),
   );
 
-  Widget _slider(String label, String key, {double min = 0, double max = 300}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Row(children: [Expanded(child: Text(label)), Text(((item.properties[key] as num?)?.toDouble() ?? min).toStringAsFixed(0), style: const TextStyle(fontWeight: FontWeight.w700))]),
-    Slider(value: ((item.properties[key] as num?)?.toDouble() ?? min).clamp(min, max), min: min, max: max,
-      activeColor: _designerPurple, onChanged: (value) => _change(key, value)),
-  ]);
+  Widget _slider(String label, String key, {double min = 0, double max = 300}) {
+    final raw = (item.properties[key] as num?)?.toDouble() ?? min;
+    final value = raw.clamp(min, max).toDouble();
+    final decimals = (min < 0 || max <= 2.5) ? 2 : 0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text(label)),
+          Text(value.toStringAsFixed(decimals),
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+        ]),
+        Slider(
+          value: value,
+          min: min,
+          max: max,
+          activeColor: _designerPurple,
+          onChanged: (next) => _change(key, next),
+        ),
+      ]),
+    );
+  }
 
   Widget _switch(String label, String key) => SwitchListTile(
     contentPadding: EdgeInsets.zero, title: Text(label), activeColor: _designerPurple,
@@ -1941,23 +1971,23 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
                 onPressed: () async { await widget.onDelete(); if (context.mounted) Navigator.pop(context); },
               ),
               TextButton(
-                onPressed: () async { await widget.onSave(); if (context.mounted) Navigator.pop(context); },
+                onPressed: _savingNow ? null : () async { await _saveOnce(); if (context.mounted) Navigator.pop(context); },
                 child: const Text('Done'),
               ),
             ],
           ),
           body: Column(children: [
+            // Full-width editing canvas: render with the same viewport width as
+            // Shopping Home. Avoid FittedBox(scaleDown), which shrank components
+            // to their intrinsic width and left the preview surrounded by blank bars.
             Expanded(
-              flex: 4,
+              flex: 5,
               child: ColoredBox(
-                color: _designerPreviewBackground,
-                child: ClipRect(
-                  child: Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.center,
-                      child: widget.visualBuilder(),
-                    ),
+                color: _designerBackground,
+                child: LayoutBuilder(
+                  builder: (context, constraints) => SizedBox(
+                    width: constraints.maxWidth,
+                    child: ClipRect(child: widget.visualBuilder()),
                   ),
                 ),
               ),
