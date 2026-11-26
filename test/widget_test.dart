@@ -10,6 +10,28 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('Icon library exposes requested categories and no hamburger menu choice', () {
+    expect(DesignerNavIcons.categories, containsAll([
+      'Nature', 'Transport', 'Water', 'Weather', 'E-commerce',
+      'Social', 'Buildings', 'Digital', 'Internet',
+    ]));
+    expect(DesignerNavIcons.all.length, greaterThan(150));
+    expect(DesignerNavIcons.all.any((icon) =>
+      icon.label.toLowerCase() == 'menu' ||
+      icon.name == 'menu' ||
+      icon.name == 'menu_line' ||
+      icon.name == 'bars'), isFalse);
+
+    final material = DesignerNavIcons.all.where((icon) => icon.family == 'Material');
+    expect(material.any((icon) => icon.name == 'flight'), isTrue);
+    expect(material.any((icon) => icon.name == 'train'), isTrue);
+    expect(material.any((icon) => icon.name == 'water_drop'), isTrue);
+    expect(material.any((icon) => icon.name == 'cloud'), isTrue);
+    expect(material.any((icon) => icon.name == 'shopping_bag'), isTrue);
+    expect(material.any((icon) => icon.name == 'apartment'), isTrue);
+    expect(material.any((icon) => icon.name == 'wifi'), isTrue);
+  });
+
   test('Navigation Bar defaults preserve the five native Shopping destinations', () {
     final config = DesignerNavigationConfig();
     expect(config.items.map((item) => item.link).toList(),
