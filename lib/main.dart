@@ -695,6 +695,8 @@ class _StoreHomeState extends State<StoreHome> {
   }
 
   Widget _designerSection(Map<String, dynamic> section) {
+    final imageCacheWidth = (MediaQuery.of(context).size.width *
+        MediaQuery.of(context).devicePixelRatio).round().clamp(320, 2048);
     final nested = section['properties'] is Map
         ? Map<String, dynamic>.from(section['properties'] as Map)
         : <String, dynamic>{};
@@ -787,7 +789,7 @@ class _StoreHomeState extends State<StoreHome> {
             decoration: BoxDecoration(
           color: backgroundImageUrl.isNotEmpty || background == 'transparent' ? null : _safeColor(background),
           image: backgroundImageUrl.isNotEmpty
-              ? DecorationImage(image: NetworkImage(backgroundImageUrl), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
+              ? DecorationImage(image: ResizeImage(NetworkImage(backgroundImageUrl), width: imageCacheWidth), fit: _designerBackgroundFit(config['background_image_fit']), alignment: _designerBackgroundAlignment(config['background_image_alignment']))
               : null,
         ),
             padding: EdgeInsets.fromLTRB(
@@ -828,7 +830,7 @@ class _StoreHomeState extends State<StoreHome> {
                               onTap: () => _openDesignerChildLink(slide),
                               child: url.isEmpty
                                   ? const ColoredBox(color: Color(0xFFEDEAF2), child: Icon(Icons.image_outlined))
-                                  : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
+                                  : Image.network(url, fit: BoxFit.cover, cacheWidth: imageCacheWidth, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)),
                             ),
                           )));
                         });
@@ -974,7 +976,7 @@ class _StoreHomeState extends State<StoreHome> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Expanded(
               child: image.isNotEmpty
-                  ? Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.category_outlined)))
+                  ? Image.network(image, fit: BoxFit.cover, cacheWidth: imageCacheWidth, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.category_outlined)))
                   : const Center(child: Icon(Icons.category_outlined, size: 34)),
             ),
             Padding(
@@ -1009,7 +1011,7 @@ class _StoreHomeState extends State<StoreHome> {
             Column(children: rows.map((category) => ListTile(
               contentPadding: EdgeInsets.zero,
               leading: category['image'] is Map && ((category['image'] as Map)['src'] ?? '').toString().isNotEmpty
-                  ? SizedBox(width: 52, height: 52, child: Image.network((category['image'] as Map)['src'].toString(), fit: BoxFit.cover))
+                  ? SizedBox(width: 52, height: 52, child: Image.network((category['image'] as Map)['src'].toString(), fit: BoxFit.cover, cacheWidth: imageCacheWidth, gaplessPlayback: true))
                   : const Icon(Icons.category_outlined),
               title: Text((category['name'] ?? '').toString()),
             )).toList())
@@ -1388,7 +1390,7 @@ class RecentlyViewedPage extends StatelessWidget {
             return Card(clipBehavior: Clip.antiAlias, child: InkWell(
               onTap: () => onOpen(item),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(child: SizedBox(width: double.infinity, child: image.isEmpty ? const Icon(Icons.shopping_bag_outlined, size: 42) : Image.network(image, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)))),
+                Expanded(child: SizedBox(width: double.infinity, child: image.isEmpty ? const Icon(Icons.shopping_bag_outlined, size: 42) : Image.network(image, fit: BoxFit.contain, cacheWidth: imageCacheWidth, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined)))),
                 Padding(padding: const EdgeInsets.fromLTRB(10, 6, 10, 2), child: Text((item['name'] ?? 'Product').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700))),
                 Padding(padding: const EdgeInsets.fromLTRB(10, 2, 10, 10), child: Text(amount, style: const TextStyle(color: purple, fontWeight: FontWeight.w800))),
               ]),
