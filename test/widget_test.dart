@@ -59,6 +59,26 @@ void main() {
     expect(DesignerNavIcons.find('FluentUI', 'home_24_regular'), isNotNull);
   });
 
+  test('Navigation icon library includes transport, nature, commerce, social, buildings and digital icons', () {
+    final expected = <(String, String)>[
+      ('Material', 'flight'),
+      ('Material', 'train'),
+      ('Material', 'water_drop'),
+      ('Material', 'wb_sunny'),
+      ('Material', 'shopping_bag'),
+      ('Material', 'apartment'),
+      ('Material', 'wifi'),
+      ('Material', 'database'),
+      ('Font Awesome', 'instagram'),
+      ('Font Awesome', 'whatsapp'),
+    ];
+    for (final pair in expected) {
+      expect(DesignerNavIcons.find(pair.$1, pair.$2), isNotNull,
+          reason: 'Missing ${pair.$1} icon ${pair.$2}');
+    }
+    expect(DesignerNavIcons.all.where((icon) => icon.family == 'Material').length, greaterThan(100));
+  });
+
   testWidgets('Navigation Bar editor shows its white workspace and live preview', (tester) async {
     DesignerNavigationConfig? saved;
     await tester.pumpWidget(MaterialApp(
@@ -169,9 +189,8 @@ void main() {
 
     // Save and publish actions live on their own Settings page, not in the
     // fixed bottom action bar, so the component canvas keeps its full width.
-    await tester.tap(find.byTooltip('Designer menu'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Settings').last);
+    expect(find.byTooltip('Designer menu'), findsNothing);
+    await tester.tap(find.byTooltip('Designer settings'));
     await tester.pumpAndSettle();
     expect(find.text('Designer Settings'), findsOneWidget);
     expect(find.text('Save Draft'), findsOneWidget);
