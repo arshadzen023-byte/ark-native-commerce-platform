@@ -925,7 +925,7 @@ class _StoreHomeState extends State<StoreHome> {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: cards.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
+                crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 6),
                 crossAxisSpacing: crossAxisGap,
                 mainAxisSpacing: mainAxisGap,
                 mainAxisExtent: categoryRowExtent,
@@ -1002,7 +1002,7 @@ class _StoreHomeState extends State<StoreHome> {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: rows.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 4),
+                crossAxisCount: ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 6),
                 mainAxisExtent: productRowExtent,
                 crossAxisSpacing: crossAxisGap,
                 mainAxisSpacing: mainAxisGap,
