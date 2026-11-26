@@ -1158,7 +1158,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           physics: const NeverScrollableScrollPhysics(),
           itemCount: shown.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns.clamp(1, 4).toInt(),
+            crossAxisCount: columns.clamp(1, 6).toInt(),
             crossAxisSpacing: gap.toDouble(),
             mainAxisSpacing: mainGap.toDouble(),
             mainAxisExtent: bannerChildHeight,
