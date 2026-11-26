@@ -672,6 +672,59 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               !submittedHomeIds.every(publishedHomeIds.contains)) {
             throw Exception('WordPress published Home did not retain every submitted component ID.');
           }
+          // Verify the layout/style values that must survive WordPress
+          // sanitization. This prevents a green Publish result when the server
+          // silently resets a component's dimensions or visual properties.
+          const propertyKeys = <String>[
+            'width', 'width_pct', 'height', 'height_px', 'min_height_px',
+            'max_width_px', 'max_cross_axis_extent', 'main_axis_spacing',
+            'cross_axis_spacing', 'item_gap', 'corner_radius', 'border_radius',
+            'columns', 'cross_axis_count', 'cross_aspect_ratio',
+            'card_aspect_ratio', 'card_radius', 'card_depth', 'elevation',
+            'card_width', 'card_image_fit', 'section_background', 'text_color',
+            'card_background', 'background_image_url', 'background_image_fit',
+            'background_image_position', 'background_position', 'background_size',
+            'background_repeat', 'font_family', 'font_size', 'font_weight',
+            'italic', 'letter_spacing', 'word_spacing', 'text_style',
+          ];
+          for (final page in _pages) {
+            final pageKey = _wordpressPageKey(page);
+            final requestedPage = configPages[pageKey];
+            final savedPage = serverPages[pageKey];
+            final requestedSections = requestedPage is Map && requestedPage['sections'] is List
+                ? requestedPage['sections'] as List
+                : const <dynamic>[];
+            final savedSections = savedPage is Map && savedPage['sections'] is List
+                ? savedPage['sections'] as List
+                : const <dynamic>[];
+            final savedById = <String, Map>{};
+            for (final section in savedSections.whereType<Map>()) {
+              savedById[(section['id'] ?? '').toString()] = section;
+            }
+            for (final requested in requestedSections.whereType<Map>()) {
+              final id = (requested['id'] ?? '').toString();
+              final saved = savedById[id];
+              if (saved == null) continue;
+              for (final key in propertyKeys) {
+                if (!requested.containsKey(key)) continue;
+                if (!saved.containsKey(key)) {
+                  throw Exception('WordPress did not preserve "$key" for component "' +
+                      (requested['title'] ?? id).toString() + '" on page "' + page + '".');
+                }
+                final before = requested[key];
+                final after = saved[key];
+                final equal = before is num && after is num
+                    ? (before.toDouble() - after.toDouble()).abs() < 0.001
+                    : jsonEncode(before) == jsonEncode(after);
+                if (!equal) {
+                  throw Exception('WordPress changed "$key" for component "' +
+                      (requested['title'] ?? id).toString() + '" on page "' + page +
+                      '" (Designer: ' + before.toString() + ', published: ' + after.toString() + ').');
+                }
+              }
+            }
+          }
+
           acceptedConfig = serverConfig;
           await prefs.setString('glowhit_published_designer_config', jsonEncode(acceptedConfig));
         }
