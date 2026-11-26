@@ -708,6 +708,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             'cross_axis_spacing', 'item_gap', 'corner_radius', 'border_radius',
             'columns', 'cross_axis_count', 'cross_aspect_ratio',
             'card_aspect_ratio', 'card_depth', 'elevation', 'card_image_fit',
+            'margin_top', 'margin_bottom', 'margin_left', 'margin_right',
+            'padding_top', 'padding_bottom', 'padding_left', 'padding_right',
+            'title_bottom_spacing',
             'section_background', 'text_color', 'title_color', 'title_background_color',
             'card_background', 'background_image_url', 'background_image_fit',
             'background_image_alignment', 'background_image_position',
@@ -727,6 +730,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             'columns': ['columns', 'cross_axis_count'],
             'card_aspect_ratio': ['card_aspect_ratio', 'cross_aspect_ratio'],
             'card_depth': ['card_depth', 'elevation'],
+            'width': ['width', 'width_pct'],
           };
           for (final page in _pages) {
             final pageKey = _wordpressPageKey(page);
@@ -1861,14 +1865,18 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Layout consistency', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                    SizedBox(height: 6),
-                    Text('Dimensions, spacing, margins and padding are saved with the component configuration. Publish verification checks that WordPress preserves the submitted values.'),
-                  ]),
+              Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  leading: const Icon(Icons.phone_android_rounded),
+                  title: const Text('App Settings', style: TextStyle(fontWeight: FontWeight.w700)),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const _DesignerAppSettingsPage(),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1895,6 +1903,36 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _DesignerAppSettingsPage extends StatelessWidget {
+  const _DesignerAppSettingsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: ThemeData.light().copyWith(
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF24212B),
+          elevation: 0,
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF24212B),
+          title: const Text('App Settings'),
+        ),
+        body: const ColoredBox(
+          color: Colors.white,
+          child: SizedBox.expand(),
+        ),
       ),
     );
   }
