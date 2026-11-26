@@ -109,9 +109,9 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Add component'));
+    await tester.tap(find.text('Add component').first);
     await tester.pumpAndSettle();
-    expect(find.text('Add component'), findsOneWidget);
+    expect(find.text('Add component'), findsNWidgets(2));
     expect(find.text('Banner'), findsWidgets);
     expect(find.text('Category'), findsWidgets);
     expect(find.text('Product'), findsWidgets);
