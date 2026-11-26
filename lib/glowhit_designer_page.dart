@@ -761,6 +761,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                       '" (Designer: ' + before.toString() + ', published: ' + after.toString() + ').');
                 }
               }
+            }
+          }
 
           acceptedConfig = serverConfig;
           await prefs.setString('glowhit_published_designer_config', jsonEncode(acceptedConfig));
