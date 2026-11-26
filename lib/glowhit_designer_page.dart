@@ -745,7 +745,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                   'border_radius', 'cross_axis_count', 'cross_aspect_ratio',
                   'elevation',
                 }.contains(key);
-                final equal = numEqual || jsonEncode(before) == jsonEncode(after);
+                final effectiveBefore = before is num ? before.toDouble() : before;
+                final effectiveAfter = after is num ? after.toDouble() : after;
+                final equal = numEqual || jsonEncode(effectiveBefore) == jsonEncode(effectiveAfter);
                 if (!equal && !isAlias) {
                   throw Exception('WordPress changed "$key" for component "' +
                       (requested['title'] ?? id).toString() + '" on page "' + page +
