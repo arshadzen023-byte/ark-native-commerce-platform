@@ -59,6 +59,25 @@ void main() {
     expect(DesignerNavIcons.find('FluentUI', 'home_24_regular'), isNotNull);
   });
 
+  testWidgets('Navigation Bar editor shows its white workspace and live preview', (tester) async {
+    DesignerNavigationConfig? saved;
+    await tester.pumpWidget(MaterialApp(
+      home: DesignerNavigationBarPage(
+        initialConfig: DesignerNavigationConfig(),
+        onSave: (value) => saved = value,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Navigation Bar'), findsOneWidget);
+    expect(find.text('Navigation Type'), findsOneWidget);
+    expect(find.text('Live Preview'), findsOneWidget);
+    expect(find.text('Add New Navigation Button'), findsNothing);
+    expect(find.byTooltip('Add New Navigation Button'), findsOneWidget);
+    expect(find.byType(BottomNavigationBar), findsOneWidget);
+    expect(saved, isNull);
+  });
+
   test('GlowHit remains configured for the live WooCommerce store', () {
     expect(storeUrl, 'https://pluginstore.shop');
   });
