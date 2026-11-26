@@ -310,8 +310,14 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
           _changed();
         },
         onDelete: () {
+          if (config.items.length <= 1) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Keep at least one Navigation Button in the app.')),
+            );
+            return;
+          }
           config.items.removeWhere((e) => e.id == item.id);
-          selectedIndex = config.items.isEmpty ? 0 : selectedIndex.clamp(0, config.items.length - 1);
+          selectedIndex = selectedIndex.clamp(0, config.items.length - 1);
           _changed();
         },
       ),
