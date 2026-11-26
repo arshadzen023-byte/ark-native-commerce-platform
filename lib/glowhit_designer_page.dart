@@ -1224,27 +1224,77 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                     offset: const Offset(0, 3)),
               ],
             ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-              if (title.isNotEmpty) Padding(
-                padding: EdgeInsets.only(bottom: ((properties['title_bottom_spacing'] as num?)?.toDouble() ?? 8)),
-                child: GestureDetector(onTap: isBanner && isSlider ? onEdit : null, child: Text(title,
-                    maxLines: ((properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4).toInt(),
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: (properties['title_text_align'] ?? 'left') == 'center' ? TextAlign.center : (properties['title_text_align'] ?? 'left') == 'right' ? TextAlign.right : TextAlign.left,
-                    style: TextStyle(
-                      color: titleColor,
-                      fontSize: compact ? 12 : ((properties['title_font_size'] as num?)?.toDouble() ?? 18),
-                      fontWeight: (properties['title_font_weight'] ?? 'bold') == 'normal' ? FontWeight.normal
-                        : (properties['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
-                      fontFamily: (properties['font_family'] ?? 'Roboto').toString(),
-                      fontStyle: properties['italic'] == true ? FontStyle.italic : FontStyle.normal,
-                      letterSpacing: (properties['letter_spacing'] as num?)?.toDouble() ?? 0,
-                      wordSpacing: (properties['word_spacing'] as num?)?.toDouble() ?? 0,
+            // Keep the component at its authored dimensions. When the editor's
+            // available viewport is shorter than the component, scroll the preview
+            // instead of shrinking it or overflowing the RenderFlex.
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (title.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: ((properties['title_bottom_spacing'] as num?)
+                                ?.toDouble() ??
+                            8),
+                      ),
+                      child: GestureDetector(
+                        onTap: isBanner && isSlider ? onEdit : null,
+                        child: Text(
+                          title,
+                          maxLines: ((properties['title_max_lines'] as num?)
+                                  ?.toInt() ??
+                              2)
+                              .clamp(1, 4)
+                              .toInt(),
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: (properties['title_text_align'] ?? 'left') ==
+                                  'center'
+                              ? TextAlign.center
+                              : (properties['title_text_align'] ?? 'left') ==
+                                      'right'
+                                  ? TextAlign.right
+                                  : TextAlign.left,
+                          style: TextStyle(
+                            color: titleColor,
+                            fontSize: compact
+                                ? 12
+                                : ((properties['title_font_size'] as num?)
+                                        ?.toDouble() ??
+                                    18),
+                            fontWeight:
+                                (properties['title_font_weight'] ?? 'bold') ==
+                                        'normal'
+                                    ? FontWeight.normal
+                                    : (properties['title_font_weight'] ??
+                                                'bold') ==
+                                            'medium'
+                                        ? FontWeight.w500
+                                        : FontWeight.bold,
+                            fontFamily:
+                                (properties['font_family'] ?? 'Roboto')
+                                    .toString(),
+                            fontStyle: properties['italic'] == true
+                                ? FontStyle.italic
+                                : FontStyle.normal,
+                            letterSpacing:
+                                (properties['letter_spacing'] as num?)
+                                        ?.toDouble() ??
+                                    0,
+                            wordSpacing:
+                                (properties['word_spacing'] as num?)
+                                        ?.toDouble() ??
+                                    0,
+                          ),
+                        ),
+                      ),
                     ),
-                  )),
-                ),
-              content,
-            ]),
+                  content,
+                ],
+              ),
+            ),
           ),
         );
         }),
