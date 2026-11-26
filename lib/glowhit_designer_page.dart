@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1968,6 +1967,54 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
     ],
   );
 
+  Widget _backgroundImageSettings() {
+    final imageUrl = (item.properties['background_image_url'] ?? '').toString();
+    return _section('Background Image / GIF', [
+      const Text(
+        'Set an image or animated GIF behind this component. Child cards remain in front.',
+        style: TextStyle(color: _designerMuted, fontSize: 12),
+      ),
+      const SizedBox(height: 8),
+      if (imageUrl.isNotEmpty)
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.network(imageUrl, height: 110, width: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const SizedBox(height: 80,
+              child: Center(child: Icon(Icons.broken_image_outlined)))),
+        ),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(child: OutlinedButton.icon(
+          icon: const Icon(Icons.wallpaper_outlined),
+          label: Text(imageUrl.isEmpty ? 'Choose Background' : 'Change Background'),
+          onPressed: _addingChild ? null : () async {
+            setState(() => _addingChild = true);
+            try {
+              final media = await widget.onChooseMedia();
+              if (!mounted || media == null) return;
+              _change('background_image_url', media['source_url'] ?? '');
+              _change('background_image_mime_type', media['mime_type'] ?? 'image/jpeg');
+            } finally {
+              if (mounted) setState(() => _addingChild = false);
+            }
+          },
+        )),
+        if (imageUrl.isNotEmpty) ...[
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'Remove background image',
+            onPressed: () {
+              _change('background_image_url', '');
+              _change('background_image_mime_type', '');
+            },
+            icon: const Icon(Icons.delete_outline, color: Colors.red),
+          ),
+        ],
+      ]),
+    ]);
+  }
+
   Widget _settingsPanel(List<String> layouts) => ListView(
     padding: const EdgeInsets.all(14),
     children: [
@@ -2000,6 +2047,10 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
             onChanged: (value) => _change('parent_category_id', int.tryParse(value) ?? 0),
           ),
         ],
+        if (item.layout.toLowerCase().contains('grid') ||
+            item.layout.toLowerCase().contains('slider') ||
+            item.layout.toLowerCase().contains('scroll'))
+          _backgroundImageSettings(),
         if (item.type == 'Product') ...[
           DropdownButtonFormField<String>(
             initialValue: (item.properties['source'] ?? 'featured').toString(),
