@@ -1404,7 +1404,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           showArrows: properties['arrows'] == true && properties['control'] != false,
           fade: properties['fade'] == true,
           viewFraction: ((properties['view_fraction'] as num?)?.toDouble() ?? .9).clamp(.4, 1).toDouble(),
-          elevation: ((properties['elevation'] as num?)?.toDouble() ?? 1).clamp(0, 20).toDouble(),
+          elevation: childElevation.clamp(0, 20).toDouble(),
           onTap: onEdit,
         )));
         });
@@ -1504,9 +1504,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           style: TextStyle(color: titleColor.withValues(alpha: .7), fontSize: 12))));
       } else if (isScroll) {
         content = SizedBox(height: cardHeight, child: ListView.separated(
-          scrollDirection: properties['horizontal'] == false ? Axis.vertical : Axis.horizontal,
+          scrollDirection: layoutSpec.horizontal ? Axis.horizontal : Axis.vertical,
           itemCount: count,
-          separatorBuilder: (_, __) => properties['horizontal'] == false ? SizedBox(height: mainGap) : SizedBox(width: gap),
+          separatorBuilder: (_, __) => layoutSpec.horizontal ? SizedBox(width: gap) : SizedBox(height: mainGap),
           itemBuilder: (_, index) => tile(index, width: layoutSpec.childWidthFor(cardWidth, fallbackMaxCrossAxisExtent: maxChildWidth)),
         ));
       } else if (isCategory && layout.contains('list_tile')) {
@@ -1545,7 +1545,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             child: SizedBox(
               width: layoutSpec.childWidthFor(cardWidth, fallbackMaxCrossAxisExtent: maxChildWidth),
               height: cardHeight,
-              child: tile(index, width: cardWidth * childWidthFactor),
+              child: tile(index, width: layoutSpec.childWidthFor(cardWidth, fallbackMaxCrossAxisExtent: maxChildWidth)),
             ),
           ),
         ));
