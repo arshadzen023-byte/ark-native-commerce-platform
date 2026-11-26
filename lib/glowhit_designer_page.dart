@@ -1923,6 +1923,7 @@ class _DesignerAppSettingsPage extends StatelessWidget {
         ),
       ),
       child: Scaffold(
+        key: const ValueKey('designer-app-settings-page'),
         backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: Colors.white,
