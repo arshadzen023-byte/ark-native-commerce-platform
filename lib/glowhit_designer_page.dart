@@ -1811,9 +1811,20 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   }
 
   Future<void> _openNavigationBar() async {
+    final rawPages = wordpressConfig['pages'];
+    final availablePages = rawPages is Map
+        ? rawPages.entries
+            .where((entry) => entry.key.toString().startsWith('custom_') && entry.value is Map)
+            .map((entry) => <String, String>{
+              'key': entry.key.toString(),
+              'title': (entry.value['title'] ?? entry.key).toString(),
+            })
+            .toList()
+        : <Map<String, String>>[];
     await Navigator.push<void>(context, MaterialPageRoute(
       builder: (_) => DesignerNavigationBarPage(
         initialConfig: navigationConfig,
+        availablePages: availablePages,
         onSave: (value) => _saveNavigationLocal(value),
       ),
     ));
