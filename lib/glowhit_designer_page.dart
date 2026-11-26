@@ -812,9 +812,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
 
   Future<Map<String, dynamic>?> _uploadGalleryMedia() async {
     try {
-      final picked = await ImagePicker().pickMedia(
-        imageQuality: 95,
-      );
+      final picked = await ImagePicker().pickMedia();
       if (picked == null) return null;
       final mime = (picked.mimeType ?? '').toLowerCase();
       if (mime.isNotEmpty && !mime.startsWith('image/')) {
