@@ -771,7 +771,7 @@ class _StoreHomeState extends State<StoreHome> {
         // Width and viewport fraction are separate Designer controls:
         // width sizes the carousel shell; view_fraction sizes each slide.
         final carouselFraction = ((config['card_width'] ?? config['view_fraction']) as num?)
-            ?.toDouble().clamp(.4, 1.0) ?? .9;
+            ?.toDouble().clamp(.4, 1.0).toDouble() ?? .9;
         final childElevation = ((config['elevation'] ?? config['card_depth']) as num?)?.toDouble() ?? 1;
         final intervalMs = ((settings['interval_ms'] ?? config['interval_ms'] ?? (((config['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
         final layout = (config['designer_component_type'] ?? config['type'] ?? '').toString();
@@ -878,6 +878,8 @@ class _StoreHomeState extends State<StoreHome> {
                                 : Image.network(
                                     url,
                                     fit: BoxFit.cover,
+                                    cacheWidth: imageCacheWidth,
+                                    gaplessPlayback: true,
                                     errorBuilder: (_, __, ___) =>
                                         const Icon(Icons.broken_image_outlined),
                                   ),
@@ -1090,7 +1092,7 @@ class _StoreHomeState extends State<StoreHome> {
       final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 260;
       final productAspect = (((config['card_aspect_ratio'] ?? config['cross_aspect_ratio']) as num?)?.toDouble() ?? .66).clamp(.4, 2.5);
       final productRowExtent = (cardHeight * (.66 / productAspect)).clamp(40, 700).toDouble();
-      final cardRadius = ((config['corner_radius'] ?? config['border_radius']) as num?)?.toDouble() ?? 12;
+      final cardRadius = (((config['corner_radius'] ?? config['border_radius']) as num?)?.toDouble() ?? 12).clamp(0, 32).toDouble();
       final cardElevation = (config['card_depth'] as num?)?.toDouble() ?? 1;
       final cards = rows.map((product) => SizedBox(
         width: cardWidth * childWidthFactor,
