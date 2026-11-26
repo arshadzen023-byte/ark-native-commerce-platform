@@ -615,7 +615,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         if (publish) {
           final serverValue = response['published_config'];
           if (serverValue is! Map || serverValue['pages'] is! Map) {
-            throw Exception('WordPress did not return the server-published JSON. Update ARK Native API Bridge to 2.2.3.');
+            throw Exception('WordPress did not return the server-published JSON. Update ARK Native API Bridge to 2.2.5 and ARK App Designer to 1.17.5.');
           }
           final serverConfig = Map<String, dynamic>.from(serverValue);
           final serverPages = Map<String, dynamic>.from(serverConfig['pages'] as Map);
@@ -672,7 +672,45 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               !submittedHomeIds.every(publishedHomeIds.contains)) {
             throw Exception('WordPress published Home did not retain every submitted component ID.');
           }
+          // Rehydrate the editor from the exact JSON WordPress published.
+          // The server normalizes component aliases, layout variants, dimensions
+          // and moves Banner children into its SQL slider store. Keeping the
+          // pre-publish local page objects here made Designer Preview differ
+          // from the Home renderer even when Publish succeeded.
+          final normalizedPages = <String, List<DesignerComponent>>{};
+          for (final page in _pages) {
+            final pageKey = _wordpressPageKey(page);
+            final pageConfig = serverPages[pageKey];
+            final sections = pageConfig is Map && pageConfig['sections'] is List
+                ? pageConfig['sections'] as List
+                : <dynamic>[];
+            normalizedPages[page] = <DesignerComponent>[];
+            for (final section in sections) {
+              if (section is Map) {
+                normalizedPages[page]!.add(
+                  await _fromWordPressSection(Map<String, dynamic>.from(section)),
+                );
+              }
+            }
+          }
+          for (final page in _pages) {
+            normalizedPages.putIfAbsent(page, () => <DesignerComponent>[]);
+          }
+          pages = normalizedPages;
+          if (pages[selectedPage]?.any((component) => component.id == selectedId) != true) {
+            selectedId = pages[selectedPage]?.isNotEmpty == true
+                ? pages[selectedPage]!.first.id
+                : null;
+          }
           acceptedConfig = serverConfig;
+          // Persist the normalized editor snapshot as the next offline fallback.
+          final normalizedLocalData = <String, dynamic>{
+            'schema': 'ark-glowhit-designer/v1',
+            'updated_at': serverConfig['updated_at'] ?? now,
+            'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
+            'templates': templates,
+          };
+          await prefs.setString(_storageKey, jsonEncode(normalizedLocalData));
           await prefs.setString('glowhit_published_designer_config', jsonEncode(acceptedConfig));
         }
         wordpressConfig = acceptedConfig;
