@@ -856,7 +856,7 @@ class _StoreHomeState extends State<StoreHome> {
       final categoryCardWidth = (((config['max_width_px'] as num?)?.toDouble() ?? 180) * childWidthFactor)
           .clamp(40, MediaQuery.of(context).size.width).toDouble();
       final categoryAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .9).clamp(.4, 2.5);
-      final categoryRowExtent = (cardHeight * (.9 / categoryAspect)).clamp(80, 500).toDouble();
+      final categoryRowExtent = (cardHeight * (.9 / categoryAspect)).clamp(40, 600).toDouble();
       final cards = rows.map((category) {
         final image = category['image'] is Map ? (category['image'] as Map)['src']?.toString() ?? '' : '';
         final card = Card(
@@ -909,7 +909,7 @@ class _StoreHomeState extends State<StoreHome> {
             SizedBox(
               height: cardHeight,
               child: ListView.separated(
-                scrollDirection: Axis.horizontal,
+                scrollDirection: config['horizontal'] == false ? Axis.vertical : Axis.horizontal,
                 itemCount: cards.length,
                 separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
                 itemBuilder: (_, index) => SizedBox(
@@ -954,7 +954,7 @@ class _StoreHomeState extends State<StoreHome> {
           .clamp(40, MediaQuery.of(context).size.width).toDouble();
       final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 260;
       final productAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .66).clamp(.4, 2.5);
-      final productRowExtent = (cardHeight * (.66 / productAspect)).clamp(120, 600).toDouble();
+      final productRowExtent = (cardHeight * (.66 / productAspect)).clamp(40, 700).toDouble();
       final cardRadius = (config['corner_radius'] as num?)?.toDouble() ?? 12;
       final cardElevation = (config['card_depth'] as num?)?.toDouble() ?? 1;
       final cards = rows.map((product) => SizedBox(
@@ -981,7 +981,7 @@ class _StoreHomeState extends State<StoreHome> {
             SizedBox(
               height: cardHeight,
               child: ListView.separated(
-                scrollDirection: Axis.horizontal,
+                scrollDirection: config['horizontal'] == false ? Axis.vertical : Axis.horizontal,
                 itemCount: cards.length,
                 separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
                 itemBuilder: (_, index) => cards[index],
