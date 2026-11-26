@@ -48,6 +48,25 @@ void main() {
     expect(restored.items.single.iconColor, '#FF77717F');
   });
 
+  test('Navigation publish verification reports changed root and item fields', () {
+    final requested = DesignerNavigationConfig();
+    final published = DesignerNavigationConfig(
+      items: [
+        DesignerNavigationItem(
+          id: 'nav-home',
+          label: 'Home',
+          link: 'home',
+          iconName: 'menu',
+        ),
+      ],
+      backgroundColor: '#F0F0F0',
+    );
+    final differences = requested.differencesFrom(published);
+    expect(differences, contains(contains('background_color')));
+    expect(differences, contains(contains('items[0].icon')));
+    expect(differences, contains(contains('Designer: 5, WordPress: 1')));
+  });
+
   test('Navigation icon packs each provide selectable icons', () {
     for (final family in DesignerNavIcons.families) {
       expect(DesignerNavIcons.all.where((icon) => icon.family == family), isNotEmpty);
