@@ -762,7 +762,7 @@ class _StoreHomeState extends State<StoreHome> {
         final height = ((settings['height_px'] ?? config['height_px'] ?? config['height'] ?? 180) as num).toDouble();
         final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
           (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
-        final maxChildWidth = (config['max_width_px'] as num?)?.toDouble() ?? MediaQuery.of(context).size.width;
+        final maxChildWidth = ((config['max_cross_axis_extent'] ?? config['max_width_px']) as num?)?.toDouble() ?? MediaQuery.of(context).size.width;
         final carouselFraction = childWidthFactor.clamp(.4, 1.0).toDouble().clamp(
           .4, (maxChildWidth / MediaQuery.of(context).size.width).clamp(.4, 1.0));
         final childElevation = ((config['elevation'] ?? config['card_depth']) as num?)?.toDouble() ?? 1;
@@ -773,7 +773,7 @@ class _StoreHomeState extends State<StoreHome> {
         final bannerGridSlides = slides.take(bannerGridLimit).toList();
         final bannerStyle = layout == 'banner_list' || layout == 'banner_scroll';
         final bannerGridColumns = ((config['columns'] as num?)?.toInt() ?? 2).clamp(1, 6);
-        final bannerGridAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3.0);
+        final bannerGridAspect = ((config['card_aspect_ratio'] ?? config['cross_aspect_ratio']) as num?)?.toDouble() ?? 1.2;
         final bannerGridRowExtent = (height * (1.2 / bannerGridAspect)).clamp(60, 500).toDouble();
         final bannerGridRows = (bannerGridSlides.length / bannerGridColumns).ceil().clamp(1, 40);
         final bannerGridHeight = bannerGridRowExtent * bannerGridRows + mainAxisGap * (bannerGridRows - 1);
@@ -840,8 +840,7 @@ class _StoreHomeState extends State<StoreHome> {
                     // Keep the published Banner Scroll child geometry identical
                     // to Designer preview: size from the inner content viewport,
                     // not the full device width (which ignores section margin/padding).
-                    final availableChildWidth = (constraints.maxWidth - 48)
-                        .clamp(40.0, constraints.maxWidth);
+                    final availableChildWidth = constraints.maxWidth.clamp(40.0, double.infinity);
                     final childWidth = (availableChildWidth * childWidthFactor)
                         .clamp(40.0, maxChildWidth).toDouble();
                     final verticalList = layout == 'banner_list' ||
@@ -958,12 +957,12 @@ class _StoreHomeState extends State<StoreHome> {
       final limit = (config['limit'] as num?)?.toInt() ?? 8;
       rows = rows.take(limit.clamp(1, 100)).toList();
       if (rows.isEmpty) return const SizedBox.shrink();
-      final cardRadius = (config['corner_radius'] as num?)?.toDouble() ?? 12;
+      final cardRadius = ((config['corner_radius'] ?? config['border_radius']) as num?)?.toDouble() ?? 12;
       final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 150;
       final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
         (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
-      final categoryCardWidth = (((config['max_width_px'] as num?)?.toDouble() ?? 180) * childWidthFactor)
-          .clamp(40, MediaQuery.of(context).size.width).toDouble();
+      final categoryCardWidth = (((config['max_cross_axis_extent'] ?? config['max_width_px']) as num?)?.toDouble() ?? 180)
+          .clamp(40, MediaQuery.of(context).size.width).toDouble() * childWidthFactor;
       final categoryAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .9).clamp(.4, 2.5);
       final categoryRowExtent = (cardHeight * (.9 / categoryAspect)).clamp(40, 600).toDouble();
       final cards = rows.map((category) {
@@ -1064,12 +1063,12 @@ class _StoreHomeState extends State<StoreHome> {
       final layout = (config['layout_variant'] ?? config['designer_component_type'] ?? type).toString().toLowerCase();
       final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
         (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
-      final cardWidth = (((config['max_width_px'] as num?)?.toDouble() ?? 174) * childWidthFactor)
-          .clamp(40, MediaQuery.of(context).size.width).toDouble();
+      final cardWidth = (((config['max_cross_axis_extent'] ?? config['max_width_px']) as num?)?.toDouble() ?? 174)
+          .clamp(40, MediaQuery.of(context).size.width).toDouble() * childWidthFactor;
       final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 260;
-      final productAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .66).clamp(.4, 2.5);
+      final productAspect = ((config['card_aspect_ratio'] ?? config['cross_aspect_ratio']) as num?)?.toDouble() ?? .66;
       final productRowExtent = (cardHeight * (.66 / productAspect)).clamp(40, 700).toDouble();
-      final cardRadius = (config['corner_radius'] as num?)?.toDouble() ?? 12;
+      final cardRadius = ((config['corner_radius'] ?? config['border_radius']) as num?)?.toDouble() ?? 12;
       final cardElevation = (config['card_depth'] as num?)?.toDouble() ?? 1;
       final cards = rows.map((product) => SizedBox(
         width: cardWidth,
