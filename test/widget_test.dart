@@ -249,6 +249,33 @@ void main() {
     expect((section['children'] as List).first['link_value'], 'page:categories');
   });
 
+  test('Published layout rounds WordPress integer dimensions before sync', () {
+    final component = DesignerComponent(
+      id: 'integer-layout-test',
+      type: 'Banner',
+      title: 'Integer layout',
+      layout: 'Banner Scroll',
+      properties: {
+        'height': 40.4,
+        'max_cross_axis_extent': 80.8,
+        'main_axis_spacing': 3.6,
+        'cross_axis_spacing': 5.4,
+        'margin_top': 7.8,
+        'padding_bottom': 11.2,
+        'elevation': 13.306451612903228,
+      },
+    );
+    final section = component.toPublishedSection();
+    expect(section['height_px'], 40);
+    expect(section['max_width_px'], 81);
+    expect(section['main_axis_spacing'], 4);
+    expect(section['cross_axis_spacing'], 5);
+    expect(section['margin_top'], 8);
+    expect(section['padding_bottom'], 11);
+    expect(section['card_depth'], 13);
+    expect(section['elevation'], 13);
+  });
+
   test('Banner publish canonicalizes WordPress Media Library child image aliases', () {
     final component = DesignerComponent(
       id: 'banner-media-alias',
