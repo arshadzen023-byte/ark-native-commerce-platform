@@ -901,7 +901,10 @@ class _StoreHomeState extends State<StoreHome> {
               title: Text((category['name'] ?? '').toString()),
             )).toList())
           else if (layout.contains('list'))
-            Column(children: cards.map((card) => SizedBox(width: double.infinity, height: cardHeight, child: card)).toList())
+            Column(children: cards.map((card) => Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(width: categoryCardWidth, height: cardHeight, child: card),
+            )).toList())
           else if (layout.contains('slider') || layout.contains('scroll'))
             SizedBox(
               height: cardHeight,
@@ -923,7 +926,15 @@ class _StoreHomeState extends State<StoreHome> {
                 mainAxisSpacing: mainAxisGap,
                 mainAxisExtent: categoryRowExtent,
               ),
-              itemBuilder: (_, index) => cards[index],
+              itemBuilder: (_, index) => LayoutBuilder(
+                builder: (context, constraints) {
+                  final childWidth = constraints.maxWidth.clamp(40, categoryCardWidth).toDouble();
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(width: childWidth, height: categoryRowExtent, child: cards[index]),
+                  );
+                },
+              ),
             ),
         ]),
       );
@@ -992,7 +1003,19 @@ class _StoreHomeState extends State<StoreHome> {
                 crossAxisSpacing: crossAxisGap,
                 mainAxisSpacing: mainAxisGap,
               ),
-              itemBuilder: (_, index) => productCard(rows[index]),
+              itemBuilder: (_, index) => LayoutBuilder(
+                builder: (context, constraints) {
+                  final childWidth = constraints.maxWidth.clamp(40, cardWidth).toDouble();
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: childWidth,
+                      height: productRowExtent,
+                      child: productCard(rows[index], radius: cardRadius, elevation: cardElevation),
+                    ),
+                  );
+                },
+              ),
             ),
         ]),
       );
