@@ -570,6 +570,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   }
 
   Future<void> _persist({bool publish = false}) async {
+    if (saving || publishing) return;
     setState(() { saving = !publish; publishing = publish; error = null; });
     try {
       final now = DateTime.now().toUtc().toIso8601String();
