@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glowhit_shopping/glowhit_designer_page.dart';
 import 'package:glowhit_shopping/designer_banner_carousel.dart';
+import 'package:glowhit_shopping/designer_layout_contract.dart';
 import 'package:glowhit_shopping/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -223,6 +224,91 @@ void main() {
     expect(visible.first['children'].first['attachment_id'], 77);
     expect(visible.last['source'], 'best_selling');
     expect(visible.last['height_px'], 260);
+  });
+
+  test('Designer and Shopping share one canonical Banner List layout spec', () {
+    final json = <String, dynamic>{
+      'type': 'banner_list',
+      'designer_component_type': 'banner_list',
+      'layout_variant': 'list',
+      'height': 40,
+      'height_px': 40,
+      'width': 1.0,
+      'width_pct': 100.0,
+      'max_cross_axis_extent': 300,
+      'max_width_px': 300,
+      'main_axis_spacing': 10,
+      'cross_axis_spacing': 10,
+      'item_gap': 10,
+      'border_radius': 16,
+      'corner_radius': 16,
+      'horizontal': true,
+      'cross_axis_count': 2,
+      'columns': 2,
+      'cross_aspect_ratio': 1,
+      'card_aspect_ratio': 1,
+      'elevation': 1,
+      'card_depth': 1,
+      'fixed_grid_view_count': 2,
+      'limit': 2,
+      'margin_left': 0,
+      'margin_right': 0,
+      'padding_left': 12,
+      'padding_right': 12,
+      'children': [
+        {'type': 'image', 'attachment_id': 83, 'image_url': 'https://example.com/benefits.png'},
+      ],
+    };
+
+    final previewSpec = DesignerLayoutSpec.fromMap(json);
+    final publishedSpec = DesignerLayoutSpec.fromMap({
+      ...json,
+      ...previewSpec.canonicalAliases(),
+    });
+
+    expect(previewSpec.height, 40);
+    expect(previewSpec.childWidthFor(360), 300);
+    expect(previewSpec.mainAxisSpacing, 10);
+    expect(previewSpec.crossAxisSpacing, 10);
+    expect(previewSpec.borderRadius, 16);
+    expect(previewSpec.elevation, 1);
+    expect(previewSpec.fixedGridViewCount, 2);
+    expect(publishedSpec.childWidthFor(360), previewSpec.childWidthFor(360));
+    expect(publishedSpec.height, previewSpec.height);
+    expect(publishedSpec.margin, previewSpec.margin);
+    expect(publishedSpec.padding, previewSpec.padding);
+  });
+
+  test('Canonical layout aliases never disagree after Designer serialization', () {
+    final section = DesignerComponent(
+      id: 'banner-list-contract',
+      type: 'Banner',
+      title: 'Benefits strip',
+      layout: 'Banner List',
+      properties: {
+        'height': 40,
+        'width': 1.0,
+        'max_cross_axis_extent': 300,
+        'main_axis_spacing': 10,
+        'cross_axis_spacing': 10,
+        'border_radius': 16,
+        'cross_axis_count': 2,
+        'cross_aspect_ratio': 1.0,
+        'elevation': 1,
+        'fixed_grid_view_count': 2,
+      },
+    ).toPublishedSection();
+
+    expect(section['height'], section['height_px']);
+    expect(section['width_pct'], 100);
+    expect(section['max_cross_axis_extent'], section['max_width_px']);
+    expect(section['main_axis_spacing'], 10);
+    expect(section['cross_axis_spacing'], section['item_gap']);
+    expect(section['border_radius'], section['corner_radius']);
+    expect(section['cross_axis_count'], section['columns']);
+    expect(section['cross_aspect_ratio'], section['card_aspect_ratio']);
+    expect(section['elevation'], section['card_depth']);
+    expect(section['fixed_grid_view_count'], section['limit']);
   });
 
   test('Published component JSON keeps the selected layout and every edited dimension', () {
