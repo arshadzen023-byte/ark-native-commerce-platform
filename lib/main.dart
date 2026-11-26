@@ -905,10 +905,12 @@ class _StoreHomeState extends State<StoreHome> {
                     return SizedBox(
                       height: height,
                       child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
+                        scrollDirection: config['horizontal'] == false ? Axis.vertical : Axis.horizontal,
                         padding: EdgeInsets.zero,
                         itemCount: slides.length,
-                        separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
+                        separatorBuilder: (_, __) => config['horizontal'] == false
+                            ? SizedBox(height: mainAxisGap)
+                            : SizedBox(width: crossAxisGap),
                         itemBuilder: (_, index) => buildBannerChild(slides[index]),
                       ),
                     );
