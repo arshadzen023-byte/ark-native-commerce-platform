@@ -964,7 +964,7 @@ class _StoreHomeState extends State<StoreHome> {
       final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
         (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
       final categoryCardWidth = (((config['max_cross_axis_extent'] ?? config['max_width_px']) as num?)?.toDouble() ?? 180)
-          .clamp(40, MediaQuery.of(context).size.width).toDouble() * childWidthFactor;
+          .clamp(40, MediaQuery.of(context).size.width).toDouble();
       final categoryAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .9).clamp(.4, 2.5);
       final categoryRowExtent = (cardHeight * (.9 / categoryAspect)).clamp(40, 600).toDouble();
       final cards = rows.map((category) {
@@ -1018,7 +1018,7 @@ class _StoreHomeState extends State<StoreHome> {
           else if (layout.contains('list'))
             Column(children: cards.map((card) => Align(
               alignment: Alignment.centerLeft,
-              child: SizedBox(width: categoryCardWidth, height: cardHeight, child: card),
+              child: SizedBox(width: categoryCardWidth * childWidthFactor, height: cardHeight, child: card),
             )).toList())
           else if (layout.contains('slider') || layout.contains('scroll'))
             SizedBox(
@@ -1028,7 +1028,7 @@ class _StoreHomeState extends State<StoreHome> {
                 itemCount: cards.length,
                 separatorBuilder: (_, __) => SizedBox(width: crossAxisGap),
                 itemBuilder: (_, index) => SizedBox(
-                  width: categoryCardWidth,
+                  width: categoryCardWidth * childWidthFactor,
                   height: cardHeight,
                   child: cards[index],
                 ),
@@ -1047,7 +1047,7 @@ class _StoreHomeState extends State<StoreHome> {
               ),
               itemBuilder: (_, index) => LayoutBuilder(
                 builder: (context, constraints) {
-                  final childWidth = constraints.maxWidth.clamp(40, categoryCardWidth).toDouble();
+                  final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, categoryCardWidth).toDouble();
                   return Align(
                     alignment: Alignment.centerLeft,
                     child: SizedBox(width: childWidth, height: categoryRowExtent, child: cards[index]),
@@ -1066,14 +1066,14 @@ class _StoreHomeState extends State<StoreHome> {
       final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
         (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
       final cardWidth = (((config['max_cross_axis_extent'] ?? config['max_width_px']) as num?)?.toDouble() ?? 174)
-          .clamp(40, MediaQuery.of(context).size.width).toDouble() * childWidthFactor;
+          .clamp(40, MediaQuery.of(context).size.width).toDouble();
       final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 260;
       final productAspect = ((config['card_aspect_ratio'] ?? config['cross_aspect_ratio']) as num?)?.toDouble() ?? .66;
       final productRowExtent = (cardHeight * (.66 / productAspect)).clamp(40, 700).toDouble();
       final cardRadius = ((config['corner_radius'] ?? config['border_radius']) as num?)?.toDouble() ?? 12;
       final cardElevation = (config['card_depth'] as num?)?.toDouble() ?? 1;
       final cards = rows.map((product) => SizedBox(
-        width: cardWidth,
+        width: cardWidth * childWidthFactor,
         height: cardHeight,
         child: productCard(product, radius: cardRadius, elevation: cardElevation),
       )).toList();
@@ -1111,7 +1111,7 @@ class _StoreHomeState extends State<StoreHome> {
             Column(children: rows.map((product) => Align(
               alignment: Alignment.centerLeft,
               child: SizedBox(
-                width: cardWidth,
+                width: cardWidth * childWidthFactor,
                 height: cardHeight,
                 child: productCard(product, radius: cardRadius, elevation: cardElevation),
               ),
@@ -1129,7 +1129,7 @@ class _StoreHomeState extends State<StoreHome> {
               ),
               itemBuilder: (_, index) => LayoutBuilder(
                 builder: (context, constraints) {
-                  final childWidth = constraints.maxWidth.clamp(40, cardWidth).toDouble();
+                  final childWidth = (constraints.maxWidth * childWidthFactor).clamp(40, cardWidth).toDouble();
                   return Align(
                     alignment: Alignment.centerLeft,
                     child: SizedBox(
