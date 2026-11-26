@@ -706,6 +706,9 @@ class _StoreHomeState extends State<StoreHome> {
 
       Widget renderCarousel(List<Map<String, dynamic>> slides, Map<String, dynamic> settings) {
         final height = ((settings['height_px'] ?? config['height_px'] ?? config['height'] ?? 180) as num).toDouble();
+        final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
+          (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
+        final maxChildWidth = (config['max_width_px'] as num?)?.toDouble() ?? MediaQuery.of(context).size.width;
         final intervalMs = ((settings['interval_ms'] ?? config['interval_ms'] ?? (((config['autoplay_seconds'] as num?)?.toDouble() ?? 4) * 1000)) as num).toInt();
         final layout = (config['designer_component_type'] ?? config['type'] ?? '').toString();
         final bannerGrid = layout == 'banner_grid';
@@ -718,7 +721,8 @@ class _StoreHomeState extends State<StoreHome> {
         return Align(
           alignment: Alignment.center,
           child: Container(
-            width: ((MediaQuery.of(context).size.width - sectionMargin.horizontal) * widthFactor)
+            // Width belongs to each child image/card, not the section shell.
+            width: (MediaQuery.of(context).size.width - sectionMargin.horizontal)
                 .clamp(0, MediaQuery.of(context).size.width).toDouble(),
             margin: sectionMargin,
             color: background == 'transparent' ? null : _safeColor(background),
@@ -795,7 +799,7 @@ class _StoreHomeState extends State<StoreHome> {
                     showDots: config['control'] != false && config['show_dots'] == true,
                     showArrows: config['control'] != false && config['show_arrows'] == true,
                     fade: config['transition'] == 'fade',
-                    viewFraction: ((config['card_width'] ?? config['view_fraction'] ?? 1) as num).toDouble(),
+                    viewFraction: childWidthFactor.clamp(.4, 1).toDouble(),
                     onSlideTap: _openDesignerChildLink,
                   ),
               ]),
@@ -844,8 +848,10 @@ class _StoreHomeState extends State<StoreHome> {
       if (rows.isEmpty) return const SizedBox.shrink();
       final cardRadius = (config['corner_radius'] as num?)?.toDouble() ?? 12;
       final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 150;
-      final categoryCardWidth = ((config['max_width_px'] as num?)?.toDouble() ?? 180)
-          .clamp(88, MediaQuery.of(context).size.width).toDouble();
+      final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
+        (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
+      final categoryCardWidth = (((config['max_width_px'] as num?)?.toDouble() ?? 180) * childWidthFactor)
+          .clamp(40, MediaQuery.of(context).size.width).toDouble();
       final categoryAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .9).clamp(.4, 2.5);
       final categoryRowExtent = (cardHeight * (.9 / categoryAspect)).clamp(80, 500).toDouble();
       final cards = rows.map((category) {
@@ -869,7 +875,7 @@ class _StoreHomeState extends State<StoreHome> {
         return SizedBox(width: categoryCardWidth, height: cardHeight, child: card);
       }).toList();
       return Container(
-        width: ((MediaQuery.of(context).size.width - margin.horizontal) * widthFactor).toDouble(),
+        width: (MediaQuery.of(context).size.width - margin.horizontal).clamp(0, MediaQuery.of(context).size.width).toDouble(),
         margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
         padding: EdgeInsets.fromLTRB(
@@ -924,16 +930,22 @@ class _StoreHomeState extends State<StoreHome> {
       final rows = _designerProducts(config);
       if (rows.isEmpty) return const SizedBox.shrink();
       final layout = (config['layout_variant'] ?? config['designer_component_type'] ?? type).toString().toLowerCase();
-      final cardWidth = (config['max_width_px'] as num?)?.toDouble() ?? 174;
+      final childWidthFactor = ((config['width'] as num?)?.toDouble() ??
+        (((config['width_pct'] as num?)?.toDouble() ?? 100) / 100)).clamp(.2, 1.0).toDouble();
+      final cardWidth = (((config['max_width_px'] as num?)?.toDouble() ?? 174) * childWidthFactor)
+          .clamp(40, MediaQuery.of(context).size.width).toDouble();
       final cardHeight = (config['height_px'] as num?)?.toDouble() ?? 260;
       final productAspect = ((config['card_aspect_ratio'] as num?)?.toDouble() ?? .66).clamp(.4, 2.5);
       final productRowExtent = (cardHeight * (.66 / productAspect)).clamp(120, 600).toDouble();
+      final cardRadius = (config['corner_radius'] as num?)?.toDouble() ?? 12;
+      final cardElevation = (config['card_depth'] as num?)?.toDouble() ?? 1;
       final cards = rows.map((product) => SizedBox(
         width: cardWidth,
-        child: productCard(product),
+        height: cardHeight,
+        child: productCard(product, radius: cardRadius, elevation: cardElevation),
       )).toList();
       return Container(
-        width: ((MediaQuery.of(context).size.width - margin.horizontal) * widthFactor).clamp(0, MediaQuery.of(context).size.width).toDouble(),
+        width: (MediaQuery.of(context).size.width - margin.horizontal).clamp(0, MediaQuery.of(context).size.width).toDouble(),
         margin: margin,
         color: background == 'transparent' ? null : _safeColor(background),
         padding: EdgeInsets.fromLTRB(
