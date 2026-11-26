@@ -1394,7 +1394,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               image: (properties['background_image_url'] ?? '').toString().isNotEmpty
                   ? DecorationImage(
                       image: NetworkImage(properties['background_image_url'].toString()),
-                      fit: BoxFit.cover,
+                      fit: _designerBackgroundFit(properties['background_image_fit']),
+                      alignment: _designerBackgroundAlignment(properties['background_image_alignment']),
                     )
                   : null,
               // Section shell remains neutral; radius and elevation belong to child cards.
