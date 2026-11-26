@@ -965,7 +965,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     final gap = ((properties['cross_axis_spacing'] ?? properties['item_gap']) as num?)?.toDouble() ?? 8;
     final mainGap = ((properties['main_axis_spacing'] ?? properties['item_gap']) as num?)?.toDouble() ?? gap;
     final radius = ((properties['border_radius'] ?? properties['corner_radius']) as num?)?.toDouble() ?? 14;
-    final widthFactor = ((properties['width'] as num?)?.toDouble() ?? 1).clamp(.25, 1.0).toDouble();
+    // Dimension values describe child items, never the outer section/card.
+    final childWidthFactor = ((properties['width'] as num?)?.toDouble() ?? 1).clamp(.25, 1.0).toDouble();
     final margin = EdgeInsets.fromLTRB(
       ((properties['margin_left'] as num?)?.toDouble() ?? 0),
       ((properties['margin_top'] as num?)?.toDouble() ?? 0),
@@ -1023,6 +1024,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               errorBuilder: (_, __, ___) => Container(color: titleColor.withValues(alpha: .08), child: const Icon(Icons.broken_image_outlined)));
       return SizedBox(
         width: tileWidth,
+        height: height.clamp(40, 500).toDouble(),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(radius.clamp(0, 32).toDouble()),
           child: Stack(fit: StackFit.expand, children: [
@@ -1053,6 +1055,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         '${prices['currency_symbol'] ?? '₹'}${(raw / divisor).toStringAsFixed(minor)}';
       return SizedBox(
         width: tileWidth,
+        height: height.clamp(40, 500).toDouble(),
         child: Card(
           margin: EdgeInsets.zero,
           color: _designerSurface,
@@ -1080,6 +1083,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       final url = (image['src'] ?? '').toString();
       return SizedBox(
         width: tileWidth,
+        height: height.clamp(40, 500).toDouble(),
         child: Card(
           margin: EdgeInsets.zero,
           color: _designerSurface,
@@ -1101,7 +1105,12 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     if (isBanner) {
       final slides = imageChildren.isEmpty ? <Map<String, dynamic>>[{'image_url': '', 'title': ''}] : imageChildren;
       if (isSlider) {
-        content = SizedBox(height: height.clamp(90, 500).toDouble(), child: ArkDesignerBannerCarousel(
+        content = LayoutBuilder(builder: (context, constraints) {
+          final childWidth = constraints.maxWidth * childWidthFactor;
+          return Align(alignment: Alignment.centerLeft, child: SizedBox(
+            width: childWidth,
+            height: height.clamp(40, 500).toDouble(),
+            child: ArkDesignerBannerCarousel(
           slides: slides,
           height: height.clamp(90, 500).toDouble(),
           radius: radius,
@@ -1113,20 +1122,21 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           fade: properties['fade'] == true,
           viewFraction: ((properties['view_fraction'] as num?)?.toDouble() ?? .9).clamp(.4, 1).toDouble(),
           onTap: onEdit,
-        ));
+        )));
+        });
       } else if (isScroll) {
-        content = SizedBox(height: height.clamp(90, 500).toDouble(), child: ListView.separated(
+        content = LayoutBuilder(builder: (context, constraints) => SizedBox(height: height.clamp(40, 500).toDouble(), child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: slides.length,
           separatorBuilder: (_, __) => SizedBox(width: gap),
-          itemBuilder: (_, index) => imageTile(slides[index], tileWidth: (MediaQuery.of(context).size.width - 48) * .78),
-        ));
+          itemBuilder: (_, index) => imageTile(slides[index], tileWidth: (constraints.maxWidth - 48) * childWidthFactor),
+        )));
       } else if (isList) {
-        content = SizedBox(height: (height.clamp(90, 500) * slides.length).clamp(90, 720).toDouble(), child: ListView.separated(
+        content = SizedBox(height: (height.clamp(40, 500) * slides.length).clamp(40, 7200).toDouble(), child: ListView.separated(
           physics: const NeverScrollableScrollPhysics(),
           itemCount: slides.length,
           separatorBuilder: (_, __) => SizedBox(height: mainGap),
-          itemBuilder: (_, index) => SizedBox(height: height.clamp(90, 500).toDouble(), child: imageTile(slides[index])),
+          itemBuilder: (_, index) => Align(alignment: Alignment.centerLeft, child: SizedBox(width: (MediaQuery.of(context).size.width - 48) * childWidthFactor, height: height.clamp(40, 500).toDouble(), child: imageTile(slides[index]))),
         ));
       } else {
         final shown = slides.take(8).toList();
@@ -1138,15 +1148,15 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             crossAxisCount: columns.clamp(1, 4).toInt(),
             crossAxisSpacing: gap.toDouble(),
             mainAxisSpacing: mainGap.toDouble(),
-            childAspectRatio: ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? 1.2).clamp(.4, 3).toDouble(),
+            mainAxisExtent: height.clamp(40, 500).toDouble(),
           ),
           itemBuilder: (_, index) => imageTile(shown[index]),
         );
       }
     } else if (isProduct || isCategory) {
       final count = isProduct ? visibleProductItems.length : categoryItems.length;
-      final cardHeight = height.clamp(120, 440).toDouble();
-      final cardWidth = ((properties['max_cross_axis_extent'] as num?)?.toDouble() ?? 180).clamp(110, 360).toDouble();
+      final cardHeight = height.clamp(40, 500).toDouble();
+      final cardWidth = ((properties['max_cross_axis_extent'] as num?)?.toDouble() ?? 180).clamp(40, 600).toDouble() * childWidthFactor;
       Widget tile(int index, {double? width}) => isProduct
           ? productTile(visibleProductItems[index], tileWidth: width)
           : categoryTile(categoryItems[index], tileWidth: width);
@@ -1175,10 +1185,10 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             physics: const NeverScrollableScrollPhysics(),
             itemCount: visibleCount,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columns.clamp(1, 4).toInt(),
+              crossAxisCount: columns.clamp(1, 6).toInt(),
               crossAxisSpacing: gap.toDouble(),
               mainAxisSpacing: mainGap.toDouble(),
-              childAspectRatio: ((properties['cross_aspect_ratio'] as num?)?.toDouble() ?? (isProduct ? .66 : .9)).clamp(.4, 2.5).toDouble(),
+              mainAxisExtent: cardHeight,
             ),
             itemBuilder: (_, index) => tile(index),
           ));
@@ -1211,8 +1221,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         return Align(
           alignment: Alignment.center,
           child: Container(
-            width: ((availableWidth - margin.horizontal) * widthFactor)
-                .clamp(0, availableWidth).toDouble(),
+            width: (availableWidth - margin.horizontal).clamp(0, availableWidth).toDouble(),
             margin: margin,
             padding: padding,
             decoration: BoxDecoration(
