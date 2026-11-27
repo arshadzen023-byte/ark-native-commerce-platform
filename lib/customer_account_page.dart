@@ -48,10 +48,11 @@ class ArkCustomerApi {
 }
 
 class CustomerSectionPage extends StatefulWidget {
-  const CustomerSectionPage({super.key, required this.token, required this.section, this.floatingActionButton});
+  const CustomerSectionPage({super.key, required this.token, required this.section, this.floatingActionButton, this.appBar});
   final String token;
   final String section;
   final Widget? floatingActionButton;
+  final PreferredSizeWidget? appBar;
   @override State<CustomerSectionPage> createState() => _CustomerSectionPageState();
 }
 
@@ -114,7 +115,7 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(widget.section), actions: [IconButton(onPressed: loading ? null : load, icon: const Icon(Icons.refresh))]),
+    appBar: widget.appBar ?? AppBar(title: Text(widget.section), actions: [IconButton(onPressed: loading ? null : load, icon: const Icon(Icons.refresh))]),
     body: loading ? const Center(child: CircularProgressIndicator()) : error != null
       ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [Text(error!, textAlign: TextAlign.center), const SizedBox(height: 12), FilledButton(onPressed: load, child: const Text('RETRY'))])))
       : _body(),

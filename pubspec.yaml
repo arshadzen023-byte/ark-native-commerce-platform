@@ -1,7 +1,7 @@
 name: glowhit_shopping
 description: GlowHit native WooCommerce shopping app
 publish_to: none
-version: 1.0.22+102
+version: 1.0.23+103
 environment:
   sdk: ">=3.3.0 <4.0.0"
 dependencies:
@@ -16,6 +16,7 @@ dependencies:
   google_fonts: ^6.2.1
   qr_flutter: ^4.1.0
   share_plus: ^10.1.4
+  speech_to_text: ^7.0.0
   firebase_core: ^3.8.1
   firebase_messaging: ^15.1.5
   flutter_local_notifications: ^18.0.1

@@ -12,6 +12,7 @@ import 'designer_banner_carousel.dart';
 import 'designer_layout_contract.dart';
 import 'designer_navigation_bar.dart';
 import 'designer_floating_action.dart';
+import 'designer_app_bar.dart';
 
 // Match the dark, purple-accented native Designer reference supplied by the user.
 const _designerPurple = Color(0xFF7650B8);
@@ -354,6 +355,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   Map<String, dynamic> templates = {};
   Map<String, dynamic> wordpressConfig = <String, dynamic>{};
   DesignerNavigationConfig navigationConfig = DesignerNavigationConfig();
+  DesignerAppBarConfig appBarConfig = DesignerAppBarConfig();
   Map<String, dynamic> floatingActions = <String, dynamic>{};
   final Map<int, Offset> _componentPointerDown = <int, Offset>{};
   late final TextEditingController _titleController = TextEditingController();
@@ -530,6 +532,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             wordpressConfig = Map<String, dynamic>.from(remote)
               ..remove('published_pages');
           navigationConfig = DesignerNavigationConfig.fromJson(remote['navigation_bar']);
+          appBarConfig = DesignerAppBarConfig(json: remote['app_bar'] is Map ? Map<String, dynamic>.from(remote['app_bar'] as Map) : const {});
           floatingActions = remote['floating_actions'] is Map
               ? Map<String, dynamic>.from(remote['floating_actions'] as Map)
               : <String, dynamic>{};
@@ -564,6 +567,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               templates = Map<String, dynamic>.from(decoded['templates'] as Map);
             }
             navigationConfig = DesignerNavigationConfig.fromJson(decoded['navigation_bar']);
+            appBarConfig = DesignerAppBarConfig(json: decoded['app_bar'] is Map ? Map<String, dynamic>.from(decoded['app_bar'] as Map) : const {});
             floatingActions = decoded['floating_actions'] is Map
                 ? Map<String, dynamic>.from(decoded['floating_actions'] as Map)
                 : <String, dynamic>{};
@@ -623,6 +627,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
         'templates': templates,
         'navigation_bar': navigationConfig.toJson(),
+        'app_bar': appBarConfig.toJson(),
         'floating_actions': floatingActions,
       };
       final localJson = const JsonEncoder.withIndent('  ').convert(localData);
@@ -647,6 +652,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       publishedConfig['native_editor_snapshot'] = true;
       publishedConfig['pages'] = configPages;
       publishedConfig['navigation_bar'] = navigationConfig.toJson();
+      publishedConfig['app_bar'] = appBarConfig.toJson();
       publishedConfig['floating_actions'] = floatingActions;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, localJson);
@@ -673,6 +679,17 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           }
           final serverConfig = Map<String, dynamic>.from(serverValue);
           final serverPages = Map<String, dynamic>.from(serverConfig['pages'] as Map);
+          final savedAppBar = serverConfig['app_bar'];
+          if (savedAppBar is! Map) {
+            throw Exception('WordPress did not return the saved App Bar configuration. Update ARK App Designer to version 1.17.8 or newer.');
+          }
+          final requestedAppBar = appBarConfig.toJson();
+          final publishedAppBar = DesignerAppBarConfig(json: Map<String, dynamic>.from(savedAppBar)).toJson();
+          for (final key in ['version','preset','enabled','background_color','foreground_color','background_image_url','background_mime_type','logo_url','height','spacing','radius','position','show_menu','show_logo','show_cart','show_voice_search','show_search','show_wishlist','show_refresh','show_location','search_placeholder','visible_pages','actions','menu_icon_family','menu_icon','cart_icon_family','cart_icon','voice_icon_family','voice_icon','search_icon_family','search_icon','wishlist_icon_family','wishlist_icon','refresh_icon_family','refresh_icon','location_icon_family','location_icon']) {
+            if (jsonEncode(requestedAppBar[key]) != jsonEncode(publishedAppBar[key])) {
+              throw Exception('WordPress changed App Bar "$key" during publish. Designer: ${requestedAppBar[key]}, WordPress: ${publishedAppBar[key]}.');
+            }
+          }
           final savedNavigation = serverConfig['navigation_bar'];
           if (savedNavigation is! Map || savedNavigation['items'] is! List) {
             throw Exception(
@@ -1859,10 +1876,36 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
       'templates': templates,
       'navigation_bar': navigationConfig.toJson(),
+      'app_bar': appBarConfig.toJson(),
       'floating_actions': floatingActions,
     };
     await prefs.setString(_storageKey, const JsonEncoder.withIndent('  ').convert(localData));
     if (mounted) setState(() {});
+  }
+
+  Future<void> _saveAppBarLocal(DesignerAppBarConfig value) async {
+    appBarConfig = DesignerAppBarConfig(json: value.toJson());
+    final prefs = await SharedPreferences.getInstance();
+    final localData = <String, dynamic>{
+      'schema': 'ark-glowhit-designer/v1',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
+      'templates': templates,
+      'navigation_bar': navigationConfig.toJson(),
+      'app_bar': appBarConfig.toJson(),
+      'floating_actions': floatingActions,
+    };
+    await prefs.setString(_storageKey, const JsonEncoder.withIndent('  ').convert(localData));
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openAppBarBuilder() async {
+    await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => DesignerAppBarBuilderPage(
+      initialConfig: appBarConfig,
+      availablePages: _floatingActionPages(),
+      onUpload: _uploadGalleryMedia,
+      onSave: _saveAppBarLocal,
+    )));
   }
 
   Future<void> _openNavigationBar() async {
@@ -1922,6 +1965,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
       'templates': templates,
       'navigation_bar': navigationConfig.toJson(),
+      'app_bar': appBarConfig.toJson(),
       'floating_actions': floatingActions,
     };
     await prefs.setString(_storageKey, const JsonEncoder.withIndent('  ').convert(localData));
@@ -1960,7 +2004,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       saving: saving,
       publishing: publishing,
       navigationConfig: navigationConfig,
+      appBarConfig: appBarConfig,
       floatingActions: floatingActions,
+      onOpenAppBar: _openAppBarBuilder,
       onOpenFloatingActions: _openFloatingActionPages,
       onOpenNavigation: _openNavigationBar,
       onReorder: _openReorder,
@@ -2046,7 +2092,9 @@ class _DesignerSettingsPage extends StatefulWidget {
     required this.saving,
     required this.publishing,
     required this.navigationConfig,
+    required this.appBarConfig,
     required this.floatingActions,
+    required this.onOpenAppBar,
     required this.onOpenFloatingActions,
     required this.onOpenNavigation,
     required this.onReorder,
@@ -2058,7 +2106,9 @@ class _DesignerSettingsPage extends StatefulWidget {
   final bool saving;
   final bool publishing;
   final DesignerNavigationConfig navigationConfig;
+  final DesignerAppBarConfig appBarConfig;
   final Map<String, dynamic> floatingActions;
+  final VoidCallback onOpenAppBar;
   final VoidCallback onOpenFloatingActions;
   final VoidCallback onOpenNavigation;
   final VoidCallback onReorder;
@@ -2149,6 +2199,18 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
                       onTap: working ? null : widget.onMyTemplates,
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: const Icon(Icons.view_quilt_rounded, color: _designerPurple),
+                  title: const Text('App Bar', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text('${widget.appBarConfig.preset} · 12 designs · live preview and voice search'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: working ? null : widget.onOpenAppBar,
                 ),
               ),
               const SizedBox(height: 12),
