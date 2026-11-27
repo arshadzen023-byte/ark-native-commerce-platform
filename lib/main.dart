@@ -402,9 +402,20 @@ class _StoreHomeState extends State<StoreHome> {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice Search is not available on this device.')));
         return;
       }
+      final locales = await _speech.locales();
+      String? selectedLocale;
+      for (final preferred in const ['en_IN', 'hi_IN']) {
+        for (final locale in locales) {
+          if (locale.localeId.toLowerCase() == preferred.toLowerCase()) {
+            selectedLocale = locale.localeId;
+            break;
+          }
+        }
+        if (selectedLocale != null) break;
+      }
       if (mounted) setState(() => _voiceListening = true);
       await _speech.listen(
-        localeId: 'en_IN',
+        localeId: selectedLocale,
         listenFor: const Duration(seconds: 30),
         pauseFor: const Duration(seconds: 4),
         onResult: (result) {
