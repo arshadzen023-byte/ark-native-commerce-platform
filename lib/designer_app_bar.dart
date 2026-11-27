@@ -22,9 +22,11 @@ class DesignerAppBarConfig {
   String get backgroundImageUrl => (_json['background_image_url'] ?? '').toString();
   String get logoUrl => (_json['logo_url'] ?? '').toString();
   String get menuHeaderImageUrl => (_json['menu_header_image_url'] ?? '').toString();
-  List<Map<String,dynamic>> get menuItems => (_json['menu_items'] as List? ?? const []).whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).where((e)=>e['visible']!=false).take(30).toList();
+  List<Map<String,dynamic>> get menuItems => (_json['menu_items'] as List? ?? const []).whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).take(30).toList();
   double get iconSize => ((_json['icon_size'] as num?)?.toDouble() ?? 22).clamp(16.0,36.0).toDouble();
   double get horizontalPadding => ((_json['horizontal_padding'] as num?)?.toDouble() ?? 10).clamp(0.0,24.0).toDouble();
+  double get leftPadding => ((_json['left_padding'] as num?)?.toDouble() ?? horizontalPadding).clamp(0.0,24.0).toDouble();
+  double get rightPadding => ((_json['right_padding'] as num?)?.toDouble() ?? horizontalPadding).clamp(0.0,24.0).toDouble();
   List<String> get searchTerms => (_json['search_placeholder_terms'] as List? ?? const ['watch','book','cloth']).map((e) => e.toString()).where((e) => e.trim().isNotEmpty).take(12).toList();
   bool show(String key) => _json[key] != false;
   bool visibleOn(String page) => (_json['visible_pages'] as Map?)?[page] != false;
@@ -33,7 +35,7 @@ class DesignerAppBarConfig {
   static const pageKeys = ['home','search','categories','wishlist','product','account','cart','orders','notifications'];
   static const defaults = <String,dynamic>{
     'version':1,'enabled':true,'preset':'custom','background_color':'#FFFFFF','foreground_color':'#202124',
-    'background_image_url':'','background_mime_type':'','logo_url':'','menu_header_image_url':'','menu_items':<dynamic>[],'icon_size':22.0,'horizontal_padding':10.0,'height':156.0,'spacing':8.0,'radius':12.0,'position':'top',
+    'background_image_url':'','background_mime_type':'','logo_url':'','menu_header_image_url':'','menu_items':<dynamic>[],'icon_size':22.0,'horizontal_padding':10.0,'left_padding':10.0,'right_padding':10.0,'height':156.0,'spacing':8.0,'radius':12.0,'position':'top',
     'show_menu':true,'show_logo':true,'show_cart':true,'show_voice_search':true,'show_search':true,'show_wishlist':true ,'show_refresh':false,'show_location':true,
     'search_placeholder':'Search products...',
     'search_placeholder_terms':<String>['watch','book','cloth'],
@@ -261,7 +263,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
       ]))),
       Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('Dimensions & Position',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold)),
-        slider('Header Height','height',48,220),slider('Icon Size','icon_size',16,36),slider('Left / Right Padding','horizontal_padding',0,24),slider('Icon / Item Spacing','spacing',0,32),slider('Corner Radius','radius',0,36),
+        slider('Header Height','height',48,220),slider('Icon Size','icon_size',16,36),slider('Left Padding','left_padding',0,24),slider('Right Padding','right_padding',0,24),slider('Icon / Item Spacing','spacing',0,32),slider('Corner Radius','radius',0,36),
         DropdownButtonFormField<String>(value:config.position,decoration:const InputDecoration(labelText:'Header Position'),items:const [DropdownMenuItem(value:'top',child:Text('Top / Standard')),DropdownMenuItem(value:'floating',child:Text('Floating / Rounded')),DropdownMenuItem(value:'overlay',child:Text('Overlay Style'))],onChanged:(v)=>setValue('position',v??'top')),
       ]))),
       Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
@@ -332,7 +334,7 @@ class DesignerAppBarView extends StatelessWidget {
       padding:EdgeInsets.zero,
       tooltip:(action['label']??'Action').toString(),
       onPressed:()=>onCustomAction(action),
-      icon:DesignerNavIcons.icon((action['icon_family']??'Material').toString(),(action['icon']??'star_outline').toString(),color:fg,size:20),
+      icon:DesignerNavIcons.icon((action['icon_family']??'Material').toString(),(action['icon']??'star_outline').toString(),color:fg,size:config.iconSize),
     );
     Widget searchField() => Container(
       height:46,
@@ -358,7 +360,7 @@ class DesignerAppBarView extends StatelessWidget {
               if(config.show('show_voice_search')) IconButton(
                 tooltip:'Voice Search',
                 onPressed:onVoiceSearch,
-                icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:_appBarAccent,size:22),
+                icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:_appBarAccent,size:config.iconSize),
               ),
               IconButton(
                 tooltip:'Clear search',
@@ -383,7 +385,7 @@ class DesignerAppBarView extends StatelessWidget {
         padding:EdgeInsets.zero,
         tooltip:'Menu',
         onPressed:onMenu,
-        icon:DesignerNavIcons.icon((data['menu_icon_family']??'Material').toString(),(data['menu_icon']??'menu').toString(),color:fg,size:24),
+        icon:DesignerNavIcons.icon((data['menu_icon_family']??'Material').toString(),(data['menu_icon']??'menu').toString(),color:fg,size:config.iconSize),
       ),
       if(config.show('show_logo')) ...[
         if(config.logoUrl.isNotEmpty) ClipRRect(borderRadius:BorderRadius.circular(6),child:Image.network(config.logoUrl,width:36,height:36,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const SizedBox.shrink())),
@@ -398,7 +400,7 @@ class DesignerAppBarView extends StatelessWidget {
         Expanded(child:SingleChildScrollView(scrollDirection:Axis.horizontal,child:Row(mainAxisSize:MainAxisSize.min,children:config.actions.where((a)=>a['visible']!=false).map(actionButton).toList()))),
     ]);
     final body=Container(
-      padding:EdgeInsets.symmetric(horizontal:config.horizontalPadding,vertical:5),
+      padding:EdgeInsets.only(left:config.leftPadding,right:config.rightPadding,top:5,bottom:5),
       decoration:BoxDecoration(
         color:imageProvider==null?bg:Colors.transparent,
         borderRadius:BorderRadius.circular(config.position=='floating'?config.radius:0),
@@ -417,7 +419,7 @@ class DesignerAppBarView extends StatelessWidget {
               child:Padding(
                 padding:const EdgeInsets.symmetric(horizontal:3,vertical:4),
                 child:Row(children:[
-                  DesignerNavIcons.icon((data['location_icon_family']??'Material').toString(),(data['location_icon']??'location_on_outlined').toString(),color:fg,size:18),
+                  DesignerNavIcons.icon((data['location_icon_family']??'Material').toString(),(data['location_icon']??'location_on_outlined').toString(),color:fg,size:config.iconSize),
                   const SizedBox(width:6),
                   Expanded(child:Text((data['address_label']??'Deliver to your address').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:TextStyle(color:DesignerAppBarConfig.color((data['address_text_color']??'#202124').toString(),fallback:Colors.black),fontSize:14,fontWeight:FontWeight.w800,height:1.15))),
                   Icon(Icons.chevron_right,color:fg,size:17),
