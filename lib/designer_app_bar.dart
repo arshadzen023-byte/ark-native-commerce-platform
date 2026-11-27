@@ -189,10 +189,31 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     final actions=DesignerAppBarConfig(json:data).actions;actions[index]['icon_family']=choice.family;actions[index]['icon']=choice.name;setValue('actions',actions);
   }
   Future<void> _pickBackgroundColor() async {
-    const colors = <Color>[Color(0xFFFFFFFF),Color(0xFFF0EAFE),Color(0xFFEAF2FF),Color(0xFFFFF3D6),Color(0xFFFFE8EF),Color(0xFFE5F7EE),Color(0xFF171923),Color(0xFF202124),Color(0xFF2874F0),Color(0xFF5B3A9E),Color(0xFF008577),Color(0xFFFFD814),Color(0xFFFCEAF3),Color(0xFFD9E8FF),Color(0xFFE8F5E9),Color(0xFFFFE0B2)];
-    final picked = await showDialog<Color>(context:context,builder:(ctx)=>AlertDialog(title:const Text('Choose App Bar Background'),content:SizedBox(width:300,child:GridView.count(shrinkWrap:true,crossAxisCount:4,crossAxisSpacing:10,mainAxisSpacing:10,children:colors.map((color)=>InkWell(onTap:()=>Navigator.pop(ctx,color),child:Container(decoration:BoxDecoration(color:color,shape:BoxShape.circle,border:Border.all(color:Colors.black26,width:1.2))))).toList())),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel'))]));
+    final current=DesignerAppBarConfig.color((data['background_color']??'#FFFFFF').toString());
+    var hsv=HSVColor.fromColor(current);
+    final picked=await showDialog<Color>(
+      context:context,
+      builder:(ctx)=>StatefulBuilder(builder:(ctx,setDialogState)=>AlertDialog(
+        title:const Text('Choose App Bar Background'),
+        content:SizedBox(width:320,child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Container(height:54,width:double.infinity,decoration:BoxDecoration(color:hsv.toColor(),borderRadius:BorderRadius.circular(12),border:Border.all(color:Colors.black12))),
+          const SizedBox(height:14),
+          const Text('Hue'),
+          Slider(value:hsv.hue.clamp(0,360).toDouble(),min:0,max:360,divisions:360,onChanged:(v)=>setDialogState(()=>hsv=hsv.withHue(v))),
+          const Text('Saturation'),
+          Slider(value:hsv.saturation,min:0,max:1,divisions:100,onChanged:(v)=>setDialogState(()=>hsv=hsv.withSaturation(v))),
+          const Text('Brightness'),
+          Slider(value:hsv.value,min:0,max:1,divisions:100,onChanged:(v)=>setDialogState(()=>hsv=hsv.withValue(v))),
+          Text('#'+hsv.toColor().value.toRadixString(16).substring(2).toUpperCase(),style:const TextStyle(fontWeight:FontWeight.w800)),
+        ])),
+        actions:[
+          TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel')),
+          FilledButton(onPressed:()=>Navigator.pop(ctx,hsv.toColor()),child:const Text('Use Colour')),
+        ],
+      )),
+    );
     if(picked==null||!mounted)return;
-    final hex='#${picked.value.toRadixString(16).substring(2).toUpperCase()}';
+    final hex='#'+picked.value.toRadixString(16).substring(2).toUpperCase();
     setState(()=>data['background_color']=hex);
     colorController.text=hex;
   }
