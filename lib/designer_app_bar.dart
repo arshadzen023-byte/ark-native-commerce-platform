@@ -21,6 +21,8 @@ class DesignerAppBarConfig {
   String get preset => (_json['preset'] ?? 'custom').toString();
   String get position => (_json['position'] ?? 'top').toString();
   String get backgroundImageUrl => (_json['background_image_url'] ?? '').toString();
+  String get backgroundColor => (_json['background_color'] ?? '#FFFFFF').toString();
+  String get foregroundColor => (_json['foreground_color'] ?? '#202124').toString();
   String get logoUrl => (_json['logo_url'] ?? '').toString();
   String get menuHeaderImageUrl => (_json['menu_header_image_url'] ?? '').toString();
   int get menuHeaderImageId => (_json['menu_header_image_id'] as num?)?.toInt() ?? int.tryParse((_json['menu_header_image_id'] ?? '0').toString()) ?? 0;
@@ -185,7 +187,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     if(result==null||!mounted)return;
     setState((){data['menu_items']=result['menu_items'] is List?result['menu_items']:DesignerAppBarConfig.defaultMenuItems;data['menu_header_image_url']=(result['menu_header_image_url']??'').toString();data['menu_header_image_id']=(result['menu_header_image_id'] as num?)?.toInt()??0;});
   }
-  Widget menuEditor()=>Card(child:Padding(padding:const EdgeInsets.all(12),child:ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.menu_open,color:_appBarAccent),title:const Text('Menu Edit',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:Text('${DesignerAppBarConfig(json:data).menuItems.length} menu items · WordPress Media Library image'),trailing:const Icon(Icons.chevron_right),onTap:openMenuEditor))));
+  Widget menuEditor()=>Card(child:Padding(padding:const EdgeInsets.all(12),child:ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.menu_open,color:_appBarAccent),title:const Text('Menu Edit',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:Text('${DesignerAppBarConfig(json:data).menuItems.length} menu items · WordPress Media Library image'),trailing:const Icon(Icons.chevron_right),onTap:openMenuEditor)));
     Future<void> editActionIcon(int index) async {
     final choice=await pickIcon();if(choice==null||!mounted)return;
     final actions=DesignerAppBarConfig(json:data).actions;actions[index]['icon_family']=choice.family;actions[index]['icon']=choice.name;setValue('actions',actions);
