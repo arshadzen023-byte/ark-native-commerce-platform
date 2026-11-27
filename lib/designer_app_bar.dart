@@ -29,6 +29,8 @@ class DesignerAppBarConfig {
     'voice_icon_family':'Material','voice_icon':'mic_none','search_icon_family':'Material','search_icon':'search',
     'wishlist_icon_family':'Material','wishlist_icon':'favorite_border','refresh_icon_family':'Material','refresh_icon':'refresh',
     'location_icon_family':'Material','location_icon':'location_on_outlined','visible_pages':<String,dynamic>{},'actions':<dynamic>[],
+    'menu_label':'GlowHit','search_background_color':'#FFFFFF','search_foreground_color':'#555555',
+    'show_location':true,
   };
 
   static Map<String,dynamic> _normalize(Map<String,dynamic> source) {
@@ -84,6 +86,8 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
   final colorController=TextEditingController();
   final placeholderController=TextEditingController();
   final previewController=TextEditingController();
+  final ScrollController settingsScrollController=ScrollController();
+  bool uploading=false;
 
   @override void initState(){
     super.initState(); data=widget.initialConfig.toJson();
@@ -93,13 +97,20 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     colorController.text=(data['background_color']??'#FFFFFF').toString();
     placeholderController.text=(data['search_placeholder']??'Search products...').toString();
   }
-  @override void dispose(){colorController.dispose();placeholderController.dispose();previewController.dispose();super.dispose();}
+  @override void dispose(){colorController.dispose();placeholderController.dispose();previewController.dispose();settingsScrollController.dispose();super.dispose();}
   void setValue(String key,dynamic value)=>setState(()=>data[key]=value);
   Future<void> apply() async { await widget.onSave(DesignerAppBarConfig(json:data)); if(mounted) Navigator.pop(context); }
   Future<void> upload(String key) async {
-    final media=await widget.onUpload(); if(media==null||!mounted)return;
-    final url=(media['source_url']??media['url']??'').toString(); if(url.isEmpty)return;
-    setState(() { data[key]=url; if(key=='background_image_url') data['background_mime_type']=(media['mime_type']??'').toString(); });
+    if(uploading)return;
+    setState(()=>uploading=true);
+    try {
+      final media=await widget.onUpload(); if(media==null||!mounted)return;
+      final url=(media['source_url']??media['url']??'').toString(); if(url.isEmpty)return;
+      setState(() { data[key]=url; if(key=='background_image_url') data['background_mime_type']=(media['mime_type']??'').toString(); });
+    } finally { if(mounted)setState(()=>uploading=false); }
+  }
+  void removeMedia(String key) {
+    setState(() { data[key]=''; if(key=='background_image_url')data['background_mime_type']=''; });
   }
   Future<NavIconChoice?> pickIcon() => showDialog<NavIconChoice>(context:context,builder:(_)=>const _AppBarIconPicker());
   Future<void> chooseIcon(String key) async {
@@ -134,14 +145,21 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     final config=DesignerAppBarConfig(json:data);
     return ClipRRect(borderRadius:BorderRadius.circular(14),child:Column(children:[
       Container(width:double.infinity,padding:const EdgeInsets.all(6),color:Colors.black12,child:const Text('LIVE PREVIEW · GLOWHIT',style:TextStyle(fontSize:10,fontWeight:FontWeight.bold))),
-      SizedBox(height:config.height.clamp(54.0,112.0).toDouble(),child:DesignerAppBarView(config:config,pageKey:'home',cartCount:2,searchController:previewController,onMenu:(){},onCart:(){},onSearch:(){},onVoiceSearch:(){},onWishlist:(){},onRefresh:(){},onLocation:(){},onCustomAction:(_){ })),
+      SizedBox(height:config.height.clamp(64.0,180.0).toDouble(),child:DesignerAppBarView(config:config,pageKey:'home',cartCount:2,searchController:previewController,onMenu:(){},onCart:(){},onSearch:(){},onVoiceSearch:(){},onWishlist:(){},onRefresh:(){},onLocation:(){},onCustomAction:(_){ })),
     ]));
   }
 
   @override Widget build(BuildContext context){
     final config=DesignerAppBarConfig(json:data);
-    return Scaffold(appBar:AppBar(title:const Text('App Bar Builder'),actions:[TextButton(onPressed:apply,child:const Text('Apply'))]),body:ListView(padding:const EdgeInsets.all(16),children:[
-      preview(),const SizedBox(height:16),
+    final previewHeight=(config.height+38).clamp(102.0,218.0).toDouble();
+    return Scaffold(
+      resizeToAvoidBottomInset:true,
+      appBar:AppBar(title:const Text('App Bar Builder'),actions:[TextButton(onPressed:apply,child:const Text('Apply'))]),
+      body:Column(children:[
+        // Pinned preview: it stays fixed while properties below scroll.
+        SizedBox(height:previewHeight, child:Padding(padding:const EdgeInsets.fromLTRB(16,10,16,8),child:preview())),
+        const Divider(height:1),
+        Expanded(child:ListView(controller:settingsScrollController,padding:const EdgeInsets.fromLTRB(16,12,16,24),children:[
       const Text('12 Ready-made App Bars',style:TextStyle(fontSize:18,fontWeight:FontWeight.w800)),
       const SizedBox(height:9),
       GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:DesignerAppBarConfig.presets.length,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:2.2,crossAxisSpacing:8,mainAxisSpacing:8),itemBuilder:(_,i)=>presetTile(DesignerAppBarConfig.presets[i])),
@@ -161,8 +179,9 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
       ]))),
       Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('Logo & Background',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold)),
-        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.image_outlined),title:const Text('Upload Logo'),subtitle:Text(config.logoUrl.isEmpty?'No logo selected':'Logo uploaded'),onTap:()=>upload('logo_url')),
-        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.wallpaper_outlined),title:const Text('Upload Background Image / GIF'),subtitle:Text(config.backgroundImageUrl.isEmpty?'No background selected':'Background media uploaded'),onTap:()=>upload('background_image_url')),
+        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.image_outlined),title:const Text('Upload Logo'),subtitle:Text(config.logoUrl.isEmpty?'No logo selected':'Logo uploaded · tap to replace'),onTap:uploading?null:()=>upload('logo_url'),trailing:config.logoUrl.isEmpty?null:IconButton(tooltip:'Delete logo',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>removeMedia('logo_url'))),
+        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.wallpaper_outlined),title:const Text('Upload Background Image / GIF'),subtitle:Text(config.backgroundImageUrl.isEmpty?'No background selected':'Background media uploaded · tap to replace'),onTap:uploading?null:()=>upload('background_image_url'),trailing:config.backgroundImageUrl.isEmpty?null:IconButton(tooltip:'Delete background',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>removeMedia('background_image_url'))),
+        if(uploading) const LinearProgressIndicator(),
         TextField(controller:colorController,decoration:const InputDecoration(labelText:'Background HEX colour'),onChanged:(v)=>setValue('background_color',v)),
         TextField(controller:placeholderController,decoration:const InputDecoration(labelText:'Search placeholder'),onChanged:(v)=>setValue('search_placeholder',v)),
       ]))),
@@ -183,7 +202,9 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
       const SizedBox(height:16),
       SizedBox(height:50,child:FilledButton.icon(onPressed:apply,icon:const Icon(Icons.check),label:const Text('Apply Selected App Bar'))),
       const SizedBox(height:28),
-    ]));
+        ])),
+      ]),
+    );
   }
 
   Widget actionEditor(int index,Map<String,dynamic> action){
@@ -195,7 +216,15 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
         IconButton(onPressed:(){actions.removeAt(index);setValue('actions',actions);},icon:const Icon(Icons.delete_outline,color:Colors.red)),
       ]),
       DropdownButtonFormField<String>(value:(action['link_type']??'page').toString(),decoration:const InputDecoration(labelText:'Destination type'),items:const [DropdownMenuItem(value:'page',child:Text('App Page')),DropdownMenuItem(value:'url',child:Text('Website URL')),DropdownMenuItem(value:'deep_link',child:Text('App Deep Link'))],onChanged:(v){actions[index]['link_type']=v??'page';setValue('actions',actions);}),
-      TextFormField(initialValue:(action['link_value']??'home').toString(),decoration:const InputDecoration(labelText:'Destination (home / cart / https://...)'),onChanged:(v){actions[index]['link_value']=v;setValue('actions',actions);}),
+      if((action['link_type']??'page')=='page')
+        DropdownButtonFormField<String>(
+          value: const ['home','search','categories','wishlist','cart','account','orders','notifications','product'].contains((action['link_value']??'home').toString())?(action['link_value']??'home').toString():'home',
+          decoration:const InputDecoration(labelText:'Destination App Page'),
+          items:const ['home','search','categories','wishlist','cart','account','orders','notifications','product'].map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
+          onChanged:(v){actions[index]['link_value']=v??'home';setValue('actions',actions);},
+        )
+      else TextFormField(initialValue:(action['link_value']??'').toString(),decoration:InputDecoration(labelText:action['link_type']=='url'?'Website URL (https://...)':'App Deep Link (ark://...)'),onChanged:(v){actions[index]['link_value']=v;setValue('actions',actions);}),
+      SwitchListTile(contentPadding:EdgeInsets.zero,title:const Text('Show this action'),value:action['visible']!=false,onChanged:(v){actions[index]['visible']=v;setValue('actions',actions);}),
     ])));
   }
 }
@@ -207,30 +236,112 @@ class DesignerAppBarView extends StatelessWidget {
   final ValueChanged<Map<String,dynamic>> onCustomAction;
   @override Widget build(BuildContext context){
     if(!config.enabled||!config.visibleOn(pageKey))return const SizedBox.shrink();
-    final data=config.toJson();final fg=DesignerAppBarConfig.color((data['foreground_color']??'#202124').toString(),fallback:Colors.black);
-    final bg=DesignerAppBarConfig.color(config.toJson()['background_color'].toString());
-    return Container(
-      height:config.height,
-      margin:config.position=='floating'?const EdgeInsets.fromLTRB(8,4,8,4):EdgeInsets.zero,
-      padding:EdgeInsets.symmetric(horizontal:config.spacing),
-      decoration:BoxDecoration(color:bg,borderRadius:BorderRadius.circular(config.position=='floating'?config.radius:0.0),
-        image:config.backgroundImageUrl.isEmpty?null:DecorationImage(image:NetworkImage(config.backgroundImageUrl),fit:BoxFit.cover,onError:(_,__){}),
-        boxShadow:config.position=='floating'?[BoxShadow(color:Colors.black.withOpacity(.12),blurRadius:10,offset:const Offset(0,3))]:null),
-      child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
-        if(config.show('show_location')) InkWell(onTap:onLocation,child:Row(children:[DesignerNavIcons.icon((data['location_icon_family']??'Material').toString(),(data['location_icon']??'location_on_outlined').toString(),color:fg,size:17),const SizedBox(width:4),Expanded(child:Text('Deliver to your address',maxLines:1,overflow:TextOverflow.ellipsis,style:TextStyle(color:fg,fontSize:11)))])),
-        Row(children:[
-          if(config.show('show_menu')) IconButton(visualDensity:VisualDensity.compact,onPressed:onMenu,icon:DesignerNavIcons.icon((data['menu_icon_family']??'Material').toString(),(data['menu_icon']??'menu').toString(),color:fg)),
-          if(config.show('show_logo')&&config.logoUrl.isNotEmpty) Padding(padding:const EdgeInsets.only(right:6),child:Image.network(config.logoUrl,width:34,height:34,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const SizedBox.shrink())),
-          if(config.show('show_logo')&&config.logoUrl.isEmpty) Padding(padding:const EdgeInsets.only(right:6),child:Text('GlowHit',style:TextStyle(color:fg,fontSize:16,fontWeight:FontWeight.w800))),
-          if(config.show('show_search')) Expanded(child:InkWell(onTap:onSearch,borderRadius:BorderRadius.circular(config.radius),child:Container(height:38,padding:const EdgeInsets.symmetric(horizontal:10),decoration:BoxDecoration(color:Colors.white.withOpacity(.94),borderRadius:BorderRadius.circular(config.radius)),child:Row(children:[DesignerNavIcons.icon((data['search_icon_family']??'Material').toString(),(data['search_icon']??'search').toString(),color:Colors.black54,size:20),const SizedBox(width:7),Expanded(child:Text((data['search_placeholder']??'Search products...').toString(),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.black38,fontSize:12)))])))),
-          if(!config.show('show_search'))const Spacer(),
-          if(config.show('show_voice_search'))IconButton(visualDensity:VisualDensity.compact,tooltip:'Voice Search',onPressed:onVoiceSearch,icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:fg)),
-          if(config.show('show_wishlist'))IconButton(visualDensity:VisualDensity.compact,onPressed:onWishlist,icon:DesignerNavIcons.icon((data['wishlist_icon_family']??'Material').toString(),(data['wishlist_icon']??'favorite_border').toString(),color:fg)),
-          if(config.show('show_cart'))IconButton(visualDensity:VisualDensity.compact,onPressed:onCart,icon:Badge(isLabelVisible:cartCount>0,label:Text('$cartCount'),child:DesignerNavIcons.icon((data['cart_icon_family']??'Material').toString(),(data['cart_icon']??'shopping_cart_outlined').toString(),color:fg))),
-          if(config.show('show_refresh'))IconButton(visualDensity:VisualDensity.compact,onPressed:onRefresh,icon:DesignerNavIcons.icon((data['refresh_icon_family']??'Material').toString(),(data['refresh_icon']??'refresh').toString(),color:fg)),
-          for(final action in config.actions.where((a)=>a['visible']!=false))IconButton(visualDensity:VisualDensity.compact,tooltip:(action['label']??'Action').toString(),onPressed:()=>onCustomAction(action),icon:DesignerNavIcons.icon((action['icon_family']??'Material').toString(),(action['icon']??'star_outline').toString(),color:fg,size:21)),
+    final data=config.toJson();
+    final fg=DesignerAppBarConfig.color((data['foreground_color']??'#202124').toString(),fallback:Colors.black);
+    final bg=DesignerAppBarConfig.color((data['background_color']??'#FFFFFF').toString());
+    Widget iconButton(String key,VoidCallback action,{bool badge=false}) {
+      final family=(data['${key}_icon_family']??'Material').toString();
+      final name=(data['${key}_icon']??'').toString();
+      final icon=DesignerNavIcons.icon(family,name,color:fg,size:21);
+      return IconButton(
+        visualDensity:VisualDensity.compact,
+        constraints:const BoxConstraints(minWidth:40,minHeight:40),
+        padding:EdgeInsets.zero,
+        tooltip:key,
+        onPressed:action,
+        icon:badge?Badge(isLabelVisible:cartCount>0,label:Text('$cartCount'),child:icon):icon,
+      );
+    }
+    Widget actionButton(Map<String,dynamic> action) => IconButton(
+      visualDensity:VisualDensity.compact,
+      constraints:const BoxConstraints(minWidth:38,minHeight:40),
+      padding:EdgeInsets.zero,
+      tooltip:(action['label']??'Action').toString(),
+      onPressed:()=>onCustomAction(action),
+      icon:DesignerNavIcons.icon((action['icon_family']??'Material').toString(),(action['icon']??'star_outline').toString(),color:fg,size:20),
+    );
+    Widget searchField({bool compact=false}) => InkWell(
+      onTap:onSearch,
+      borderRadius:BorderRadius.circular(config.radius),
+      child:Container(
+        height:compact?38:46,
+        padding:const EdgeInsets.symmetric(horizontal:12),
+        decoration:BoxDecoration(color:Colors.white.withOpacity(.96),borderRadius:BorderRadius.circular(config.radius)),
+        child:Row(children:[
+          DesignerNavIcons.icon((data['search_icon_family']??'Material').toString(),(data['search_icon']??'search').toString(),color:Colors.black54,size:22),
+          const SizedBox(width:10),
+          Expanded(child:Text((data['search_placeholder']??'Search products, brands and more').toString(),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.black54,fontSize:14))),
+          if(config.show('show_voice_search')) IconButton(
+            visualDensity:VisualDensity.compact,
+            tooltip:'Voice Search',
+            onPressed:onVoiceSearch,
+            icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:_appBarAccent,size:22),
+          ),
         ]),
-      ]),
+      ),
+    );
+    final imageProvider=config.backgroundImageUrl.isEmpty?null:NetworkImage(config.backgroundImageUrl);
+    final topRow=Row(children:[
+      if(config.show('show_menu')) IconButton(
+        visualDensity:VisualDensity.compact,
+        constraints:const BoxConstraints(minWidth:40,minHeight:40),
+        padding:EdgeInsets.zero,
+        onPressed:onMenu,
+        icon:DesignerNavIcons.icon((data['menu_icon_family']??'Material').toString(),(data['menu_icon']??'menu').toString(),color:fg,size:24),
+      ),
+      if(config.show('show_logo')) ...[
+        if(config.logoUrl.isNotEmpty) ClipRRect(borderRadius:BorderRadius.circular(6),child:Image.network(config.logoUrl,width:36,height:36,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const SizedBox.shrink())),
+        const SizedBox(width:8),
+        Flexible(child:Text((data['menu_label']??'GlowHit').toString(),maxLines:1,overflow:TextOverflow.ellipsis,style:TextStyle(color:fg,fontSize:17,fontWeight:FontWeight.w800))),
+      ],
+      const Spacer(),
+      if(config.show('show_wishlist')) iconButton('wishlist',onWishlist),
+      if(config.show('show_cart')) iconButton('cart',onCart,badge:true),
+      if(config.show('show_refresh')) iconButton('refresh',onRefresh),
+      for(final action in config.actions.where((a)=>a['visible']!=false).take(3)) actionButton(action),
+    ]);
+    final body=Container(
+      padding:EdgeInsets.symmetric(horizontal:config.spacing,vertical:5),
+      decoration:BoxDecoration(
+        color:bg,
+        borderRadius:BorderRadius.circular(config.position=='floating'?config.radius:0),
+        image:imageProvider==null?null:DecorationImage(image:imageProvider,fit:BoxFit.cover,onError:(_,__){}),
+        boxShadow:config.position=='floating'?[BoxShadow(color:Colors.black.withOpacity(.12),blurRadius:10,offset:const Offset(0,3))]:null,
+      ),
+      child:Column(
+        mainAxisSize:MainAxisSize.min,
+        children:[
+          SizedBox(height:40,child:topRow),
+          if(config.show('show_search')) Padding(padding:const EdgeInsets.only(top:4),child:searchField()),
+          if(config.show('show_location')) Padding(
+            padding:const EdgeInsets.only(top:4),
+            child:InkWell(
+              onTap:onLocation,
+              borderRadius:BorderRadius.circular(8),
+              child:Padding(
+                padding:const EdgeInsets.symmetric(horizontal:3,vertical:4),
+                child:Row(children:[
+                  DesignerNavIcons.icon((data['location_icon_family']??'Material').toString(),(data['location_icon']??'location_on_outlined').toString(),color:fg,size:18),
+                  const SizedBox(width:6),
+                  Expanded(child:Text((data['address_label']??'Deliver to your address').toString(),maxLines:1,overflow:TextOverflow.ellipsis,style:TextStyle(color:fg,fontSize:12))),
+                  Icon(Icons.chevron_right,color:fg,size:17),
+                ]),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return ClipRRect(
+      borderRadius:BorderRadius.circular(config.position=='floating'?config.radius:0),
+      child: SizedBox(
+        width:double.infinity,
+        height:config.height.clamp(88.0,220.0).toDouble(),
+        child:Stack(fit:StackFit.expand,children:[
+          if(imageProvider!=null) Image(image:imageProvider,fit:BoxFit.cover,errorBuilder:(_,__,___)=>ColoredBox(color:bg)),
+          body,
+        ]),
+      ),
     );
   }
 }
