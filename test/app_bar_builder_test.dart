@@ -67,8 +67,8 @@ void main() {
     expect(find.text('App Bar Builder'), findsOneWidget);
     expect(find.text('LIVE PREVIEW · GLOWHIT'), findsOneWidget);
     expect(find.text('12 Ready-made App Bars'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Voice Search'), 260);
-    expect(find.text('Voice Search'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Voice Search').first, 260);
+    expect(find.text('Voice Search'), findsNWidgets(2));
     await tester.scrollUntilVisible(find.text('Page Visibility'), 260);
     expect(find.text('Page Visibility'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Custom Action Buttons'), 260);
