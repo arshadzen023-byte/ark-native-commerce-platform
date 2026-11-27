@@ -9,6 +9,10 @@ class DesignerAppBarConfig {
   Map<String, dynamic> toJson() => Map<String, dynamic>.from(_json);
   bool get enabled => _json['enabled'] != false;
   double get height => ((_json['height'] as num?)?.toDouble() ?? 72).clamp(88.0,220.0).toDouble();
+  double get renderHeight {
+    final minimum = 50.0 + (show('show_search') ? 50.0 : 0.0) + (show('show_location') ? 32.0 : 0.0);
+    return height < minimum ? minimum : height;
+  }
   double get spacing => ((_json['spacing'] as num?)?.toDouble() ?? 8).clamp(0.0,32.0).toDouble();
   double get radius => ((_json['radius'] as num?)?.toDouble() ?? 12).clamp(0.0,36.0).toDouble();
   String get preset => (_json['preset'] ?? 'custom').toString();
@@ -145,13 +149,13 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     final config=DesignerAppBarConfig(json:data);
     return ClipRRect(borderRadius:BorderRadius.circular(14),child:Column(children:[
       Container(width:double.infinity,padding:const EdgeInsets.all(6),color:Colors.black12,child:const Text('LIVE PREVIEW · GLOWHIT',style:TextStyle(fontSize:10,fontWeight:FontWeight.bold))),
-      SizedBox(height:config.height.clamp(88.0,220.0).toDouble(),child:DesignerAppBarView(config:config,pageKey:'home',cartCount:2,searchController:previewController,searchFocusNode:previewFocusNode,onSearchSubmitted:(_){},onMenu:(){},onCart:(){},onSearch:(){},onVoiceSearch:(){},onWishlist:(){},onRefresh:(){},onLocation:(){},onCustomAction:(_){ })),
+      SizedBox(height:config.renderHeight,child:DesignerAppBarView(config:config,pageKey:'home',cartCount:2,searchController:previewController,searchFocusNode:previewFocusNode,onSearchSubmitted:(_){},onMenu:(){},onCart:(){},onSearch:(){},onVoiceSearch:(){},onWishlist:(){},onRefresh:(){},onLocation:(){},onCustomAction:(_){ })),
     ]));
   }
 
   @override Widget build(BuildContext context){
     final config=DesignerAppBarConfig(json:data);
-    final previewHeight=(config.height+50).clamp(150.0,240.0).toDouble();
+    final previewHeight=(config.renderHeight+50).clamp(150.0,270.0).toDouble();
     return Scaffold(
       resizeToAvoidBottomInset:true,
       appBar:AppBar(title:const Text('App Bar Builder'),actions:[TextButton(onPressed:apply,child:const Text('Apply'))]),
@@ -218,9 +222,9 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
       DropdownButtonFormField<String>(value:(action['link_type']??'page').toString(),decoration:const InputDecoration(labelText:'Destination type'),items:const [DropdownMenuItem(value:'page',child:Text('App Page')),DropdownMenuItem(value:'url',child:Text('Website URL')),DropdownMenuItem(value:'deep_link',child:Text('App Deep Link'))],onChanged:(v){actions[index]['link_type']=v??'page';setValue('actions',actions);}),
       if((action['link_type']??'page')=='page')
         DropdownButtonFormField<String>(
-          value: const ['home','search','categories','wishlist','cart','account','orders','notifications','product'].contains((action['link_value']??'home').toString())?(action['link_value']??'home').toString():'home',
+          value: <String>{'home','search','categories','wishlist','cart','account','orders','notifications','product',...widget.availablePages.map((page)=>page['key']??'')}.contains((action['link_value']??'home').toString())?(action['link_value']??'home').toString():'home',
           decoration:const InputDecoration(labelText:'Destination App Page'),
-          items:const ['home','search','categories','wishlist','cart','account','orders','notifications','product'].map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
+          items: <String>{'home','search','categories','wishlist','cart','account','orders','notifications','product',...widget.availablePages.map((page)=>page['key']??'')}.where((value)=>value.isNotEmpty).map((value)=>DropdownMenuItem(value:value,child:Text(widget.availablePages.firstWhere((page)=>page['key']==value,orElse:()=>{'title':value})['title']??value))).toList(),
           onChanged:(v){actions[index]['link_value']=v??'home';setValue('actions',actions);},
         )
       else TextFormField(initialValue:(action['link_value']??'').toString(),decoration:InputDecoration(labelText:action['link_type']=='url'?'Website URL (https://...)':'App Deep Link (ark://...)'),onChanged:(v){actions[index]['link_value']=v;setValue('actions',actions);}),
@@ -329,7 +333,6 @@ class DesignerAppBarView extends StatelessWidget {
       decoration:BoxDecoration(
         color:bg,
         borderRadius:BorderRadius.circular(config.position=='floating'?config.radius:0),
-        image:imageProvider==null?null:DecorationImage(image:imageProvider,fit:BoxFit.cover,onError:(_,__){}),
         boxShadow:config.position=='floating'?[BoxShadow(color:Colors.black.withOpacity(.12),blurRadius:10,offset:const Offset(0,3))]:null,
       ),
       child:Column(
