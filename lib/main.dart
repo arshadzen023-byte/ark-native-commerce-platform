@@ -1679,7 +1679,7 @@ class _StoreHomeState extends State<StoreHome> {
     if (!config.enabled || !config.visibleOn(pageKey)) return null;
     final topInset = MediaQuery.paddingOf(context).top;
     return PreferredSize(
-      preferredSize: Size.fromHeight(config.renderHeight),
+      preferredSize: Size.fromHeight(config.renderHeight + topInset),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
