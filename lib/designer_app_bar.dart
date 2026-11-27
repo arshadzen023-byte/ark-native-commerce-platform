@@ -9,9 +9,9 @@ class DesignerAppBarConfig {
   final Map<String, dynamic> _data;
   Map<String, dynamic> toJson() => Map<String, dynamic>.from(_data);
   String get preset => (_data['preset'] ?? 'custom').toString();
-  double get height => ((_data['height'] as num?)?.toDouble() ?? 72).clamp(48.0, 160.0);
-  double get spacing => ((_data['spacing'] as num?)?.toDouble() ?? 8).clamp(0.0, 32.0);
-  double get radius => ((_data['radius'] as num?)?.toDouble() ?? 12).clamp(0.0, 36.0);
+  double get height => ((_data['height'] as num?)?.toDouble() ?? 72).clamp(48.0, 160.0).toDouble();
+  double get spacing => ((_data['spacing'] as num?)?.toDouble() ?? 8).clamp(0.0, 32.0).toDouble();
+  double get radius => ((_data['radius'] as num?)?.toDouble() ?? 12).clamp(0.0, 36.0).toDouble();
   String get position => (_data['position'] ?? 'top').toString();
   String get backgroundColor => (_data['background_color'] ?? '#FFFFFF').toString();
   String get backgroundImageUrl => (_data['background_image_url'] ?? '').toString();
@@ -246,7 +246,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
           child: const Text('LIVE PREVIEW · GLOWHIT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .8)),
         ),
         SizedBox(
-          height: config.height.clamp(54, 112),
+          height: config.height.clamp(54, 112).toDouble(),
           child: DesignerAppBarView(
             config: config,
             pageKey: 'home',
@@ -405,7 +405,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
   }
 
   Widget _slider(String label, String key, double min, double max, double step) {
-    final value = ((data[key] as num?)?.toDouble() ?? min).clamp(min, max);
+    final value = ((data[key] as num?)?.toDouble() ?? min).clamp(min, max).toDouble();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label), Text(value.toStringAsFixed(0))]),
       Slider(value: value, min: min, max: max, divisions: ((max - min) / step).round(), onChanged: (v) => _set(key, v)),
@@ -473,10 +473,10 @@ class DesignerAppBarView extends StatelessWidget {
     final data = config.toJson();
     final content = Container(
       height: config.height,
-      padding: EdgeInsets.symmetric(horizontal: config.spacing.clamp(0, 24)),
+      padding: EdgeInsets.symmetric(horizontal: config.spacing.clamp(0, 24).toDouble()),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(config.position == 'floating' ? config.radius : 0),
+        borderRadius: BorderRadius.circular(config.position == 'floating' ? config.radius : 0.0),
         image: config.backgroundImageUrl.isEmpty ? null : DecorationImage(
           image: NetworkImage(config.backgroundImageUrl),
           fit: BoxFit.cover,
