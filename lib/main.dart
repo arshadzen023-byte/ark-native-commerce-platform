@@ -460,7 +460,7 @@ class _StoreHomeState extends State<StoreHome> {
           if (config.menuHeaderImageUrl.isNotEmpty)
             ClipRRect(borderRadius:BorderRadius.circular(14),child:Padding(padding:const EdgeInsets.fromLTRB(14,4,14,10),child:Image.network(config.menuHeaderImageUrl,width:double.infinity,height:118,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const SizedBox.shrink()))),
           Flexible(child:ListView(shrinkWrap:true,padding:const EdgeInsets.fromLTRB(12,4,12,18),children:[
-            for(final item in menuItems.where((e)=>e['visible']!=false))
+            for(final item in menuItems.where((e)=>e['visible']!=false && (canManageDesigner || (e['link_value']??'').toString()!='designer')))
               ListTile(
                 leading: _menuLeadingIcon(item),
                 title: Text((item['title']??'Menu item').toString(),style:const TextStyle(fontWeight:FontWeight.w700)),
