@@ -1334,7 +1334,7 @@ class _StoreHomeState extends State<StoreHome> {
                                         overflow: TextOverflow.ellipsis,
                                         textAlign: titleAlignment,
                                         style: TextStyle(
-                                          color: _safeColor((config['title_color'] ?? '#FFFFFF').toString(), fallback: Colors.white),
+                                          color: _safeColor((config['title_color'] ?? '#FFFFFF').toString()),
                                           fontSize: (config['title_font_size'] as num?)?.toDouble() ?? 11,
                                           fontWeight: (config['title_font_weight'] ?? 'bold') == 'normal'
                                               ? FontWeight.normal
