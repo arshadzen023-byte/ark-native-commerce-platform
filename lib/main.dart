@@ -248,6 +248,7 @@ class _StoreHomeState extends State<StoreHome> {
   int notificationCount = 0;
   @override void initState() {
     super.initState();
+    searchFocusNode.addListener(_handleSearchFocusChange);
     customerToken = widget.initialToken;
     push = GlowHitPushService(onTap: _handleNotificationLink, onForeground: _refreshNotificationCount);
     push.initialize(customerJwt: customerToken).then((_) => _refreshNotificationCount());
@@ -390,7 +391,9 @@ class _StoreHomeState extends State<StoreHome> {
     await _handleNotificationLink(value);
   }
 
-  @override void dispose() { _speech.stop(); searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
+  void _handleSearchFocusChange() { if (mounted) setState(() {}); }
+
+  @override void dispose() { searchFocusNode.removeListener(_handleSearchFocusChange); _speech.stop(); searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
 
   Future<void> _startVoiceSearch() async {
     try {
@@ -1625,13 +1628,26 @@ class _StoreHomeState extends State<StoreHome> {
         ? Map<String, dynamic>.from(designerConfig['app_bar'] as Map)
         : const {});
     if (!config.enabled || !config.visibleOn(pageKey)) return null;
+    final topInset = MediaQuery.paddingOf(context).top;
     return PreferredSize(
       preferredSize: Size.fromHeight(config.height),
-      child: DesignerAppBarView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: topInset),
+          SizedBox(
+            height: config.height,
+            child: DesignerAppBarView(
         config: config,
         pageKey: pageKey,
         cartCount: cartCount,
         searchController: searchController,
+        searchFocusNode: searchFocusNode,
+        onSearchSubmitted: (value) {
+          search = value.trim();
+          FocusScope.of(context).unfocus();
+          load();
+        },
         onMenu: () => _openAppBarMenu(pageKey),
         onCart: () {
           if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
@@ -1664,6 +1680,9 @@ class _StoreHomeState extends State<StoreHome> {
           if (_isNestedAppBarPage(pageKey) && (action['link_type'] ?? 'page') == 'page') Navigator.of(context).pop();
           _openAppBarCustomAction(action);
         },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1722,14 +1741,25 @@ class _StoreHomeState extends State<StoreHome> {
         ]),
       ),
     ]);
-    return Scaffold(
+    return PopScope<void>(
+      canPop: tab == 0 && !searchFocusNode.hasFocus,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (searchFocusNode.hasFocus) {
+          searchFocusNode.unfocus();
+          return;
+        }
+        if (tab != 0) setState(() => tab = 0);
+      },
+      child: Scaffold(
       appBar: activeAppBar,
       body: SafeArea(top: false, child: page),
       floatingActionButton: _buildDesignerFloatingAction(
         tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home')
           : tab == 1 ? 'categories' : tab == 2 ? 'wishlist' : tab == 3 ? 'cart' : 'account',
       ),
-      bottomNavigationBar: _buildDesignerBottomNavigation());
+      bottomNavigationBar: _buildDesignerBottomNavigation()),
+    );
   }
 }
 
