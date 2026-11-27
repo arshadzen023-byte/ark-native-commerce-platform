@@ -685,7 +685,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           }
           final requestedAppBar = appBarConfig.toJson();
           final publishedAppBar = DesignerAppBarConfig(json: Map<String, dynamic>.from(savedAppBar)).toJson();
-          for (final key in ['preset','enabled','background_color','background_image_url','logo_url','height','spacing','radius','position','show_menu','show_logo','show_cart','show_voice_search','show_search','show_wishlist','show_refresh','show_location','search_placeholder']) {
+          for (final key in ['version','preset','enabled','background_color','foreground_color','background_image_url','background_mime_type','logo_url','height','spacing','radius','position','show_menu','show_logo','show_cart','show_voice_search','show_search','show_wishlist','show_refresh','show_location','search_placeholder','visible_pages','actions','menu_icon_family','menu_icon','cart_icon_family','cart_icon','voice_icon_family','voice_icon','search_icon_family','search_icon','wishlist_icon_family','wishlist_icon','refresh_icon_family','refresh_icon','location_icon_family','location_icon']) {
             if (jsonEncode(requestedAppBar[key]) != jsonEncode(publishedAppBar[key])) {
               throw Exception('WordPress changed App Bar "$key" during publish. Designer: ${requestedAppBar[key]}, WordPress: ${publishedAppBar[key]}.');
             }
@@ -1965,6 +1965,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
       'templates': templates,
       'navigation_bar': navigationConfig.toJson(),
+      'app_bar': appBarConfig.toJson(),
       'floating_actions': floatingActions,
     };
     await prefs.setString(_storageKey, const JsonEncoder.withIndent('  ').convert(localData));
