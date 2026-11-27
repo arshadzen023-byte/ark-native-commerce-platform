@@ -1630,13 +1630,13 @@ class _StoreHomeState extends State<StoreHome> {
     if (!config.enabled || !config.visibleOn(pageKey)) return null;
     final topInset = MediaQuery.paddingOf(context).top;
     return PreferredSize(
-      preferredSize: Size.fromHeight(config.height),
+      preferredSize: Size.fromHeight(config.renderHeight),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(height: topInset),
           SizedBox(
-            height: config.height,
+            height: config.renderHeight,
             child: DesignerAppBarView(
         config: config,
         pageKey: pageKey,
