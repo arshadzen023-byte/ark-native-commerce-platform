@@ -356,6 +356,8 @@ class DesignerAppBarView extends StatelessWidget {
       child:TextField(
         controller:searchController,
         focusNode:searchFocusNode,
+        textAlign:TextAlign.center,
+        textAlignVertical:TextAlignVertical.center,
         textInputAction:TextInputAction.search,
         onTap:onSearch,
         onSubmitted:onSearchSubmitted,
