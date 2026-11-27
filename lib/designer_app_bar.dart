@@ -53,7 +53,6 @@ class DesignerAppBarConfig {
     out['actions']=normalizeActions(source['actions']);
     final terms = source['search_placeholder_terms'];
     out['search_placeholder_terms'] = terms is List ? terms.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).take(12).toList() : <String>['watch','book','cloth'];
-    if ((out['search_placeholder_terms'] as List).isEmpty) out['search_placeholder_terms'] = <String>['watch','book','cloth'];
     out['height']=((out['height'] as num?)?.toDouble()??156).clamp(88.0,220.0).toDouble();
     out['spacing']=((out['spacing'] as num?)?.toDouble()??8).clamp(0.0,32.0).toDouble();
     out['radius']=((out['radius'] as num?)?.toDouble()??12).clamp(0.0,36.0).toDouble();
@@ -318,8 +317,7 @@ class DesignerAppBarView extends StatelessWidget {
                 tooltip:'Clear search',
                 onPressed:(){
                   searchController.clear();
-                  onSearchSubmitted('');
-                  searchFocusNode.requestFocus();
+                  searchFocusNode.unfocus();
                 },
                 icon:const Icon(Icons.close,color:Colors.black54),
               ),
