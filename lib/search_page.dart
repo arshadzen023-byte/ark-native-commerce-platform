@@ -212,7 +212,7 @@ class _GlowHitSearchPageState extends State<GlowHitSearchPage> {
       }
       if (!mounted) return;
       setState(() => _listening = true);
-      _speech.listen(
+      await _speech.listen(
         localeId: localeId,
         listenFor: const Duration(seconds: 45),
         pauseFor: const Duration(seconds: 7),
