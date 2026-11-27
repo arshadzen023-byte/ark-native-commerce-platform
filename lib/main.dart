@@ -277,6 +277,7 @@ class _StoreHomeState extends State<StoreHome> {
     await _refreshNotificationCount(markSeen: true);
     final link = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NotificationInboxPage(
       service: push,
+      appBar: _buildConfiguredAppBar('notifications'),
       floatingActionButton: _buildDesignerFloatingAction('notifications'),
     )));
     await _refreshNotificationCount();
@@ -302,7 +303,7 @@ class _StoreHomeState extends State<StoreHome> {
           }
         } catch (_) { if (mounted) setState(() => tab = 4); }
       } else {
-        if (mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders')));
+        if (mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders', appBar: _buildConfiguredAppBar('orders'))));
       }
       return;
     }
@@ -1426,7 +1427,7 @@ class _StoreHomeState extends State<StoreHome> {
             : <Map<String, dynamic>>[];
         await Navigator.of(context).push(MaterialPageRoute<void>(
           builder: (_) => Scaffold(
-            appBar: AppBar(title: Text((pageData['title'] ?? pageKey).toString())),
+            appBar: _buildConfiguredAppBar(pageKey) ?? AppBar(title: Text((pageData['title'] ?? pageKey).toString())),
             body: ListView(
               padding: const EdgeInsets.only(bottom: 16),
               children: sections.map(_designerSection).toList(),
@@ -1529,7 +1530,7 @@ class _StoreHomeState extends State<StoreHome> {
           : <Map<String, dynamic>>[];
       await Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (_) => Scaffold(
-          appBar: AppBar(title: Text((pageData['title'] ?? item.label).toString())),
+          appBar: _buildConfiguredAppBar(pageKey) ?? AppBar(title: Text((pageData['title'] ?? item.label).toString())),
           body: ListView(
             padding: const EdgeInsets.only(bottom: 16),
             children: sections.map(_designerSection).toList(),
@@ -1617,7 +1618,7 @@ class _StoreHomeState extends State<StoreHome> {
         onLocation: () async {
           if (customerToken == null) { setState(() => tab = 4); return; }
           await Navigator.push(context, MaterialPageRoute(builder: (_) =>
-              CustomerSectionPage(token: customerToken!, section: 'Saved Addresses')));
+              CustomerSectionPage(token: customerToken!, section: 'Saved Addresses', appBar: _buildConfiguredAppBar('account'))));
         },
         onCustomAction: _openAppBarCustomAction,
       ),
@@ -1655,7 +1656,7 @@ class _StoreHomeState extends State<StoreHome> {
     );
   }
 
-  Widget account() => AccountPanel(onLogin: (token) { setState(() => customerToken = token); push.register(customerJwt: token); }, onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } try { await push.unlinkAccount(); } catch (_) {} final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() { customerToken = null; notificationCount = 0; }); }, token: customerToken, onRecentViewed: _openRecentlyViewed, ordersFloatingActionButton: _buildDesignerFloatingAction('orders'));
+  Widget account() => AccountPanel(ordersAppBar: _buildConfiguredAppBar('orders'), onLogin: (token) { setState(() => customerToken = token); push.register(customerJwt: token); }, onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } try { await push.unlinkAccount(); } catch (_) {} final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() { customerToken = null; notificationCount = 0; }); }, token: customerToken, onRecentViewed: _openRecentlyViewed, ordersFloatingActionButton: _buildDesignerFloatingAction('orders'));
   @override Widget build(BuildContext context) {
     final titles = ['Shopping', 'Categories', 'Wishlist', 'Cart', 'Account'];
     Widget page;
@@ -1688,12 +1689,13 @@ class _StoreHomeState extends State<StoreHome> {
 }
 
 class AccountPanel extends StatefulWidget {
-  const AccountPanel({super.key, required this.onLogin, required this.onLogout, required this.token, required this.onRecentViewed, this.ordersFloatingActionButton});
+  const AccountPanel({super.key, required this.onLogin, required this.onLogout, required this.token, required this.onRecentViewed, this.ordersFloatingActionButton, this.ordersAppBar});
   final ValueChanged<String> onLogin;
   final VoidCallback onLogout;
   final VoidCallback onRecentViewed;
   final String? token;
   final Widget? ordersFloatingActionButton;
+  final PreferredSizeWidget? ordersAppBar;
   @override State<AccountPanel> createState() => _AccountPanelState();
 }
 
@@ -1813,7 +1815,7 @@ class _AccountPanelState extends State<AccountPanel> with SingleTickerProviderSt
         ),
         const SizedBox(height: 22),
         const Padding(padding: EdgeInsets.only(left: 3, bottom: 10), child: Text('MY ACCOUNT', style: TextStyle(fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.w800, color: purple))),
-        _menuTile(context, Icons.receipt_long_rounded, 'My Orders', 'Track, cancel and review your purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'My Orders', floatingActionButton: widget.ordersFloatingActionButton)))),
+        _menuTile(context, Icons.receipt_long_rounded, 'My Orders', 'Track, cancel and review your purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'My Orders', floatingActionButton: widget.ordersFloatingActionButton, appBar: widget.ordersAppBar)))),
         _menuTile(context, Icons.download_for_offline_rounded, 'Downloads', 'Your available digital purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Downloads')))),
         _menuTile(context, Icons.location_on_rounded, 'Saved Addresses', 'Manage delivery addresses', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Saved Addresses')))),
         _menuTile(context, Icons.person_rounded, 'Edit Profile', 'Update your name and contact details', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Edit Profile')))),
