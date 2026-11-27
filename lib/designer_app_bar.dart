@@ -23,7 +23,7 @@ class DesignerAppBarConfig {
   static const defaults = <String,dynamic>{
     'version':1,'enabled':true,'preset':'custom','background_color':'#FFFFFF','foreground_color':'#202124',
     'background_image_url':'','background_mime_type':'','logo_url':'','height':156.0,'spacing':8.0,'radius':12.0,'position':'top',
-    'show_menu':true,'show_logo':true,'show_cart':true,'show_voice_search':true,'show_search':true,'show_wishlist':true,'show_refresh':false,'show_location':false,
+    'show_menu':true,'show_logo':true,'show_cart':true,'show_voice_search':true,'show_search':true,'show_wishlist':true ,'show_refresh':false,'show_location':true,
     'search_placeholder':'Search products...',
     'menu_icon_family':'Material','menu_icon':'menu','cart_icon_family':'Material','cart_icon':'shopping_cart_outlined',
     'voice_icon_family':'Material','voice_icon':'mic_none','search_icon_family':'Material','search_icon':'search',
@@ -31,7 +31,6 @@ class DesignerAppBarConfig {
     'location_icon_family':'Material','location_icon':'location_on_outlined','visible_pages':<String,dynamic>{},'actions':<dynamic>[],
     'menu_label':'GlowHit','search_background_color':'#FFFFFF','search_foreground_color':'#555555',
     'top_actions':<dynamic>[],
-    'show_location':true,
   };
 
   static Map<String,dynamic> _normalize(Map<String,dynamic> source) {
