@@ -113,6 +113,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
   late Map<String, dynamic> data;
   final _color = TextEditingController();
   final _placeholder = TextEditingController();
+  final _previewSearchController = TextEditingController();
 
   @override
   void initState() {
@@ -126,6 +127,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
   void dispose() {
     _color.dispose();
     _placeholder.dispose();
+    _previewSearchController.dispose();
     super.dispose();
   }
 
@@ -243,7 +245,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
             config: config,
             pageKey: 'home',
             cartCount: 2,
-            searchController: TextEditingController(text: ''),
+            searchController: _previewSearchController,
             onMenu: () {},
             onCart: () {},
             onSearch: () {},
