@@ -247,7 +247,6 @@ class _StoreHomeState extends State<StoreHome> {
   String? customerToken;
   late final GlowHitPushService push;
   int notificationCount = 0;
-  bool _designerAdminAccess = false;
   @override void initState() {
     super.initState();
     searchFocusNode.addListener(_handleSearchFocusChange);
@@ -430,10 +429,8 @@ class _StoreHomeState extends State<StoreHome> {
     try {
       final response = await ArkCustomerApi(token).request('designer/config');
       final allowed = response is Map && response['pages'] is Map;
-      _designerAdminAccess = allowed;
       return allowed;
     } catch (_) {
-      _designerAdminAccess = false;
       return false;
     }
   }
@@ -471,7 +468,7 @@ class _StoreHomeState extends State<StoreHome> {
                 onTap:()=>Navigator.pop(ctx,item),
               ),
             if(canManageDesigner)
-              ListTile(leading:const Icon(Icons.design_services_outlined,color:Color(0xFF51408F)),title:const Text('ARK Designer',style:TextStyle(fontWeight:FontWeight.w700)),trailing:const Icon(Icons.chevron_right),onTap:()=>Navigator.pop(ctx,{'id':'designer','link_type':'page','link_value':'designer','title':'ARK Designer'}),
+              ListTile(leading:const Icon(Icons.design_services_outlined,color:Color(0xFF51408F)),title:const Text('ARK Designer',style:TextStyle(fontWeight:FontWeight.w700)),trailing:const Icon(Icons.chevron_right),onTap:()=>Navigator.pop(ctx,{'id':'designer','link_type':'page','link_value':'designer','title':'ARK Designer'})),
           ])),
         ]),
       )),
@@ -725,7 +722,6 @@ class _StoreHomeState extends State<StoreHome> {
       return;
     }
     if (!mounted) return;
-    _designerAdminAccess = true;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GlowHitDesignerPage(token: token)));
     // The Designer may have published while Shopping stayed alive. Always
     // re-fetch the public config when returning instead of relying on memory.
