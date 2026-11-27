@@ -1633,7 +1633,7 @@ class _StoreHomeState extends State<StoreHome> {
     final currentPageKey = tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home') : tab == 1 ? 'categories' : tab == 2 ? 'wishlist' : tab == 3 ? 'cart' : 'account';
     final appBarConfig = DesignerAppBarConfig(json: designerConfig['app_bar'] is Map ? Map<String, dynamic>.from(designerConfig['app_bar'] as Map) : const {});
     final useCustomAppBar = appBarConfig.enabled && appBarConfig.visibleOn(currentPageKey);
-    final Widget activeAppBar = useCustomAppBar
+    final PreferredSizeWidget activeAppBar = useCustomAppBar
       ? PreferredSize(
           preferredSize: Size.fromHeight(appBarConfig.height),
           child: DesignerAppBarView(
