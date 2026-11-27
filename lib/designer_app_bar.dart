@@ -232,7 +232,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
 
   @override Widget build(BuildContext context){
     final config=DesignerAppBarConfig(json:data);
-    final previewHeight=(config.renderHeight+50).clamp(150.0,270.0).toDouble();
+    final previewHeight=(config.renderHeight+66).clamp(166.0,300.0).toDouble();
     return Scaffold(
       resizeToAvoidBottomInset:true,
       appBar:AppBar(title:const Text('App Bar Builder'),actions:[TextButton(onPressed:apply,child:const Text('Apply'))]),
