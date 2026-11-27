@@ -30,7 +30,6 @@ class DesignerAppBarConfig {
     'wishlist_icon_family':'Material','wishlist_icon':'favorite_border','refresh_icon_family':'Material','refresh_icon':'refresh',
     'location_icon_family':'Material','location_icon':'location_on_outlined','visible_pages':<String,dynamic>{},'actions':<dynamic>[],
     'menu_label':'GlowHit','search_background_color':'#FFFFFF','search_foreground_color':'#555555',
-    'top_actions':<dynamic>[],
   };
 
   static Map<String,dynamic> _normalize(Map<String,dynamic> source) {
@@ -44,7 +43,6 @@ class DesignerAppBarConfig {
       'link_type':(e['link_type']??'page').toString(),'link_value':(e['link_value']??'home').toString(),'visible':e['visible']!=false,
     }).toList() : <Map<String,dynamic>>[];
     out['actions']=normalizeActions(source['actions']);
-    out['top_actions']=normalizeActions(source['top_actions']);
     out['height']=((out['height'] as num?)?.toDouble()??156).clamp(88.0,220.0).toDouble();
     out['spacing']=((out['spacing'] as num?)?.toDouble()??8).clamp(0.0,32.0).toDouble();
     out['radius']=((out['radius'] as num?)?.toDouble()??12).clamp(0.0,36.0).toDouble();
@@ -146,13 +144,13 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     final config=DesignerAppBarConfig(json:data);
     return ClipRRect(borderRadius:BorderRadius.circular(14),child:Column(children:[
       Container(width:double.infinity,padding:const EdgeInsets.all(6),color:Colors.black12,child:const Text('LIVE PREVIEW · GLOWHIT',style:TextStyle(fontSize:10,fontWeight:FontWeight.bold))),
-      SizedBox(height:config.height.clamp(64.0,180.0).toDouble(),child:DesignerAppBarView(config:config,pageKey:'home',cartCount:2,searchController:previewController,onMenu:(){},onCart:(){},onSearch:(){},onVoiceSearch:(){},onWishlist:(){},onRefresh:(){},onLocation:(){},onCustomAction:(_){ })),
+      SizedBox(height:config.height.clamp(88.0,220.0).toDouble(),child:DesignerAppBarView(config:config,pageKey:'home',cartCount:2,searchController:previewController,onMenu:(){},onCart:(){},onSearch:(){},onVoiceSearch:(){},onWishlist:(){},onRefresh:(){},onLocation:(){},onCustomAction:(_){ })),
     ]));
   }
 
   @override Widget build(BuildContext context){
     final config=DesignerAppBarConfig(json:data);
-    final previewHeight=(config.height+38).clamp(102.0,218.0).toDouble();
+    final previewHeight=(config.height+50).clamp(150.0,240.0).toDouble();
     return Scaffold(
       resizeToAvoidBottomInset:true,
       appBar:AppBar(title:const Text('App Bar Builder'),actions:[TextButton(onPressed:apply,child:const Text('Apply'))]),
@@ -300,7 +298,8 @@ class DesignerAppBarView extends StatelessWidget {
       if(config.show('show_wishlist')) iconButton('wishlist',onWishlist),
       if(config.show('show_cart')) iconButton('cart',onCart,badge:true),
       if(config.show('show_refresh')) iconButton('refresh',onRefresh),
-      for(final action in (data['top_actions'] as List? ?? const []).whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).where((a)=>a['visible']!=false).take(3)) actionButton(action),
+      if(config.actions.where((a)=>a['visible']!=false).isNotEmpty)
+        Expanded(child:SingleChildScrollView(scrollDirection:Axis.horizontal,child:Row(mainAxisSize:MainAxisSize.min,children:config.actions.where((a)=>a['visible']!=false).map(actionButton).toList()))),
     ]);
     final body=Container(
       padding:EdgeInsets.symmetric(horizontal:config.spacing,vertical:5),
@@ -330,14 +329,6 @@ class DesignerAppBarView extends StatelessWidget {
                 ]),
               ),
             ),
-          ),
-          for(final action in config.actions.where((a)=>a['visible']!=false).take(10)) Padding(
-            padding:const EdgeInsets.only(top:3),
-            child:InkWell(onTap:()=>onCustomAction(action),child:Row(children:[
-              DesignerNavIcons.icon((action['icon_family']??'Material').toString(),(action['icon']??'star_outline').toString(),color:fg,size:19),
-              const SizedBox(width:7),
-              Text((action['label']??'Action').toString(),style:TextStyle(color:fg,fontSize:12)),
-            ])),
           ),
         ],
       ),
