@@ -658,7 +658,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             throw Exception(
               'WordPress saved the request but returned an incompatible response. '
               'The active ARK Native API Bridge publish endpoint must return the saved Home JSON. '
-              'Check that only one ARK Native API Bridge is active and that version 2.2.5 is the active copy.',
+              'Check that only one ARK Native API Bridge is active and that version 2.2.6 is the active copy.',
             );
           }
           final serverConfig = Map<String, dynamic>.from(serverValue);
