@@ -17,6 +17,7 @@ void main() {
       'enabled': true,
       'show_voice_search': true,
       'show_cart': false,
+      'top_actions': [{'id':'a2','label':'Profile','link_type':'page','link_value':'account'}],
       'height': 88,
       'spacing': 12,
       'radius': 18,
@@ -39,6 +40,7 @@ void main() {
     expect(config.visibleOn('custom_campaign'), isFalse);
     expect(config.visibleOn('home'), isTrue);
     expect(config.actions.single['link_value'], 'account');
+    expect((json['top_actions'] as List).single['link_value'], 'account');
   });
 
   test('App Bar Builder limits custom action buttons to ten', () {
@@ -73,6 +75,41 @@ void main() {
     await tester.pumpAndSettle();
     expect(saved, isNotNull);
     expect(saved!.toJson()['show_voice_search'], isTrue);
+  });
+
+  testWidgets('Native App Bar uses a single search field and three-row layout', (tester) async {
+    final config=DesignerAppBarConfig(json:{
+      'height':156,
+      'show_menu':true,
+      'show_search':true,
+      'show_voice_search':true,
+      'show_location':true,
+    });
+    await tester.pumpWidget(MaterialApp(home:Scaffold(
+      appBar:PreferredSize(preferredSize:Size.fromHeight(config.height),child:DesignerAppBarView(
+        config:config,pageKey:'home',cartCount:0,searchController:TextEditingController(),
+        onMenu:(){},onCart:(){},onSearch:(){},onVoiceSearch:(){},onWishlist:(){},onRefresh:(){},onLocation:(){},onCustomAction:(_){},
+      )),
+    )));
+    await tester.pumpAndSettle();
+    expect(find.text('Search products...'),findsOneWidget);
+    expect(find.text('Deliver to your address'),findsOneWidget);
+    expect(find.byTooltip('Voice Search'),findsOneWidget);
+    expect(find.byType(TextField),findsNothing);
+  });
+
+  testWidgets('App Bar Builder pins the preview outside the scrolling properties', (tester) async {
+    await tester.pumpWidget(MaterialApp(home:DesignerAppBarBuilderPage(
+      initialConfig:DesignerAppBarConfig(),
+      availablePages:const [{'key':'home','title':'Home'}],
+      onUpload:() async=>null,
+      onSave:(_) async{},
+    )));
+    await tester.pumpAndSettle();
+    final preview=find.text('LIVE PREVIEW · GLOWHIT');
+    expect(preview,findsOneWidget);
+    expect(find.byType(Expanded),findsWidgets);
+    expect(find.text('12 Ready-made App Bars'),findsOneWidget);
   });
 
   testWidgets('Native App Bar view renders voice, cart and custom actions', (tester) async {
