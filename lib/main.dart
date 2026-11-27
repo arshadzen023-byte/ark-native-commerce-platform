@@ -220,6 +220,54 @@ class GlowHitApp extends StatelessWidget {
   );
 }
 
+
+/// Collapses the top App Bar row and keeps only Search + Delivery Address pinned.
+class _GlowHitPinnedSearchAddressHeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _GlowHitPinnedSearchAddressHeaderDelegate({
+    required this.minHeight,
+    required this.maxHeight,
+    required this.backgroundColor,
+    required this.child,
+  });
+
+  final double minHeight;
+  final double maxHeight;
+  final Color backgroundColor;
+  final Widget child;
+
+  @override
+  double get minExtent => minHeight;
+
+  @override
+  double get maxExtent => maxHeight < minHeight ? minHeight : maxHeight;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    // Align bottom so the final Search/Address rows stay in place as the
+    // upper Menu/Logo/Actions row is clipped smoothly during scrolling.
+    return ColoredBox(
+      color: backgroundColor,
+      child: ClipRect(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: SizedBox(
+            height: maxExtent,
+            width: double.infinity,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _GlowHitPinnedSearchAddressHeaderDelegate oldDelegate) =>
+      minHeight != oldDelegate.minHeight ||
+      maxHeight != oldDelegate.maxHeight ||
+      backgroundColor != oldDelegate.backgroundColor ||
+      child != oldDelegate.child;
+}
+
 class StoreHome extends StatefulWidget {
   const StoreHome({super.key, this.initialToken});
   final String? initialToken;
@@ -243,6 +291,7 @@ class _StoreHomeState extends State<StoreHome> {
   bool _designerAdminCheckComplete = false;
   DateTime? _designerAdminVerifiedAt;
   final Map<String, Future<Map<String, dynamic>>> _sliderFutures = {};
+  final Map<String, Timer> _componentCountdownTimers = {};
   final WooStoreApi woo = WooStoreApi();
   Map<String, dynamic> liveCart = {};
   bool cartBusy = false;
@@ -425,7 +474,7 @@ class _StoreHomeState extends State<StoreHome> {
 
   void _handleSearchFocusChange() { if (mounted) setState(() {}); }
 
-  @override void dispose() { searchFocusNode.removeListener(_handleSearchFocusChange); searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
+  @override void dispose() { for (final timer in _componentCountdownTimers.values) { timer.cancel(); } _componentCountdownTimers.clear(); searchFocusNode.removeListener(_handleSearchFocusChange); searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
 
   bool _isNestedAppBarPage(String pageKey) => !const ['home','search','categories','wishlist','cart','account'].contains(pageKey);
 
@@ -764,6 +813,7 @@ class _StoreHomeState extends State<StoreHome> {
         if (decoded is Map) {
           final value = Map<String, dynamic>.from(decoded);
           if (mounted) setState(() => designerConfig = value);
+          unawaited(_precacheDesignerImages(value));
         }
       } catch (_) {}
     }
@@ -807,6 +857,8 @@ class _StoreHomeState extends State<StoreHome> {
 
       // Cache only the same published shape that the public Home renderer reads.
       await prefs.setString('glowhit_published_designer_config', jsonEncode(value));
+      // Warm Home component assets after updating the published configuration.
+      unawaited(_precacheDesignerImages(value));
       _sliderFutures.clear();
       if (mounted) setState(() => designerConfig = value);
       debugPrint('[ARK Designer Sync] Published Home v${value['version'] ?? value['published_version'] ?? 'unknown'}: ${sections.length} visible sections');
@@ -835,6 +887,46 @@ class _StoreHomeState extends State<StoreHome> {
         setState(() => storeCategories = decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList());
       }
     } catch (_) {}
+  }
+
+  Future<void> _precacheDesignerImages(Map<String, dynamic> config) async {
+    final urls = <String>{};
+    final rawPages = config['pages'];
+    if (rawPages is Map) {
+      for (final rawPage in rawPages.values.whereType<Map>()) {
+        final rawSections = rawPage['sections'];
+        if (rawSections is! List) continue;
+        for (final rawSection in rawSections.whereType<Map>()) {
+          final nested = rawSection['properties'] is Map
+              ? Map<String, dynamic>.from(rawSection['properties'] as Map)
+              : <String, dynamic>{};
+          final section = <String, dynamic>{...rawSection, ...nested};
+          for (final key in const ['background_image_url','image_url','source_url','thumbnail_url']) {
+            final url = (section[key] ?? '').toString().trim();
+            if (url.startsWith('https://') || url.startsWith('http://')) urls.add(url);
+          }
+          for (final key in const ['children','slides']) {
+            final children = section[key];
+            if (children is! List) continue;
+            for (final child in children.whereType<Map>()) {
+              final url = (child['image_url'] ?? child['source_url'] ?? child['url'] ?? '').toString().trim();
+              if (url.startsWith('https://') || url.startsWith('http://')) urls.add(url);
+            }
+          }
+        }
+      }
+    }
+    final cacheWidth = (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio)
+        .round().clamp(320, 1600);
+    for (final url in urls.take(12)) {
+      if (!mounted) return;
+      try {
+        await precacheImage(ResizeImage(NetworkImage(url), width: cacheWidth), context)
+            .timeout(const Duration(seconds: 5));
+      } catch (_) {
+        // An unavailable image must not block the Home screen.
+      }
+    }
   }
 
   Future<Map<String, dynamic>> _loadDesignerSlider(String key) async {
@@ -898,6 +990,20 @@ class _StoreHomeState extends State<StoreHome> {
     if (config['visible'] == false) return const SizedBox.shrink();
     final layoutSpec = DesignerLayoutSpec.fromMap(config);
     final title = (config['title'] ?? '').toString();
+    final countdownEnabled = config['countdown_enabled'] == true;
+    final countdownExpiry = DateTime.tryParse((config['countdown_time'] ?? '').toString());
+    if (countdownEnabled && config['countdown_auto_hide'] == true && countdownExpiry != null) {
+      final timerKey = (config['id'] ?? section['id'] ?? title).toString();
+      _componentCountdownTimers.remove(timerKey)?.cancel();
+      final remaining = countdownExpiry.difference(DateTime.now());
+      if (remaining <= Duration.zero) return const SizedBox.shrink();
+      _componentCountdownTimers[timerKey] = Timer(remaining, () {
+        if (mounted) {
+          _componentCountdownTimers.remove(timerKey);
+          setState(() {});
+        }
+      });
+    }
     final showTitle = config['show_title'] != false && title.isNotEmpty;
     final background = (config['section_background'] ?? 'transparent').toString();
     final backgroundImageUrl = (config['background_image_url'] ?? '').toString().trim();
@@ -1077,7 +1183,14 @@ class _StoreHomeState extends State<StoreHome> {
                                         slide['title'].toString(),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                        textAlign: titleAlignment,
+                                        style: TextStyle(
+                                          color: _safeColor((config['title_color'] ?? '#FFFFFF').toString(), fallback: Colors.white),
+                                          fontSize: (config['title_font_size'] as num?)?.toDouble() ?? 11,
+                                          fontWeight: (config['title_font_weight'] ?? 'bold') == 'normal'
+                                              ? FontWeight.normal
+                                              : (config['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -1133,6 +1246,12 @@ class _StoreHomeState extends State<StoreHome> {
                           fade: config['transition'] == 'fade',
                           viewFraction: carouselFraction,
                           elevation: childElevation.clamp(0, 12).toDouble(),
+                          titleAlignment: titleAlignment,
+                          titleFontSize: (config['title_font_size'] as num?)?.toDouble() ?? 16,
+                          titleFontWeight: (config['title_font_weight'] ?? 'bold') == 'normal'
+                              ? FontWeight.normal
+                              : (config['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
+                          titleColor: _safeColor((config['title_color'] ?? '#FFFFFF').toString(), fallback: Colors.white),
                           onSlideTap: _openDesignerChildLink,
                         ),
                       ),
@@ -1548,35 +1667,22 @@ class _StoreHomeState extends State<StoreHome> {
         : const {});
     // The App Bar collapses its top action/logo row during Home scrolling,
     // while Search and Delivery Address remain visible as pinned rows.
-    final pinnedRowsHeight = (config.show('show_search') ? 54.0 : 0.0)
-        + (config.show('show_location') ? 40.0 : 0.0);
-    final fullHeaderHeight = config.renderHeight.toDouble();
-    final expandedHeight = (fullHeaderHeight - pinnedRowsHeight)
-        .clamp(0.0, fullHeaderHeight).toDouble();
+    final pinnedRowsHeight = ((config.show('show_search') ? 54.0 : 0.0)
+        + (config.show('show_location') ? 40.0 : 0.0)).clamp(48.0, 120.0).toDouble();
+    final fullHeaderHeight = config.renderHeight.toDouble().clamp(pinnedRowsHeight, 260.0);
     return RefreshIndicator(
       onRefresh: _loadDesignerConfig,
       child: CustomScrollView(
         key: const PageStorageKey<String>('glowhit-home-scroll'),
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          SliverAppBar(
-            automaticallyImplyLeading: false,
-            primary: false,
+          SliverPersistentHeader(
             pinned: true,
-            floating: false,
-            snap: false,
-            toolbarHeight: pinnedRowsHeight,
-            collapsedHeight: pinnedRowsHeight,
-            expandedHeight: fullHeaderHeight,
-            backgroundColor: DesignerAppBarConfig.color(config.backgroundColor),
-            surfaceTintColor: Colors.transparent,
-            flexibleSpace: FlexibleSpaceBar(
-              collapseMode: CollapseMode.pin,
-              background: SizedBox.expand(
-                child: ClipRect(
-                  child: _buildConfiguredAppBar('home') ?? const SizedBox.shrink(),
-                ),
-              ),
+            delegate: _GlowHitPinnedSearchAddressHeaderDelegate(
+              minHeight: pinnedRowsHeight,
+              maxHeight: fullHeaderHeight,
+              backgroundColor: DesignerAppBarConfig.color(config.backgroundColor),
+              child: _buildConfiguredAppBar('home') ?? const SizedBox.shrink(),
             ),
           ),
           if (designerConfigLoading && sections.isEmpty)
