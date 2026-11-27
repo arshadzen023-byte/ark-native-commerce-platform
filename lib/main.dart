@@ -1222,8 +1222,8 @@ class _StoreHomeState extends State<StoreHome> {
   Widget? _buildDesignerFloatingAction(String pageKey) {
     final action = _floatingActionForPage(pageKey);
     if (action == null) return null;
-    final size = ((action['size'] as num?)?.toDouble() ?? 56).clamp(40.0, 76.0);
-    final right = ((action['margin_right'] as num?)?.toDouble() ?? 16).clamp(0.0, 120.0);
+    final size = ((action['size'] as num?)?.toDouble() ?? 56).clamp(40.0, 76.0).toDouble();
+    final right = ((action['margin_right'] as num?)?.toDouble() ?? 16).clamp(0.0, 120.0).toDouble();
     final bottom = ((action['margin_bottom'] as num?)?.toDouble() ?? 16).clamp(0.0, 120.0);
     final family = (action['icon_family'] ?? 'Material').toString();
     final iconName = (action['icon'] ?? 'add').toString();
@@ -1238,7 +1238,7 @@ class _StoreHomeState extends State<StoreHome> {
               ? 'Open action' : action['tooltip'].toString(),
           backgroundColor: _safeColor((action['background_color'] ?? '#5B3A9E').toString()),
           foregroundColor: _safeColor((action['icon_color'] ?? '#FFFFFF').toString()),
-          onPressed: () => _handleDesignerFloatingAction(pageKey, action),
+          onPressed: () => _handleDesignerFloatingAction(action),
           child: DesignerNavIcons.icon(
             family, iconName,
             color: _safeColor((action['icon_color'] ?? '#FFFFFF').toString()),
@@ -1249,7 +1249,7 @@ class _StoreHomeState extends State<StoreHome> {
     );
   }
 
-  Future<void> _handleDesignerFloatingAction(String sourcePage, Map<String, dynamic> action) async {
+  Future<void> _handleDesignerFloatingAction(Map<String, dynamic> action) async {
     final type = (action['link_type'] ?? 'in_app').toString();
     final target = (action['link_value'] ?? '').toString().trim();
     if (target.isEmpty) {
