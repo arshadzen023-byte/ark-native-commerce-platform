@@ -271,13 +271,15 @@ class _StoreHomeState extends State<StoreHome> {
       if (decoded is! Map) return;
       final address = Map<String, dynamic>.from(decoded);
       selectedDeliveryAddress = address;
-      final locality = [address['address_1'], address['address_2'], address['city'], address['postcode']]
+      final house = [address['address_1'], address['address_2']]
           .where((v) => v != null && v.toString().trim().isNotEmpty)
           .map((v) => v.toString().trim()).join(', ');
-      final label = (address['label'] ?? '').toString().trim();
-      final full = locality.isNotEmpty ? locality : label;
-      final compact = full.isEmpty ? 'Deliver to your address' : 'Deliver to $full';
-      final display = compact.length > 20 ? '${compact.substring(0, 19)}…' : compact;
+      final city = (address['city'] ?? '').toString().trim();
+      final pin = (address['postcode'] ?? '').toString().trim();
+      final locality = [house, city].where((v) => v.isNotEmpty).join(', ');
+      final display = locality.isEmpty && pin.isEmpty
+          ? 'Deliver to your address'
+          : 'Deliver to ' + (locality.isEmpty ? 'your address' : locality) + (pin.isEmpty ? '' : '\nPIN ' + pin);
       if (mounted) setState(() => deliveryAddressLabel = display);
     } catch (_) {}
   }
@@ -421,15 +423,73 @@ class _StoreHomeState extends State<StoreHome> {
 
   bool _isNestedAppBarPage(String pageKey) => !const ['home','search','categories','wishlist','cart','account'].contains(pageKey);
 
+  Future<bool> _checkDesignerAdminAccess() async {
+    final token = customerToken;
+    if (token == null || token.isEmpty) return false;
+    try {
+      final response = await ArkCustomerApi(token).request('designer/config');
+      final allowed = response is Map && response['pages'] is Map;
+      return allowed;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _openAppBarMenu([String pageKey = 'home']) async {
-    final choice = await showModalBottomSheet<String>(context: context, builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      for (final item in const [('home','Home',Icons.home_outlined),('categories','Categories',Icons.grid_view),('wishlist','Wishlist',Icons.favorite_border),('cart','Cart',Icons.shopping_cart_outlined),('account','Account',Icons.person_outline),('designer','ARK Designer',Icons.design_services_outlined)])
-        ListTile(leading: Icon(item.$3), title: Text(item.$2), onTap: () => Navigator.pop(ctx, item.$1)),
-    ])));
+    final canManageDesigner = await _checkDesignerAdminAccess();
+    if (!mounted) return;
+    final raw = designerConfig['app_bar'] is Map ? Map<String,dynamic>.from(designerConfig['app_bar'] as Map) : <String,dynamic>{};
+    final config = DesignerAppBarConfig(json: raw);
+    final configured = config.menuItems;
+    final menuItems = configured.isNotEmpty ? configured : <Map<String,dynamic>>[
+      {'id':'home','title':'Home','link_type':'page','link_value':'home','leading_icon':'home_outlined'},
+      {'id':'categories','title':'Categories','link_type':'page','link_value':'categories','leading_icon':'grid_view'},
+      {'id':'wishlist','title':'Wishlist','link_type':'page','link_value':'wishlist','leading_icon':'favorite_border'},
+      {'id':'cart','title':'Cart','link_type':'page','link_value':'cart','leading_icon':'shopping_cart_outlined'},
+      {'id':'account','title':'Account','link_type':'page','link_value':'account','leading_icon':'person_outline'},
+    ];
+    final choice = await showModalBottomSheet<Map<String,dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SafeArea(child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * .82),
+        decoration: const BoxDecoration(color: Color(0xFFFFFBFF), borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width:42,height:4,margin:const EdgeInsets.only(top:10,bottom:8),decoration:BoxDecoration(color:Colors.black26,borderRadius:BorderRadius.circular(5))),
+          if (config.menuHeaderImageUrl.isNotEmpty)
+            ClipRRect(borderRadius:BorderRadius.circular(14),child:Padding(padding:const EdgeInsets.fromLTRB(14,4,14,10),child:Image.network(config.menuHeaderImageUrl,width:double.infinity,height:118,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const SizedBox.shrink()))),
+          Flexible(child:ListView(shrinkWrap:true,padding:const EdgeInsets.fromLTRB(12,4,12,18),children:[
+            for(final item in menuItems.where((e)=>e['visible']!=false && (canManageDesigner || (e['link_value']??'').toString()!='designer')))
+              ListTile(
+                leading: _menuLeadingIcon(item),
+                title: Text((item['title']??'Menu item').toString(),style:const TextStyle(fontWeight:FontWeight.w700)),
+                trailing: DesignerNavIcons.icon((item['trailing_icon_family']??'Material').toString(),(item['trailing_icon']??'chevron_right').toString(),color:const Color(0xFF51408F),size:20),
+                onTap:()=>Navigator.pop(ctx,item),
+              ),
+            if(canManageDesigner)
+              ListTile(leading:const Icon(Icons.design_services_outlined,color:Color(0xFF51408F)),title:const Text('ARK Designer',style:TextStyle(fontWeight:FontWeight.w700)),trailing:const Icon(Icons.chevron_right),onTap:()=>Navigator.pop(ctx,{'id':'designer','link_type':'page','link_value':'designer','title':'ARK Designer'})),
+          ])),
+        ]),
+      )),
+    );
     if (!mounted || choice == null) return;
-    if (choice == 'designer') { await _openDesigner(); return; }
+    final target = (choice['link_value'] ?? '').toString();
+    if (target == 'designer') { await _openDesigner(); return; }
     if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
-    setState(() => tab = switch (choice) {'home' => 0, 'categories' => 1, 'wishlist' => 2, 'cart' => 3, _ => 4});
+    await _openAppBarCustomAction({
+      'label':choice['title']??'Menu item',
+      'link_type':choice['link_type']??'page',
+      'link_value':target,
+    });
+  }
+
+  Widget _menuLeadingIcon(Map<String,dynamic> item) {
+    final icon=DesignerNavIcons.icon((item['leading_icon_family']??'Material').toString(),(item['leading_icon']??'home_outlined').toString(),color:const Color(0xFF51408F),size:22);
+    final style=(item['leading_icon_style']??'plain').toString();
+    if(style=='circle') return CircleAvatar(backgroundColor:const Color(0xFFEDE7F8),child:icon);
+    if(style=='tile') return Container(width:42,height:42,alignment:Alignment.center,decoration:BoxDecoration(color:const Color(0xFFEDE7F8),borderRadius:BorderRadius.circular(12)),child:icon);
+    return icon;
   }
 
   Future<void> _openAppBarCustomAction(Map<String, dynamic> action) async {

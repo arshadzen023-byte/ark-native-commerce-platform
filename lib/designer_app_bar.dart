@@ -21,6 +21,12 @@ class DesignerAppBarConfig {
   String get position => (_json['position'] ?? 'top').toString();
   String get backgroundImageUrl => (_json['background_image_url'] ?? '').toString();
   String get logoUrl => (_json['logo_url'] ?? '').toString();
+  String get menuHeaderImageUrl => (_json['menu_header_image_url'] ?? '').toString();
+  List<Map<String,dynamic>> get menuItems => (_json['menu_items'] as List? ?? const []).whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).take(30).toList();
+  double get iconSize => ((_json['icon_size'] as num?)?.toDouble() ?? 22).clamp(16.0,36.0).toDouble();
+  double get horizontalPadding => ((_json['horizontal_padding'] as num?)?.toDouble() ?? 10).clamp(0.0,24.0).toDouble();
+  double get leftPadding => ((_json['left_padding'] as num?)?.toDouble() ?? horizontalPadding).clamp(0.0,24.0).toDouble();
+  double get rightPadding => ((_json['right_padding'] as num?)?.toDouble() ?? horizontalPadding).clamp(0.0,24.0).toDouble();
   List<String> get searchTerms => (_json['search_placeholder_terms'] as List? ?? const ['watch','book','cloth']).map((e) => e.toString()).where((e) => e.trim().isNotEmpty).take(12).toList();
   bool show(String key) => _json[key] != false;
   bool visibleOn(String page) => (_json['visible_pages'] as Map?)?[page] != false;
@@ -29,7 +35,7 @@ class DesignerAppBarConfig {
   static const pageKeys = ['home','search','categories','wishlist','product','account','cart','orders','notifications'];
   static const defaults = <String,dynamic>{
     'version':1,'enabled':true,'preset':'custom','background_color':'#FFFFFF','foreground_color':'#202124',
-    'background_image_url':'','background_mime_type':'','logo_url':'','height':156.0,'spacing':8.0,'radius':12.0,'position':'top',
+    'background_image_url':'','background_mime_type':'','logo_url':'','menu_header_image_url':'','menu_items':<dynamic>[],'icon_size':22.0,'horizontal_padding':10.0,'left_padding':10.0,'right_padding':10.0,'height':156.0,'spacing':8.0,'radius':12.0,'position':'top',
     'show_menu':true,'show_logo':true,'show_cart':true,'show_voice_search':true,'show_search':true,'show_wishlist':true ,'show_refresh':false,'show_location':true,
     'search_placeholder':'Search products...',
     'search_placeholder_terms':<String>['watch','book','cloth'],
@@ -51,6 +57,21 @@ class DesignerAppBarConfig {
       'link_type':(e['link_type']??'page').toString(),'link_value':(e['link_value']??'home').toString(),'visible':e['visible']!=false,
     }).toList() : <Map<String,dynamic>>[];
     out['actions']=normalizeActions(source['actions']);
+    final rawMenu = source['menu_items'];
+    out['menu_items'] = rawMenu is List ? rawMenu.whereType<Map>().take(30).map((e)=><String,dynamic>{
+      'id':(e['id']??DateTime.now().microsecondsSinceEpoch).toString(),
+      'title':(e['title']??'Menu item').toString(),
+      'link_type':(e['link_type']??'page').toString(),
+      'link_value':(e['link_value']??'home').toString(),
+      'leading_icon_family':(e['leading_icon_family']??'Material').toString(),
+      'leading_icon':(e['leading_icon']??'home_outlined').toString(),
+      'leading_icon_style':(e['leading_icon_style']??'plain').toString(),
+      'trailing_icon_family':(e['trailing_icon_family']??'Material').toString(),
+      'trailing_icon':(e['trailing_icon']??'chevron_right').toString(),
+      'visible':e['visible']!=false,
+    }).toList() : <Map<String,dynamic>>[];
+    out['icon_size']=((out['icon_size'] as num?)?.toDouble()??22).clamp(16.0,36.0).toDouble();
+    out['horizontal_padding']=((out['horizontal_padding'] as num?)?.toDouble()??10).clamp(0.0,24.0).toDouble();
     final terms = source['search_placeholder_terms'];
     out['search_placeholder_terms'] = terms is List ? terms.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).take(12).toList() : <String>['watch','book','cloth'];
     out['height']=((out['height'] as num?)?.toDouble()??156).clamp(88.0,220.0).toDouble();
@@ -136,15 +157,63 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     actions.add({'id':DateTime.now().microsecondsSinceEpoch.toString(),'label':'Action ${actions.length+1}','icon_family':'Material','icon':'star_outline','link_type':'page','link_value':'home','visible':true});
     setValue('actions',actions);
   }
+  void addMenuItem() {
+    final items=List<Map<String,dynamic>>.from(DesignerAppBarConfig(json:data).toJson()['menu_items'] as List);
+    items.add({'id':DateTime.now().microsecondsSinceEpoch.toString(),'title':'New menu item','link_type':'page','link_value':'home','leading_icon_family':'Material','leading_icon':'home_outlined','leading_icon_style':'plain','trailing_icon_family':'Material','trailing_icon':'chevron_right','visible':true});
+    setValue('menu_items',items);
+  }
+  Future<void> chooseMenuIcon(int index,String field) async {
+    final choice=await pickIcon();if(choice==null||!mounted)return;
+    final items=List<Map<String,dynamic>>.from(DesignerAppBarConfig(json:data).toJson()['menu_items'] as List);
+    items[index][field+'_family']=choice.family;items[index][field]=choice.name;setValue('menu_items',items);
+  }
+  Widget menuEditor() {
+    final items=List<Map<String,dynamic>>.from(DesignerAppBarConfig(json:data).toJson()['menu_items'] as List);
+    return Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Row(children:[const Expanded(child:Text('Menu Edit',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold))),TextButton.icon(onPressed:items.length>=30?null:addMenuItem,icon:const Icon(Icons.add),label:const Text('Add item'))]),
+      ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.image_outlined),title:const Text('Menu Top Image · WordPress Gallery'),subtitle:Text((data['menu_header_image_url']??'').toString().isEmpty?'No menu image selected':'Image selected · tap to replace'),onTap:uploading?null:()=>upload('menu_header_image_url'),trailing:(data['menu_header_image_url']??'').toString().isEmpty?null:IconButton(tooltip:'Delete menu image',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>setValue('menu_header_image_url',''))),
+      if((data['menu_header_image_url']??'').toString().isNotEmpty) ClipRRect(borderRadius:BorderRadius.circular(10),child:Image.network(data['menu_header_image_url'].toString(),height:100,width:double.infinity,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const SizedBox(height:40,child:Text('Menu image preview unavailable')))),
+      for(var i=0;i<items.length;i++) Card(color:const Color(0xFFF8F7FC),child:Padding(padding:const EdgeInsets.all(9),child:Column(children:[
+        Row(children:[Expanded(child:TextFormField(initialValue:(items[i]['title']??'').toString(),decoration:const InputDecoration(labelText:'Title'),onChanged:(v){items[i]['title']=v;setValue('menu_items',items);})),IconButton(onPressed:(){final next=List<Map<String,dynamic>>.from(items)..removeAt(i);setValue('menu_items',next);},icon:const Icon(Icons.delete_outline,color:Colors.red))]),
+        DropdownButtonFormField<String>(value:(items[i]['link_type']??'page').toString(),decoration:const InputDecoration(labelText:'Link type'),items:const [DropdownMenuItem(value:'page',child:Text('App Page')),DropdownMenuItem(value:'url',child:Text('Website URL')),DropdownMenuItem(value:'deep_link',child:Text('Deep Link'))],onChanged:(v){items[i]['link_type']=v??'page';setValue('menu_items',items);}),
+        TextFormField(initialValue:(items[i]['link_value']??'home').toString(),decoration:const InputDecoration(labelText:'Link / Destination'),onChanged:(v){items[i]['link_value']=v;setValue('menu_items',items);}),
+        Row(children:[Expanded(child:ListTile(dense:true,contentPadding:EdgeInsets.zero,leading:DesignerNavIcons.icon((items[i]['leading_icon_family']??'Material').toString(),(items[i]['leading_icon']??'home_outlined').toString(),color:_appBarAccent),title:const Text('Leading Icon'),onTap:()=>chooseMenuIcon(i,'leading_icon'))),Expanded(child:ListTile(dense:true,contentPadding:EdgeInsets.zero,leading:DesignerNavIcons.icon((items[i]['trailing_icon_family']??'Material').toString(),(items[i]['trailing_icon']??'chevron_right').toString(),color:_appBarAccent),title:const Text('Trailing Icon'),onTap:()=>chooseMenuIcon(i,'trailing_icon')))]),
+        DropdownButtonFormField<String>(value:(items[i]['leading_icon_style']??'plain').toString(),decoration:const InputDecoration(labelText:'Leading Icon Style'),items:const [DropdownMenuItem(value:'plain',child:Text('Plain')),DropdownMenuItem(value:'circle',child:Text('Circle')),DropdownMenuItem(value:'tile',child:Text('Colored Tile'))],onChanged:(v){items[i]['leading_icon_style']=v??'plain';setValue('menu_items',items);}),
+        SwitchListTile(contentPadding:EdgeInsets.zero,title:const Text('Show menu item'),value:items[i]['visible']!=false,onChanged:(v){items[i]['visible']=v;setValue('menu_items',items);}),
+      ]))),
+      if(items.isEmpty) const Text('No custom menu items. Add items to replace the default menu list.'),
+    ])));
+  }
   Future<void> editActionIcon(int index) async {
     final choice=await pickIcon();if(choice==null||!mounted)return;
     final actions=DesignerAppBarConfig(json:data).actions;actions[index]['icon_family']=choice.family;actions[index]['icon']=choice.name;setValue('actions',actions);
   }
   Future<void> _pickBackgroundColor() async {
-    const colors = <Color>[Color(0xFFFFFFFF),Color(0xFFF0EAFE),Color(0xFFEAF2FF),Color(0xFFFFF3D6),Color(0xFFFFE8EF),Color(0xFFE5F7EE),Color(0xFF171923),Color(0xFF202124),Color(0xFF2874F0),Color(0xFF5B3A9E),Color(0xFF008577),Color(0xFFFFD814),Color(0xFFFCEAF3),Color(0xFFD9E8FF),Color(0xFFE8F5E9),Color(0xFFFFE0B2)];
-    final picked = await showDialog<Color>(context:context,builder:(ctx)=>AlertDialog(title:const Text('Choose App Bar Background'),content:SizedBox(width:300,child:GridView.count(shrinkWrap:true,crossAxisCount:4,crossAxisSpacing:10,mainAxisSpacing:10,children:colors.map((color)=>InkWell(onTap:()=>Navigator.pop(ctx,color),child:Container(decoration:BoxDecoration(color:color,shape:BoxShape.circle,border:Border.all(color:Colors.black26,width:1.2))))).toList())),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel'))]));
+    final current=DesignerAppBarConfig.color((data['background_color']??'#FFFFFF').toString());
+    var hsv=HSVColor.fromColor(current);
+    final picked=await showDialog<Color>(
+      context:context,
+      builder:(ctx)=>StatefulBuilder(builder:(ctx,setDialogState)=>AlertDialog(
+        title:const Text('Choose App Bar Background'),
+        content:SizedBox(width:320,child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Container(height:54,width:double.infinity,decoration:BoxDecoration(color:hsv.toColor(),borderRadius:BorderRadius.circular(12),border:Border.all(color:Colors.black12))),
+          const SizedBox(height:14),
+          const Text('Hue'),
+          Slider(value:hsv.hue.clamp(0,360).toDouble(),min:0,max:360,divisions:360,onChanged:(v)=>setDialogState(()=>hsv=hsv.withHue(v))),
+          const Text('Saturation'),
+          Slider(value:hsv.saturation,min:0,max:1,divisions:100,onChanged:(v)=>setDialogState(()=>hsv=hsv.withSaturation(v))),
+          const Text('Brightness'),
+          Slider(value:hsv.value,min:0,max:1,divisions:100,onChanged:(v)=>setDialogState(()=>hsv=hsv.withValue(v))),
+          Text('#'+hsv.toColor().value.toRadixString(16).substring(2).toUpperCase(),style:const TextStyle(fontWeight:FontWeight.w800)),
+        ])),
+        actions:[
+          TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel')),
+          FilledButton(onPressed:()=>Navigator.pop(ctx,hsv.toColor()),child:const Text('Use Colour')),
+        ],
+      )),
+    );
     if(picked==null||!mounted)return;
-    final hex='#${picked.value.toRadixString(16).substring(2).toUpperCase()}';
+    final hex='#'+picked.value.toRadixString(16).substring(2).toUpperCase();
     setState(()=>data['background_color']=hex);
     colorController.text=hex;
   }
@@ -198,6 +267,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
         switchTile('show_search','Search',Icons.search),switchTile('show_wishlist','Wishlist',Icons.favorite_border),
         switchTile('show_refresh','Refresh',Icons.refresh),switchTile('show_location','Address / Location',Icons.location_on_outlined),
       ]))),
+      menuEditor(),
       Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('Icon Library',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold)),
         for(final item in [('menu_icon','Menu',Icons.menu),('cart_icon','Cart',Icons.shopping_cart_outlined),('voice_icon','Voice Search',Icons.mic_none),('search_icon','Search',Icons.search),('wishlist_icon','Wishlist',Icons.favorite_border),('refresh_icon','Refresh',Icons.refresh),('location_icon','Location',Icons.location_on_outlined)])
@@ -214,7 +284,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
       ]))),
       Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('Dimensions & Position',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold)),
-        slider('Header Height','height',48,160),slider('Icon / Item Spacing','spacing',0,32),slider('Corner Radius','radius',0,36),
+        slider('Header Height','height',48,220),slider('Icon Size','icon_size',16,36),slider('Left Padding','left_padding',0,24),slider('Right Padding','right_padding',0,24),slider('Icon / Item Spacing','spacing',0,32),slider('Corner Radius','radius',0,36),
         DropdownButtonFormField<String>(value:config.position,decoration:const InputDecoration(labelText:'Header Position'),items:const [DropdownMenuItem(value:'top',child:Text('Top / Standard')),DropdownMenuItem(value:'floating',child:Text('Floating / Rounded')),DropdownMenuItem(value:'overlay',child:Text('Overlay Style'))],onChanged:(v)=>setValue('position',v??'top')),
       ]))),
       Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
@@ -269,7 +339,7 @@ class DesignerAppBarView extends StatelessWidget {
     Widget iconButton(String key,VoidCallback action,{bool badge=false}) {
       final family=(data['${key}_icon_family']??'Material').toString();
       final name=(data['${key}_icon']??'').toString();
-      final icon=DesignerNavIcons.icon(family,name,color:fg,size:21);
+      final icon=DesignerNavIcons.icon(family,name,color:fg,size:config.iconSize);
       return IconButton(
         visualDensity:VisualDensity.compact,
         constraints:const BoxConstraints(minWidth:40,minHeight:40),
@@ -285,7 +355,7 @@ class DesignerAppBarView extends StatelessWidget {
       padding:EdgeInsets.zero,
       tooltip:(action['label']??'Action').toString(),
       onPressed:()=>onCustomAction(action),
-      icon:DesignerNavIcons.icon((action['icon_family']??'Material').toString(),(action['icon']??'star_outline').toString(),color:fg,size:20),
+      icon:DesignerNavIcons.icon((action['icon_family']??'Material').toString(),(action['icon']??'star_outline').toString(),color:fg,size:config.iconSize),
     );
     Widget searchField() => Container(
       height:46,
@@ -304,16 +374,23 @@ class DesignerAppBarView extends StatelessWidget {
           isDense:true,
           hint: _RotatingSearchHint(terms: config.searchTerms.isEmpty ? [(data['search_placeholder']??'Search products...').toString()] : config.searchTerms, style: const TextStyle(color:Colors.black54,fontSize:14)),
           hintStyle:const TextStyle(color:Colors.black54,fontSize:14),
-          prefixIcon:DesignerNavIcons.icon((data['search_icon_family']??'Material').toString(),(data['search_icon']??'search').toString(),color:Colors.black54,size:22),
+          prefixIcon:DesignerNavIcons.icon((data['search_icon_family']??'Material').toString(),(data['search_icon']??'search').toString(),color:Colors.black54,size:config.iconSize),
+          prefixIconConstraints:const BoxConstraints(minWidth:44,minHeight:46),
           suffixIcon:Row(
             mainAxisSize:MainAxisSize.min,
             children:[
               if(config.show('show_voice_search')) IconButton(
+                visualDensity:VisualDensity.compact,
+                constraints:const BoxConstraints(minWidth:38,minHeight:40),
+                padding:EdgeInsets.zero,
                 tooltip:'Voice Search',
                 onPressed:onVoiceSearch,
-                icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:_appBarAccent,size:22),
+                icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:_appBarAccent,size:config.iconSize),
               ),
               IconButton(
+                visualDensity:VisualDensity.compact,
+                constraints:const BoxConstraints(minWidth:38,minHeight:40),
+                padding:EdgeInsets.zero,
                 tooltip:'Clear search',
                 onPressed:(){
                   searchController.clear();
@@ -324,7 +401,7 @@ class DesignerAppBarView extends StatelessWidget {
             ],
           ),
           border:InputBorder.none,
-          contentPadding:const EdgeInsets.symmetric(vertical:12),
+          contentPadding:const EdgeInsets.only(left:0,right:6,top:12,bottom:12),
         ),
       ),
     );
@@ -336,7 +413,7 @@ class DesignerAppBarView extends StatelessWidget {
         padding:EdgeInsets.zero,
         tooltip:'Menu',
         onPressed:onMenu,
-        icon:DesignerNavIcons.icon((data['menu_icon_family']??'Material').toString(),(data['menu_icon']??'menu').toString(),color:fg,size:24),
+        icon:DesignerNavIcons.icon((data['menu_icon_family']??'Material').toString(),(data['menu_icon']??'menu').toString(),color:fg,size:config.iconSize),
       ),
       if(config.show('show_logo')) ...[
         if(config.logoUrl.isNotEmpty) ClipRRect(borderRadius:BorderRadius.circular(6),child:Image.network(config.logoUrl,width:36,height:36,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const SizedBox.shrink())),
@@ -351,9 +428,9 @@ class DesignerAppBarView extends StatelessWidget {
         Expanded(child:SingleChildScrollView(scrollDirection:Axis.horizontal,child:Row(mainAxisSize:MainAxisSize.min,children:config.actions.where((a)=>a['visible']!=false).map(actionButton).toList()))),
     ]);
     final body=Container(
-      padding:EdgeInsets.symmetric(horizontal:config.spacing,vertical:5),
+      padding:EdgeInsets.only(left:config.leftPadding,right:config.rightPadding,top:5,bottom:5),
       decoration:BoxDecoration(
-        color:bg,
+        color:imageProvider==null?bg:Colors.transparent,
         borderRadius:BorderRadius.circular(config.position=='floating'?config.radius:0),
         boxShadow:config.position=='floating'?[BoxShadow(color:Colors.black.withOpacity(.12),blurRadius:10,offset:const Offset(0,3))]:null,
       ),
@@ -370,9 +447,9 @@ class DesignerAppBarView extends StatelessWidget {
               child:Padding(
                 padding:const EdgeInsets.symmetric(horizontal:3,vertical:4),
                 child:Row(children:[
-                  DesignerNavIcons.icon((data['location_icon_family']??'Material').toString(),(data['location_icon']??'location_on_outlined').toString(),color:fg,size:18),
+                  DesignerNavIcons.icon((data['location_icon_family']??'Material').toString(),(data['location_icon']??'location_on_outlined').toString(),color:fg,size:config.iconSize),
                   const SizedBox(width:6),
-                  Expanded(child:Text((data['address_label']??'Deliver to your address').toString(),maxLines:1,overflow:TextOverflow.ellipsis,style:TextStyle(color:fg,fontSize:12))),
+                  Expanded(child:Text((data['address_label']??'Deliver to your address').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:TextStyle(color:DesignerAppBarConfig.color((data['address_text_color']??'#202124').toString(),fallback:Colors.black),fontSize:14,fontWeight:FontWeight.w800,height:1.15))),
                   Icon(Icons.chevron_right,color:fg,size:17),
                 ]),
               ),

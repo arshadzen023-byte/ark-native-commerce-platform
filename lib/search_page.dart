@@ -36,6 +36,8 @@ class _GlowHitSearchPageState extends State<GlowHitSearchPage> {
   bool _loading = false;
   bool _editingRecent = false;
   bool _listening = false;
+  bool _voiceDialogOpen = false;
+  bool _voiceStarting = false;
   String? _error;
   String _query = '';
 
@@ -62,7 +64,7 @@ class _GlowHitSearchPageState extends State<GlowHitSearchPage> {
     _controller.removeListener(_onQueryChanged);
     _controller.dispose();
     _focus.dispose();
-    _speech.stop();
+    _speech.cancel();
     super.dispose();
   }
 
@@ -157,14 +159,47 @@ class _GlowHitSearchPageState extends State<GlowHitSearchPage> {
     await _search(term);
   }
 
+  Future<void> _closeVoiceDialog() async {
+    if (_voiceDialogOpen && mounted) {
+      _voiceDialogOpen = false;
+      Navigator.of(context, rootNavigator: true).maybePop();
+    }
+  }
+
+  Future<void> _stopVoiceSearch({bool closePopup = true}) async {
+    try { await _speech.stop(); } catch (_) {}
+    if (mounted) setState(() => _listening = false);
+    if (closePopup) await _closeVoiceDialog();
+  }
+
   Future<void> _startVoiceSearch() async {
+    if (_voiceStarting || _listening) return;
+    _voiceStarting = true;
     try {
       final available = await _speech.initialize(
-        onStatus: (status) { if (mounted) setState(() => _listening = status == 'listening'); },
-        onError: (error) { if (mounted) setState(() => _listening = false); },
+        onStatus: (status) {
+          if (!mounted) return;
+          final active = status == 'listening';
+          setState(() => _listening = active);
+          if ((status == 'done' || status == 'notListening') && _voiceDialogOpen) {
+            _closeVoiceDialog();
+          }
+        },
+        onError: (error) {
+          if (!mounted) return;
+          setState(() => _listening = false);
+          _closeVoiceDialog();
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Voice Search error: ' + error.errorMsg)));
+        },
       );
       if (!available) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice Search is not available on this device.')));
+        if (mounted) {
+          await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(
+            title:const Text('Voice Search unavailable'),
+            content:const Text('Please allow microphone permission and make sure a speech recognition service is available on your phone.'),
+            actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('OK'))],
+          ));
+        }
         return;
       }
       final locales = await _speech.locales();
@@ -175,22 +210,57 @@ class _GlowHitSearchPageState extends State<GlowHitSearchPage> {
         }
         if (localeId != null) break;
       }
-      if (mounted) setState(() => _listening = true);
+      if (!mounted) return;
+      setState(() => _listening = true);
       await _speech.listen(
         localeId: localeId,
-        listenFor: const Duration(seconds: 25),
-        pauseFor: const Duration(seconds: 4),
+        listenFor: const Duration(seconds: 45),
+        pauseFor: const Duration(seconds: 7),
+        onDevice: false,
+        cancelOnError: false,
+        partialResults: true,
         onResult: (result) {
           if (!mounted || result.recognizedWords.trim().isEmpty) return;
-          _controller.text = result.recognizedWords.trim();
+          _controller.value = TextEditingValue(
+            text: result.recognizedWords.trim(),
+            selection: TextSelection.collapsed(offset: result.recognizedWords.trim().length),
+          );
           if (result.finalResult) {
             setState(() => _listening = false);
-            _submit();
+            _closeVoiceDialog();
+            _submit(result.recognizedWords.trim());
           }
         },
       );
-    } catch (_) {
-      if (mounted) setState(() => _listening = false);
+      _voiceDialogOpen = true;
+      showDialog<void>(
+        context:context,
+        barrierDismissible:false,
+        builder:(ctx)=>AlertDialog(
+          shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(22)),
+          content:Column(mainAxisSize:MainAxisSize.min,children:[
+            Container(width:76,height:76,decoration:const BoxDecoration(color:Color(0xFFEDE7F8),shape:BoxShape.circle),child:Icon(Icons.mic,color:_listening?Colors.red:_searchPurple,size:38)),
+            const SizedBox(height:14),
+            const Text('Listening…',style:TextStyle(fontSize:20,fontWeight:FontWeight.w800)),
+            const SizedBox(height:6),
+            const Text('Speak your product name in Hindi or English',textAlign:TextAlign.center,style:TextStyle(color:Colors.black54)),
+            const SizedBox(height:16),
+            const LinearProgressIndicator(),
+          ]),
+          actions:[
+            TextButton(onPressed:()=>_stopVoiceSearch(),child:const Text('Cancel')),
+            FilledButton.icon(onPressed:()=>_stopVoiceSearch(),icon:const Icon(Icons.stop),label:const Text('Stop')),
+          ],
+        ),
+      ).whenComplete(() { _voiceDialogOpen=false; if(_listening) _stopVoiceSearch(closePopup:false); });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _listening = false);
+        await _closeVoiceDialog();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Could not start Voice Search: ' + error.toString())));
+      }
+    } finally {
+      _voiceStarting = false;
     }
   }
 
@@ -275,7 +345,7 @@ class _GlowHitSearchPageState extends State<GlowHitSearchPage> {
                   onSubmitted: _submit,
                   decoration: const InputDecoration(border: InputBorder.none, hintText: 'Search products, brands and more...', isDense: true),
                 )),
-                IconButton(tooltip: _listening ? 'Stop voice search' : 'Voice Search', onPressed: _listening ? () async { await _speech.stop(); if (mounted) setState(() => _listening = false); } : _startVoiceSearch, icon: Icon(_listening ? Icons.mic : Icons.mic_none, color: _listening ? Colors.red : Colors.black87)),
+                IconButton(tooltip: _listening ? 'Stop voice search' : 'Voice Search', onPressed: _listening ? _stopVoiceSearch : _startVoiceSearch, icon: Icon(_listening ? Icons.mic : Icons.mic_none, color: _listening ? Colors.red : Colors.black87)),
                 if (_controller.text.isNotEmpty) IconButton(tooltip: 'Clear', onPressed: () { _controller.clear(); _focus.requestFocus(); }, icon: const Icon(Icons.close)),
               ]),
             )),
