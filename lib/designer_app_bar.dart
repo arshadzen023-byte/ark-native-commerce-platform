@@ -12,6 +12,7 @@ class DesignerAppBarConfig {
   double get spacing => ((_json['spacing'] as num?)?.toDouble() ?? 8).clamp(0.0,32.0).toDouble();
   double get radius => ((_json['radius'] as num?)?.toDouble() ?? 12).clamp(0.0,36.0).toDouble();
   String get preset => (_json['preset'] ?? 'custom').toString();
+  String get position => (_json['position'] ?? 'top').toString();
   String get backgroundImageUrl => (_json['background_image_url'] ?? '').toString();
   String get logoUrl => (_json['logo_url'] ?? '').toString();
   bool show(String key) => _json[key] != false;
