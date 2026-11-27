@@ -222,7 +222,21 @@ jobs:
               manifest.write_text(content, encoding="utf-8")
           if "android.permission.RECORD_AUDIO" not in manifest.read_text(encoding="utf-8"):
               raise SystemExit("RECORD_AUDIO permission was not added")
-          print("Verified RECORD_AUDIO permission for native Voice Search")
+          content = manifest.read_text(encoding="utf-8")
+          queries = """  <queries>
+              <intent>
+                  <action android:name="android.speech.RecognitionService" />
+              </intent>
+          </queries>"""
+          if "android.speech.RecognitionService" not in content:
+              marker = "    <application"
+              if marker not in content:
+                  raise SystemExit("Could not find Android application tag for speech recognition query")
+              content = content.replace(marker, queries + chr(10) + marker, 1)
+              manifest.write_text(content, encoding="utf-8")
+          if "android.speech.RecognitionService" not in manifest.read_text(encoding="utf-8"):
+              raise SystemExit("Android speech recognition package visibility query was not added")
+          print("Verified RECORD_AUDIO permission and Android 11+ speech recognition query")
           PY
       - name: Resolve dependencies
         run: flutter pub get
