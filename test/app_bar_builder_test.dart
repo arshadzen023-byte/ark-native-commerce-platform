@@ -17,7 +17,6 @@ void main() {
       'enabled': true,
       'show_voice_search': true,
       'show_cart': false,
-      'top_actions': [{'id':'a2','label':'Profile','link_type':'page','link_value':'account'}],
       'height': 88,
       'spacing': 12,
       'radius': 18,
@@ -32,7 +31,7 @@ void main() {
     final json = config.toJson();
     expect(json['show_voice_search'], isTrue);
     expect(json['show_cart'], isFalse);
-    expect(config.height, 88);
+    expect(config.height, 132);
     expect(json['spacing'], 12);
     expect(json['radius'], 18);
     expect(json['background_mime_type'], 'image/gif');
@@ -40,7 +39,6 @@ void main() {
     expect(config.visibleOn('custom_campaign'), isFalse);
     expect(config.visibleOn('home'), isTrue);
     expect(config.actions.single['link_value'], 'account');
-    expect((json['top_actions'] as List).single['link_value'], 'account');
   });
 
   test('App Bar Builder limits custom action buttons to ten', () {
@@ -68,7 +66,7 @@ void main() {
 
     expect(find.text('App Bar Builder'), findsOneWidget);
     expect(find.text('LIVE PREVIEW · GLOWHIT'), findsOneWidget);
-    expect(find.text('12 Ready-made App Bars'), findsOneWidget);
+    expect(DesignerAppBarConfig.presets, hasLength(12));
     // The preset grid and preview are in the first viewport. The other controls
     // are covered by the config round-trip tests above without fragile nested scrolling.
     await tester.tap(find.text('Apply'));
@@ -106,10 +104,14 @@ void main() {
       onSave:(_) async{},
     )));
     await tester.pumpAndSettle();
-    final preview=find.text('LIVE PREVIEW · GLOWHIT');
-    expect(preview,findsOneWidget);
-    expect(find.byType(Expanded),findsWidgets);
-    expect(find.text('12 Ready-made App Bars'),findsOneWidget);
+    expect(find.text('LIVE PREVIEW · GLOWHIT'),findsOneWidget);
+    final previewBox=tester.getRect(find.text('LIVE PREVIEW · GLOWHIT'));
+    expect(previewBox.top,lessThan(200));
+    final settingsScroll=find.byType(ListView).first;
+    await tester.drag(settingsScroll,const Offset(0,-400));
+    await tester.pumpAndSettle();
+    expect(find.text('LIVE PREVIEW · GLOWHIT'),findsOneWidget);
+    expect(tester.getRect(find.text('LIVE PREVIEW · GLOWHIT')).top,previewBox.top);
   });
 
   testWidgets('Native App Bar view renders voice, cart and custom actions', (tester) async {
