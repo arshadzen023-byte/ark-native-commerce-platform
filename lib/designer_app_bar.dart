@@ -34,7 +34,7 @@ class DesignerAppBarConfig {
     final out=<String,dynamic>{...defaults,...source};
     final visibility=source['visible_pages'];
     final custom=visibility is Map ? visibility.keys.map((e)=>e.toString()).where((e)=>RegExp(r'^custom_[a-z0-9_]{1,40}$').hasMatch(e)).toList() : <String>[];
-    out['visible_pages']={<String,dynamic>{for(final page in [...pageKeys,...custom]) page: visibility is Map ? visibility[page]!=false : true}};
+    out['visible_pages'] = <String,dynamic>{for(final page in [...pageKeys,...custom]) page: visibility is Map ? visibility[page]!=false : true};
     final raw=source['actions'];
     out['actions']=raw is List ? raw.whereType<Map>().take(10).map((e)=><String,dynamic>{
       'id':(e['id']??'').toString(),'label':(e['label']??'Action').toString(),
@@ -98,12 +98,12 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
   Future<void> upload(String key) async {
     final media=await widget.onUpload(); if(media==null||!mounted)return;
     final url=(media['source_url']??media['url']??'').toString(); if(url.isEmpty)return;
-    setState(()=>{data[key]=url;if(key=='background_image_url')data['background_mime_type']=(media['mime_type']??'').toString();});
+    setState(() { data[key]=url; if(key=='background_image_url') data['background_mime_type']=(media['mime_type']??'').toString(); });
   }
   Future<NavIconChoice?> pickIcon() => showDialog<NavIconChoice>(context:context,builder:(_)=>const _AppBarIconPicker());
   Future<void> chooseIcon(String key) async {
     final choice=await pickIcon();if(choice==null||!mounted)return;
-    setState(()=>{data['${key}_family']=choice.family;data[key]=choice.name;});
+    setState(() { data['${key}_family']=choice.family; data[key]=choice.name; });
   }
   Future<void> addAction() async {
     final actions=DesignerAppBarConfig(json:data).actions;
@@ -124,7 +124,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     final selected=data['preset']==preset['id'];
     final bg=DesignerAppBarConfig.color(preset['background_color'].toString());
     final fg=DesignerAppBarConfig.color(preset['foreground_color'].toString(),fallback:Colors.black);
-    return InkWell(onTap:()=>setState(()=>{data.addAll(preset);data['preset']=preset['id'];colorController.text=data['background_color'].toString();}),child:Container(padding:const EdgeInsets.all(9),decoration:BoxDecoration(border:Border.all(color:selected?_appBarAccent:Colors.black12,width:selected?2:1),borderRadius:BorderRadius.circular(12)),child:Column(children:[
+    return InkWell(onTap:()=>setState(() { data.addAll(preset); data['preset']=preset['id']; colorController.text=data['background_color'].toString(); }),child:Container(padding:const EdgeInsets.all(9),decoration:BoxDecoration(border:Border.all(color:selected?_appBarAccent:Colors.black12,width:selected?2:1),borderRadius:BorderRadius.circular(12)),child:Column(children:[
       Container(height:32,decoration:BoxDecoration(color:bg,borderRadius:BorderRadius.circular(7)),child:Row(children:[Icon(Icons.menu,size:15,color:fg),const SizedBox(width:5),Expanded(child:Container(height:15,decoration:BoxDecoration(color:fg.withOpacity(.13),borderRadius:BorderRadius.circular(12)))),Icon(Icons.shopping_cart_outlined,size:15,color:fg)])),
       const SizedBox(height:5),Text(preset['name'].toString(),style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700)),
     ])));
@@ -172,7 +172,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
       ]))),
       Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('Page Visibility',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold)),
-        for(final page in widget.availablePages) CheckboxListTile(contentPadding:EdgeInsets.zero,dense:true,title:Text(page['title']??page['key']??''),value:(data['visible_pages'] as Map?)?[page['key']]!=false,onChanged:(v){final map=Map<String,dynamic>.from(data['visible_pages'] as Map???{});map[page['key']??'home']=v??true;setValue('visible_pages',map);}),
+        for(final page in widget.availablePages) CheckboxListTile(contentPadding:EdgeInsets.zero,dense:true,title:Text(page['title']??page['key']??''),value:(data['visible_pages'] as Map?)?[page['key']]!=false,onChanged:(v){final map=Map<String,dynamic>.from(data['visible_pages'] as Map? ?? <String,dynamic>{});map[page['key']??'home']=v??true;setValue('visible_pages',map);}),
       ]))),
       Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(children:[
         Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[const Text('Custom Action Buttons',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold)),TextButton.icon(onPressed:config.actions.length>=10?null:addAction,icon:const Icon(Icons.add),label:const Text('Add'))]),
