@@ -2378,7 +2378,7 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
         _imageUrl = (data['image_url'] ?? '').toString();
         _attachmentId = (data['attachment_id'] as num?)?.toInt() ?? 0;
         _durationController.text = ((data['duration_seconds'] as num?)?.toInt() ?? 3).toString();
-        _imageScale = ((data['image_scale'] as num?)?.toDouble() ?? 1).clamp(.25, 2.0);
+        _imageScale = ((data['image_scale'] as num?)?.toDouble() ?? 1).clamp(.25, 2.0).toDouble();
         _fit = (data['fit'] ?? 'contain').toString();
       } catch (_) {}
     }
