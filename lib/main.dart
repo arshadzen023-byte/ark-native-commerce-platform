@@ -266,7 +266,10 @@ class _StoreHomeState extends State<StoreHome> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString('glowhit_selected_delivery_address');
-      if (raw == null || raw.isEmpty) return;
+      if (raw == null || raw.isEmpty) {
+        if (mounted) setState(() { selectedDeliveryAddress = {}; deliveryAddressLabel = 'Deliver to your address'; });
+        return;
+      }
       final decoded = jsonDecode(raw);
       if (decoded is! Map) return;
       final address = Map<String, dynamic>.from(decoded);
