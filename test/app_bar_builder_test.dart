@@ -60,7 +60,7 @@ void main() {
         {'key':'custom_campaign','title':'Campaign'},
       ],
       onUpload: () async => null,
-      onSave: (value) => saved = value,
+      onSave: (value) async { saved = value; },
     )));
     await tester.pumpAndSettle();
 
