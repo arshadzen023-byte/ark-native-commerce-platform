@@ -575,7 +575,7 @@ class _DesignerNavigationBarPageState extends State<DesignerNavigationBarPage> {
         backgroundColor: Colors.white,
         floatingActionButton: Padding(
           // Keep the add action clear of the fixed Live Preview navigation bar.
-          padding: const EdgeInsets.only(bottom: 72),
+          padding: const EdgeInsets.only(bottom: 88),
           child: FloatingActionButton(
             tooltip: 'Add New Navigation Button',
             onPressed: _addItem,
