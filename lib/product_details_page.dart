@@ -11,6 +11,7 @@ class ProductDetailsPage extends StatelessWidget {
     required this.onBuyNow,
     required this.isWishlisted,
     required this.onWishlist,
+    this.floatingActionButton,
   });
 
   final Map<String, dynamic> product;
@@ -18,6 +19,7 @@ class ProductDetailsPage extends StatelessWidget {
   final VoidCallback onBuyNow;
   final bool isWishlisted;
   final VoidCallback onWishlist;
+  final Widget? floatingActionButton;
 
   String _plainText(dynamic value) => (value ?? '')
       .toString()
@@ -91,6 +93,7 @@ class ProductDetailsPage extends StatelessWidget {
           ],
         ],
       ),
+      floatingActionButton: floatingActionButton,
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
