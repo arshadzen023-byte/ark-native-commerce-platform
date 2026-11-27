@@ -53,7 +53,7 @@ jobs:
           app_id = 'applicationId = "com.ark.glowhit"' if kotlin_dsl else 'applicationId "com.ark.glowhit"'
           namespace = 'namespace = "com.ark.glowhit"' if kotlin_dsl else 'namespace "com.ark.glowhit"'
           for key, replacement in (("applicationId", app_id), ("namespace", namespace)):
-              pattern = rf'(?m)^\s*{key}\s*(?:=\s*)?["\\'][^"\\']+["\\']'
+              pattern = rf'(?m)^\s*{key}\s*(?:=\s*)?"[^"]+"'
               if re.search(pattern, text):
                   text = re.sub(pattern, replacement, text, count=1)
               elif key == "applicationId":
