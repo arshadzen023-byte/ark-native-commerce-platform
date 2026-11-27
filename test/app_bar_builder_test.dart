@@ -56,6 +56,8 @@ void main() {
       'menu_header_image_url': 'https://pluginstore.shop/wp-content/uploads/menu-top.jpg',
       'icon_size': 30,
       'horizontal_padding': 18,
+      'left_padding': 6,
+      'right_padding': 20,
       'menu_items': [
         {
           'id':'menu-help',
@@ -75,6 +77,8 @@ void main() {
     expect(config.menuHeaderImageUrl, contains('menu-top.jpg'));
     expect(config.iconSize, 30);
     expect(config.horizontalPadding, 18);
+    expect(config.leftPadding, 6);
+    expect(config.rightPadding, 20);
     expect(config.menuItems.single['title'], 'Help Centre');
     expect(config.menuItems.single['link_value'], 'https://pluginstore.shop/help');
     expect(config.menuItems.single['leading_icon_style'], 'tile');
