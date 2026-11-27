@@ -1400,7 +1400,7 @@ class _StoreHomeState extends State<StoreHome> {
                           titleFontWeight: (config['title_font_weight'] ?? 'bold') == 'normal'
                               ? FontWeight.normal
                               : (config['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
-                          titleColor: _safeColor((config['title_color'] ?? '#FFFFFF').toString(), fallback: Colors.white),
+                          titleColor: _safeColor((config['title_color'] ?? '#FFFFFF').toString()),
                           onSlideTap: _openDesignerChildLink,
                         ),
                       ),
