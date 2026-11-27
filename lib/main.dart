@@ -474,11 +474,18 @@ class _StoreHomeState extends State<StoreHome> {
       case 'cart': setState(() => tab = 3); break;
       case 'account': setState(() => tab = 4); break;
       case 'orders':
-        if (customerToken != null) await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders')));
+        if (customerToken != null) await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders', appBar: _buildConfiguredAppBar('orders'))));
         else setState(() => tab = 4);
         break;
       case 'notifications': await _openNotifications(); break;
-      default: await _openNavigationItem(DesignerNavigationItem(id: 'appbar-$target', label: (action['label'] ?? 'Action').toString(), link: 'page', linkValue: 'page:$target'), selectedNavigationIndex);
+      case 'product':
+        if(products.isNotEmpty) {
+          final p=products.first;
+          await Navigator.push(context,MaterialPageRoute(builder:(_)=>ProductDetailsPage(product:p,onAddToCart:()=>_addToCart(p),onBuyNow:()=>_buyNow(p),isWishlisted:wishlist.any((e)=>e['id']==p['id']),onWishlist:()=>setState((){wishlist.any((e)=>e['id']==p['id'])?wishlist.removeWhere((e)=>e['id']==p['id']):wishlist.add(p);}),appBar:_buildConfiguredAppBar('product'),floatingActionButton:_buildDesignerFloatingAction('product'))));
+        }
+        break;
+      default:
+        await _openNavigationItem(DesignerNavigationItem(id:'appbar-$target',label:(action['label']??'Action').toString(),link:'page',linkValue:'page:$target'),selectedNavigationIndex);
     }
   }
 
@@ -1462,7 +1469,6 @@ class _StoreHomeState extends State<StoreHome> {
         : const <Map<String, dynamic>>[];
     final sectionWidgets = sections.map(_designerSection).toList();
     return Column(children: [
-      Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(focusNode: searchFocusNode, controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
       Expanded(child: RefreshIndicator(
         onRefresh: _loadDesignerConfig,
         child: ListView(
@@ -1483,7 +1489,6 @@ class _StoreHomeState extends State<StoreHome> {
   Widget catalog() => designerConfig['pages'] is Map && ((designerConfig['pages'] as Map)['home'] is Map) && (((designerConfig['pages'] as Map)['home'] as Map)['sections'] is List)
       ? _designerCatalog()
       : Column(children: [
-    Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
     Container(margin: const EdgeInsets.symmetric(horizontal: 16), padding: const EdgeInsets.all(18), width: double.infinity, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF33205F), Color(0xFF92517F)]), borderRadius: BorderRadius.circular(18)), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('THE EVERYDAY EDIT', style: TextStyle(color: Colors.white70, letterSpacing: 2, fontSize: 10)), SizedBox(height: 8), Text('Find your next\nfavourite thing.', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)), SizedBox(height: 8), Text('SHOP THE COLLECTION  →', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))])),
     SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(12), child: Row(children: [
       for (final item in [('For You','date',false),('Deals','date',true),('Top Rated','rating',false),('Featured','popularity',false)])
@@ -1708,7 +1713,9 @@ class _StoreHomeState extends State<StoreHome> {
         ]),
       ),
     ]);
-    return Scaffold(appBar: activeAppBar, body: SafeArea(child: page),
+    return Scaffold(
+      appBar: activeAppBar,
+      body: SafeArea(top: false, child: page),
       floatingActionButton: _buildDesignerFloatingAction(
         tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home')
           : tab == 1 ? 'categories' : tab == 2 ? 'wishlist' : tab == 3 ? 'cart' : 'account',
