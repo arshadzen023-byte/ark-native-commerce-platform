@@ -2275,7 +2275,7 @@ class _DesignerFloatingActionPagesPage extends StatelessWidget {
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('Remove Floating Button?'),
-                    content: Text('Remove the Floating Action Button settings for \${page['title']}?'),
+                    content: Text('Remove the Floating Action Button settings for ${page['title']}?'),
                     actions: [
                       TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
                       FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remove')),
@@ -3601,11 +3601,11 @@ class _DesignerReorderPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final linkType = (config['link_type'] ?? 'in_app').toString();
     final pages = widget.availablePages;
-    final linkValues = pages.map((page) => 'page:\${page['key']}').toSet();
+    final linkValues = pages.map((page) => 'page:${page['key']}').toSet();
     var linkValue = (config['link_value'] ?? 'page:home').toString();
     if (linkType == 'in_app' && !linkValues.contains(linkValue)) linkValue = 'page:home';
     return Scaffold(
-      appBar: AppBar(title: Text('\${widget.pageTitle} · Floating Button')),
+      appBar: AppBar(title: Text('${widget.pageTitle} · Floating Button')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
@@ -3648,7 +3648,7 @@ class _DesignerReorderPage extends StatelessWidget {
                   )),
                 ]),
                 const SizedBox(height: 8),
-                Text('\${config['icon_family']} · \${config['icon']}', style: const TextStyle(color: _designerMuted, fontSize: 12)),
+                Text('${config['icon_family']} · ${config['icon']}', style: const TextStyle(color: _designerMuted, fontSize: 12)),
               ]),
             ),
           ),
@@ -3661,24 +3661,24 @@ class _DesignerReorderPage extends StatelessWidget {
                 const SizedBox(height: 14),
                 _colourField('Button background colour', 'background_color', '#5B3A9E'),
                 _colourField('Icon colour', 'icon_color', '#FFFFFF'),
-                Text('Button size · \${config['size']} px'),
+                Text('Button size · ${config['size']} px'),
                 Slider(
                   min: 40, max: 76, divisions: 18,
                   value: ((config['size'] as num?)?.toDouble() ?? 56).clamp(40, 76).toDouble(),
                   activeColor: _designerPurple,
                   onChanged: (value) => setState(() => config['size'] = value.round()),
                 ),
-                Text('Bottom offset · \${config['margin_bottom']} px'),
+                Text('Bottom offset · ${config['margin_bottom']} px'),
                 Slider(
                   min: 0, max: 120, divisions: 24,
                   value: ((config['margin_bottom'] as num?)?.toDouble() ?? 16).clamp(0, 120).toDouble(),
                   activeColor: _designerPurple,
                   onChanged: (value) => setState(() => config['margin_bottom'] = value.round()),
                 ),
-                Text('Right offset · \${config['margin_right']} px'),
+                Text('Right offset · ${config['margin_right']} px'),
                 Slider(
                   min: 0, max: 120, divisions: 24,
-                  value: ((config['margin_right'] as num?)?.toDouble() ?? 16).clamp(0, 120),
+                  value: ((config['margin_right'] as num?)?.toDouble() ?? 16).clamp(0, 120).toDouble(),
                   activeColor: _designerPurple,
                   onChanged: (value) => setState(() => config['margin_right'] = value.round()),
                 ),
@@ -3721,7 +3721,7 @@ class _DesignerReorderPage extends StatelessWidget {
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Open page', border: OutlineInputBorder()),
                     items: pages.map((page) => DropdownMenuItem(
-                      value: 'page:\${page['key']}',
+                      value: 'page:${page['key']}',
                       child: Text(page['title'] ?? page['key']!),
                     )).toList(),
                     onChanged: (value) => setState(() {
@@ -3798,7 +3798,7 @@ class _DesignerFloatingIconPickerState extends State<_DesignerFloatingIconPicker
   Widget build(BuildContext context) {
     final icons = DesignerNavIcons.all.where((choice) {
       final matchesQuery = query.isEmpty ||
-          '\${choice.name} \${choice.label} \${choice.family}'.toLowerCase().contains(query.toLowerCase());
+          '${choice.name} ${choice.label} ${choice.family}'.toLowerCase().contains(query.toLowerCase());
       final matchesCategory = category == 'All' || DesignerNavIcons.categoryFor(choice) == category;
       final matchesFamily = family == 'All' || choice.family == family;
       return matchesQuery && matchesCategory && matchesFamily;
