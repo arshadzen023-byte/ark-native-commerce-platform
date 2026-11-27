@@ -21,6 +21,7 @@ import 'designer_layout_contract.dart';
 import 'designer_navigation_bar.dart';
 import 'designer_app_bar.dart';
 import 'search_page.dart';
+import 'delivery_address_page.dart';
 
 const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
@@ -232,6 +233,7 @@ class _StoreHomeState extends State<StoreHome> {
   String? error;
   String search = '';
   String deliveryAddressLabel = 'Deliver to your address';
+  Map<String, dynamic> selectedDeliveryAddress = {};
   List<Map<String, dynamic>> products = [];
   List<Map<String, dynamic>> wishlist = [];
   List<Map<String, dynamic>> storeCategories = [];
@@ -268,6 +270,7 @@ class _StoreHomeState extends State<StoreHome> {
       final decoded = jsonDecode(raw);
       if (decoded is! Map) return;
       final address = Map<String, dynamic>.from(decoded);
+      selectedDeliveryAddress = address;
       final locality = [address['address_1'], address['address_2'], address['city'], address['postcode']]
           .where((v) => v != null && v.toString().trim().isNotEmpty)
           .map((v) => v.toString().trim()).join(', ');
@@ -1713,9 +1716,17 @@ class _StoreHomeState extends State<StoreHome> {
         onRefresh: () { load(); _refreshCart(); _loadDesignerConfig(); },
         onLocation: () async {
           if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
-          if (customerToken == null) { setState(() => tab = 4); return; }
-          await Navigator.push(context, MaterialPageRoute(builder: (_) =>
-              CustomerSectionPage(token: customerToken!, section: 'Saved Addresses', appBar: _buildConfiguredAppBar('account'))));
+          final result = await Navigator.push<Map<String, dynamic>>(context, MaterialPageRoute(
+            builder: (_) => DeliveryAddressPage(
+              api: woo,
+              customerToken: customerToken,
+              initialAddress: Map<String, dynamic>.from(selectedDeliveryAddress),
+            ),
+          ));
+          if (result != null && result['cart'] is Map && mounted) {
+            setState(() => liveCart = Map<String, dynamic>.from(result['cart'] as Map));
+          }
+          await _loadSelectedDeliveryAddress();
         },
         onCustomAction: (action) {
           if (_isNestedAppBarPage(pageKey) && (action['link_type'] ?? 'page') == 'page') Navigator.of(context).pop();
