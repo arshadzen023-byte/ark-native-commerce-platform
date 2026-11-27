@@ -475,7 +475,7 @@ class _StoreHomeState extends State<StoreHome> {
         else setState(() => tab = 4);
         break;
       case 'notifications': await _openNotifications(); break;
-      default: await _handleDesignerChildLink({'link_type':'in_app','link_value':'page:$target'});
+      default: await _openNavigationItem(DesignerNavigationItem(id: 'appbar-$target', label: (action['label'] ?? 'Action').toString(), link: 'page', linkValue: 'page:$target'), selectedNavigationIndex);
     }
   }
 
