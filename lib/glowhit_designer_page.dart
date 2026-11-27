@@ -10,6 +10,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'customer_account_page.dart';
 import 'designer_banner_carousel.dart';
 import 'designer_layout_contract.dart';
+import 'designer_navigation_bar.dart';
+import 'designer_floating_action.dart';
 
 // Match the dark, purple-accented native Designer reference supplied by the user.
 const _designerPurple = Color(0xFF7650B8);
@@ -207,12 +209,35 @@ class DesignerComponent {
         ? (values['children'] as List).whereType<Map>().map((rawChild) {
             final child = Map<String, dynamic>.from(rawChild);
             final kind = (child['type'] ?? 'image').toString().toLowerCase();
-            final rawId = child['attachment_id'] ?? child['media_id'] ?? child['id'];
+            final nestedMedia = child['media'] ?? child['attachment'] ?? child['image'];
+            final mediaMap = nestedMedia is Map
+                ? Map<String, dynamic>.from(nestedMedia)
+                : <String, dynamic>{};
+            final rawId = child['attachment_id'] ??
+                child['media_id'] ??
+                mediaMap['attachment_id'] ??
+                mediaMap['media_id'] ??
+                mediaMap['id'] ??
+                child['id'];
             final attachmentId = rawId is num
                 ? rawId.toInt()
                 : int.tryParse((rawId ?? '').toString()) ?? 0;
-            dynamic rawImage = child['image_url'] ?? child['source_url'] ?? child['url'] ?? child['src'] ?? child['image'] ?? '';
-            if (rawImage is Map) rawImage = rawImage['url'] ?? rawImage['src'] ?? '';
+            dynamic rawImage = child['image_url'] ??
+                child['source_url'] ??
+                child['url'] ??
+                child['src'] ??
+                mediaMap['image_url'] ??
+                mediaMap['source_url'] ??
+                mediaMap['url'] ??
+                mediaMap['src'] ??
+                (nestedMedia is String ? nestedMedia : '');
+            if (rawImage is Map) {
+              rawImage = rawImage['image_url'] ??
+                  rawImage['source_url'] ??
+                  rawImage['url'] ??
+                  rawImage['src'] ??
+                  '';
+            }
             final imageUrl = rawImage.toString().trim();
             final supported = kind == 'image' || kind == 'video';
             if (!supported || (attachmentId < 1 && imageUrl.isEmpty)) return null;
@@ -328,6 +353,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   Map<String, List<DesignerComponent>> pages = {};
   Map<String, dynamic> templates = {};
   Map<String, dynamic> wordpressConfig = <String, dynamic>{};
+  DesignerNavigationConfig navigationConfig = DesignerNavigationConfig();
+  Map<String, dynamic> floatingActions = <String, dynamic>{};
   final Map<int, Offset> _componentPointerDown = <int, Offset>{};
   late final TextEditingController _titleController = TextEditingController();
   late final TextEditingController _descriptionController = TextEditingController();
@@ -502,6 +529,10 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                 : <dynamic>[];
             wordpressConfig = Map<String, dynamic>.from(remote)
               ..remove('published_pages');
+          navigationConfig = DesignerNavigationConfig.fromJson(remote['navigation_bar']);
+          floatingActions = remote['floating_actions'] is Map
+              ? Map<String, dynamic>.from(remote['floating_actions'] as Map)
+              : <String, dynamic>{};
             pages[page] = <DesignerComponent>[];
             for (final section in sections) {
               if (section is Map) {
@@ -532,6 +563,10 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             if (decoded['templates'] is Map) {
               templates = Map<String, dynamic>.from(decoded['templates'] as Map);
             }
+            navigationConfig = DesignerNavigationConfig.fromJson(decoded['navigation_bar']);
+            floatingActions = decoded['floating_actions'] is Map
+                ? Map<String, dynamic>.from(decoded['floating_actions'] as Map)
+                : <String, dynamic>{};
           }
         } catch (_) {
           error = 'Saved draft could not be read. A fresh draft was loaded.';
@@ -587,6 +622,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         'updated_at': now,
         'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
         'templates': templates,
+        'navigation_bar': navigationConfig.toJson(),
+        'floating_actions': floatingActions,
       };
       final localJson = const JsonEncoder.withIndent('  ').convert(localData);
       final publishedConfig = Map<String, dynamic>.from(wordpressConfig);
@@ -609,6 +646,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       // not later mistaken for a legacy partial draft and merged back.
       publishedConfig['native_editor_snapshot'] = true;
       publishedConfig['pages'] = configPages;
+      publishedConfig['navigation_bar'] = navigationConfig.toJson();
+      publishedConfig['floating_actions'] = floatingActions;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, localJson);
       try {
@@ -629,11 +668,27 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             throw Exception(
               'WordPress saved the request but returned an incompatible response. '
               'The active ARK Native API Bridge publish endpoint must return the saved Home JSON. '
-              'Check that only one ARK Native API Bridge is active and that version 2.2.5 is the active copy.',
+              'Check that only one ARK Native API Bridge is active and that version 2.2.6 is the active copy.',
             );
           }
           final serverConfig = Map<String, dynamic>.from(serverValue);
           final serverPages = Map<String, dynamic>.from(serverConfig['pages'] as Map);
+          final savedNavigation = serverConfig['navigation_bar'];
+          if (savedNavigation is! Map || savedNavigation['items'] is! List) {
+            throw Exception(
+              'WordPress did not return the saved navigation_bar configuration. '
+              'Update the ARK Native Commerce Bridge publish/read endpoint to preserve the navigation_bar JSON before publishing this feature.',
+            );
+          }
+          final publishedNavigation = DesignerNavigationConfig.fromJson(savedNavigation);
+          final navigationDifferences = navigationConfig.differencesFrom(publishedNavigation);
+          if (navigationDifferences.isNotEmpty) {
+            throw Exception(
+              'WordPress did not preserve the Navigation Bar settings. '
+              'Changed fields: ${navigationDifferences.join('; ')}. '
+              'Update the active ARK Native Commerce Bridge so its publish and read endpoints save and return every navigation_bar field.',
+            );
+          }
 
           // Verify every component ID from the requested snapshot survived the
           // WordPress sanitizer before the UI displays a Publish-success toast.
@@ -774,6 +829,23 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             }
           }
 
+          final savedFloatingActions = serverConfig['floating_actions'];
+          if (savedFloatingActions is! Map) {
+            throw Exception('WordPress did not return the saved per-page Floating Action Button settings. Update the active ARK App Designer plugin to version 1.17.7 or newer.');
+          }
+          for (final entry in floatingActions.entries) {
+            if (entry.value is! Map) continue;
+            final savedAction = savedFloatingActions[entry.key];
+            if (savedAction is! Map) {
+              throw Exception('WordPress did not preserve the Floating Action Button for page "${entry.key}".');
+            }
+            final requestedAction = Map<String, dynamic>.from(entry.value as Map);
+            for (final key in ['enabled','icon_family','icon','icon_color','background_color','size','margin_bottom','margin_right','link_type','link_value','tooltip']) {
+              if (jsonEncode(requestedAction[key]) != jsonEncode(savedAction[key])) {
+                throw Exception('WordPress changed Floating Action Button "$key" on page "${entry.key}".');
+              }
+            }
+          }
           acceptedConfig = serverConfig;
           await prefs.setString('glowhit_published_designer_config', jsonEncode(acceptedConfig));
         }
@@ -1778,32 +1850,126 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     )));
   }
 
+  Future<void> _saveNavigationLocal(DesignerNavigationConfig value) async {
+    navigationConfig = value.clone();
+    final prefs = await SharedPreferences.getInstance();
+    final localData = <String, dynamic>{
+      'schema': 'ark-glowhit-designer/v1',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
+      'templates': templates,
+      'navigation_bar': navigationConfig.toJson(),
+      'floating_actions': floatingActions,
+    };
+    await prefs.setString(_storageKey, const JsonEncoder.withIndent('  ').convert(localData));
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openNavigationBar() async {
+    final rawPages = wordpressConfig['pages'];
+    final availablePages = rawPages is Map
+        ? rawPages.entries
+            .where((entry) => entry.key.toString().startsWith('custom_') && entry.value is Map)
+            .map((entry) => <String, String>{
+              'key': entry.key.toString(),
+              'title': (entry.value['title'] ?? entry.key).toString(),
+            })
+            .toList()
+        : <Map<String, String>>[];
+    await Navigator.push<void>(context, MaterialPageRoute(
+      builder: (_) => DesignerNavigationBarPage(
+        initialConfig: navigationConfig,
+        availablePages: availablePages,
+        onSave: (value) => _saveNavigationLocal(value),
+      ),
+    ));
+  }
+
+  List<Map<String, String>> _floatingActionPages() {
+    final pages = <Map<String, String>>[
+      {'key':'home','title':'Home'},
+      {'key':'search','title':'Search'},
+      {'key':'categories','title':'Categories'},
+      {'key':'wishlist','title':'Wishlist'},
+      {'key':'product','title':'Product'},
+      {'key':'account','title':'Account'},
+      {'key':'cart','title':'Cart'},
+      {'key':'orders','title':'Orders'},
+      {'key':'notifications','title':'Notifications'},
+    ];
+    final rawPages = wordpressConfig['pages'];
+    if (rawPages is Map) {
+      for (final entry in rawPages.entries) {
+        final key = entry.key.toString();
+        if (key.startsWith('custom_') && entry.value is Map) {
+          pages.add({'key':key,'title':(entry.value['title'] ?? key).toString()});
+        }
+      }
+    }
+    return pages;
+  }
+
+  Future<void> _saveFloatingActionLocal(String pageKey, Map<String, dynamic>? value) async {
+    if (value == null) {
+      floatingActions.remove(pageKey);
+    } else {
+      floatingActions[pageKey] = Map<String, dynamic>.from(value);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final localData = <String, dynamic>{
+      'schema': 'ark-glowhit-designer/v1',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
+      'templates': templates,
+      'navigation_bar': navigationConfig.toJson(),
+      'floating_actions': floatingActions,
+    };
+    await prefs.setString(_storageKey, const JsonEncoder.withIndent('  ').convert(localData));
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openFloatingActionPages() async {
+    await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => DesignerFloatingActionPagesPage(
+      availablePages: _floatingActionPages(),
+      configuredActions: floatingActions,
+      onEdit: (page) async {
+        final pageKey = page['key']!;
+        final initial = floatingActions[pageKey] is Map
+            ? Map<String, dynamic>.from(floatingActions[pageKey] as Map)
+            : <String, dynamic>{
+                'enabled': true, 'icon_family': 'Material', 'icon': 'add',
+                'icon_color': '#FFFFFF', 'background_color': '#5B3A9E',
+                'size': 56, 'margin_bottom': 16, 'margin_right': 16,
+                'link_type': 'in_app', 'link_value': 'page:home', 'tooltip': page['title'] ?? '',
+              };
+        final result = await Navigator.push<Map<String, dynamic>?>(context, MaterialPageRoute(
+          builder: (_) => DesignerFloatingActionSettingsPage(
+            pageTitle: page['title']!,
+            initialConfig: initial,
+            availablePages: _floatingActionPages(),
+          ),
+        ));
+        if (result != null) await _saveFloatingActionLocal(pageKey, result);
+      },
+      onRemove: (pageKey) => _saveFloatingActionLocal(pageKey, null),
+    )));
+  }
+
   Future<void> _openDesignerSettings() async {
     await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => _DesignerSettingsPage(
       saving: saving,
       publishing: publishing,
+      navigationConfig: navigationConfig,
+      floatingActions: floatingActions,
+      onOpenFloatingActions: _openFloatingActionPages,
+      onOpenNavigation: _openNavigationBar,
+      onReorder: _openReorder,
+      onTemplates: _openTemplates,
+      onMyTemplates: _openMyTemplates,
       onSaveDraft: () => _persist(),
       onPublish: () => _persist(publish: true),
     )));
   }
-
-  Widget _designerMenu() => PopupMenuButton<String>(
-    icon: const Icon(Icons.menu_rounded),
-    tooltip: 'Designer menu',
-    onSelected: (value) {
-      if (value == 'reorder') _openReorder();
-      if (value == 'templates') _openTemplates();
-      if (value == 'my_templates') _openMyTemplates();
-      if (value == 'settings') _openDesignerSettings();
-    },
-    itemBuilder: (_) => const [
-      PopupMenuItem(value: 'reorder', child: ListTile(leading: Icon(Icons.reorder), title: Text('Reorder Components'), dense: true)),
-      PopupMenuItem(value: 'templates', child: ListTile(leading: Icon(Icons.dashboard_customize), title: Text('Templates'), dense: true)),
-      PopupMenuItem(value: 'my_templates', child: ListTile(leading: Icon(Icons.collections_bookmark), title: Text('My Templates'), dense: true)),
-      PopupMenuDivider(),
-      PopupMenuItem(value: 'settings', child: ListTile(leading: Icon(Icons.settings_outlined), title: Text('Settings'), dense: true)),
-    ],
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -1822,7 +1988,6 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         foregroundColor: _designerText,
         title: const Text('ARK Designer', style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
-          _designerMenu(),
           IconButton(
             tooltip: 'Designer settings',
             icon: const Icon(Icons.tune_rounded),
@@ -1880,11 +2045,25 @@ class _DesignerSettingsPage extends StatefulWidget {
   const _DesignerSettingsPage({
     required this.saving,
     required this.publishing,
+    required this.navigationConfig,
+    required this.floatingActions,
+    required this.onOpenFloatingActions,
+    required this.onOpenNavigation,
+    required this.onReorder,
+    required this.onTemplates,
+    required this.onMyTemplates,
     required this.onSaveDraft,
     required this.onPublish,
   });
   final bool saving;
   final bool publishing;
+  final DesignerNavigationConfig navigationConfig;
+  final Map<String, dynamic> floatingActions;
+  final VoidCallback onOpenFloatingActions;
+  final VoidCallback onOpenNavigation;
+  final VoidCallback onReorder;
+  final VoidCallback onTemplates;
+  final VoidCallback onMyTemplates;
   final Future<void> Function() onSaveDraft;
   final Future<void> Function() onPublish;
 
@@ -1942,6 +2121,58 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
                       ),
                     ),
                   ]),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.reorder_rounded),
+                      title: const Text('Reorder Components'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: working ? null : widget.onReorder,
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.dashboard_customize_rounded),
+                      title: const Text('Templates'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: working ? null : widget.onTemplates,
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.collections_bookmark_rounded),
+                      title: const Text('My Templates'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: working ? null : widget.onMyTemplates,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: const Icon(Icons.add_circle_outline_rounded, color: _designerPurple),
+                  title: const Text('Floating Action Button', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text('${widget.floatingActions.length} page(s) configured · choose pages, icons and links'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: working ? null : widget.onOpenFloatingActions,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: const Icon(Icons.navigation, color: _designerPurple),
+                  title: const Text('Navigation Bar', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Edit buttons, links, icons, colours and live preview'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: working ? null : widget.onOpenNavigation,
                 ),
               ),
               const SizedBox(height: 12),

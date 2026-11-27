@@ -17,6 +17,7 @@ import 'notification_service.dart';
 import 'notification_inbox_page.dart';
 import 'glowhit_designer_page.dart';
 import 'designer_layout_contract.dart';
+import 'designer_navigation_bar.dart';
 
 const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
@@ -223,6 +224,7 @@ class StoreHome extends StatefulWidget {
 
 class _StoreHomeState extends State<StoreHome> {
   int tab = 0;
+  int selectedNavigationIndex = 0;
   bool loading = false;
   String? error;
   String search = '';
@@ -236,6 +238,7 @@ class _StoreHomeState extends State<StoreHome> {
   Map<String, dynamic> liveCart = {};
   bool cartBusy = false;
   final searchController = TextEditingController();
+  final FocusNode searchFocusNode = FocusNode();
   String? customerToken;
   late final GlowHitPushService push;
   int notificationCount = 0;
@@ -268,7 +271,10 @@ class _StoreHomeState extends State<StoreHome> {
   }
   Future<void> _openNotifications() async {
     await _refreshNotificationCount(markSeen: true);
-    final link = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NotificationInboxPage(service: push)));
+    final link = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NotificationInboxPage(
+      service: push,
+      floatingActionButton: _buildDesignerFloatingAction('notifications'),
+    )));
     await _refreshNotificationCount();
     if (link != null && link.isNotEmpty) await _handleNotificationLink(link);
   }
@@ -303,7 +309,7 @@ class _StoreHomeState extends State<StoreHome> {
           final product = jsonDecode(response.body);
           if (product is Map && mounted) {
             final p = Map<String, dynamic>.from(product);
-            await Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(product: p, onAddToCart: () => _addToCart(p), onBuyNow: () => _buyNow(p), isWishlisted: wishlist.any((e) => e['id'] == p['id']), onWishlist: () => setState(() { wishlist.any((e) => e['id'] == p['id']) ? wishlist.removeWhere((e) => e['id'] == p['id']) : wishlist.add(p); }))));
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(product: p, onAddToCart: () => _addToCart(p), onBuyNow: () => _buyNow(p), isWishlisted: wishlist.any((e) => e['id'] == p['id']), onWishlist: () => setState(() { wishlist.any((e) => e['id'] == p['id']) ? wishlist.removeWhere((e) => e['id'] == p['id']) : wishlist.add(p); }), floatingActionButton: _buildDesignerFloatingAction('product'))));
           }
         }
       } catch (_) {}
@@ -379,7 +385,7 @@ class _StoreHomeState extends State<StoreHome> {
     await _handleNotificationLink(value);
   }
 
-  @override void dispose() { searchController.dispose(); super.dispose(); }
+  @override void dispose() { searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
 
   Future<void> load({String order = 'date', bool sale = false}) async {
     setState(() { loading = true; error = null; });
@@ -483,6 +489,7 @@ class _StoreHomeState extends State<StoreHome> {
               ? wishlist.removeWhere((e) => e['id'] == product['id'])
               : wishlist.add(product);
           }),
+          floatingActionButton: _buildDesignerFloatingAction('product'),
         )));
       },
     )));
@@ -510,6 +517,7 @@ class _StoreHomeState extends State<StoreHome> {
             onWishlist: () => setState(() {
               liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p);
             }),
+            floatingActionButton: _buildDesignerFloatingAction('product'),
           )));
         },
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1204,6 +1212,151 @@ class _StoreHomeState extends State<StoreHome> {
     return Color(parsed == null ? 0xFF202733 : (raw.length == 6 ? 0xFF000000 | parsed : parsed));
   }
 
+  Map<String, dynamic>? _floatingActionForPage(String pageKey) {
+    final raw = designerConfig['floating_actions'];
+    if (raw is! Map || raw[pageKey] is! Map) return null;
+    final action = Map<String, dynamic>.from(raw[pageKey] as Map);
+    return action['enabled'] == true ? action : null;
+  }
+
+  Widget? _buildDesignerFloatingAction(String pageKey) {
+    final action = _floatingActionForPage(pageKey);
+    if (action == null) return null;
+    final size = ((action['size'] as num?)?.toDouble() ?? 56).clamp(40.0, 76.0).toDouble();
+    final right = ((action['margin_right'] as num?)?.toDouble() ?? 16).clamp(0.0, 120.0).toDouble();
+    final bottom = ((action['margin_bottom'] as num?)?.toDouble() ?? 16).clamp(0.0, 120.0);
+    final family = (action['icon_family'] ?? 'Material').toString();
+    final iconName = (action['icon'] ?? 'add').toString();
+    return Padding(
+      padding: EdgeInsets.only(right: right, bottom: bottom),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: FloatingActionButton(
+          heroTag: 'ark-designer-fab-$pageKey',
+          tooltip: (action['tooltip'] ?? '').toString().trim().isEmpty
+              ? 'Open action' : action['tooltip'].toString(),
+          backgroundColor: _safeColor((action['background_color'] ?? '#5B3A9E').toString()),
+          foregroundColor: _safeColor((action['icon_color'] ?? '#FFFFFF').toString()),
+          onPressed: () => _handleDesignerFloatingAction(action),
+          child: DesignerNavIcons.icon(
+            family, iconName,
+            color: _safeColor((action['icon_color'] ?? '#FFFFFF').toString()),
+            size: size * .43,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleDesignerFloatingAction(Map<String, dynamic> action) async {
+    final type = (action['link_type'] ?? 'in_app').toString();
+    final target = (action['link_value'] ?? '').toString().trim();
+    if (target.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose a destination for this Floating Action Button in Designer Settings.')),
+      );
+      return;
+    }
+    if (type == 'chrome' || type == 'deeplink') {
+      final uri = Uri.tryParse(target);
+      final allowed = uri != null && uri.scheme.isNotEmpty &&
+          (type == 'chrome'
+              ? const ['http', 'https'].contains(uri.scheme.toLowerCase()) && uri.host.isNotEmpty
+              : const ['http', 'https', 'ark', 'glowhit', 'mailto', 'tel'].contains(uri.scheme.toLowerCase()));
+      if (!allowed) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This Floating Action Button link is invalid.')),
+        );
+        return;
+      }
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open this link.')),
+      );
+      return;
+    }
+
+    final pageKey = target.replaceFirst(RegExp(r'^page:'), '').trim();
+    switch (pageKey) {
+      case 'home':
+      case 'store':
+        if (mounted) setState(() => tab = 0);
+        return;
+      case 'search':
+        if (mounted) {
+          setState(() => tab = 0);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) FocusScope.of(context).requestFocus(searchFocusNode);
+          });
+        }
+        return;
+      case 'categories':
+        if (mounted) setState(() => tab = 1);
+        return;
+      case 'wishlist':
+        if (mounted) setState(() => tab = 2);
+        return;
+      case 'cart':
+        if (mounted) setState(() => tab = 3);
+        return;
+      case 'account':
+        if (mounted) setState(() => tab = 4);
+        return;
+      case 'orders':
+        if (customerToken == null || customerToken!.isEmpty) {
+          if (mounted) {
+            setState(() => tab = 4);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please sign in to view your orders.')),
+            );
+          }
+          return;
+        }
+        await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => CustomerSectionPage(
+            token: customerToken!,
+            section: 'My Orders',
+            floatingActionButton: _buildDesignerFloatingAction('orders'),
+          ),
+        ));
+        return;
+      case 'notifications':
+        await _openNotifications();
+        return;
+      case 'product':
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Open a product first to use its Product page action.')),
+        );
+        return;
+      default:
+        final pages = designerConfig['pages'];
+        final pageData = pages is Map ? pages[pageKey] : null;
+        if (pageData is! Map) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('The selected Designer page was not found.')),
+          );
+          return;
+        }
+        final sections = pageData['sections'] is List
+            ? (pageData['sections'] as List).whereType<Map>()
+                .where((section) => section['visible'] != false)
+                .map((section) => Map<String, dynamic>.from(section)).toList()
+            : <Map<String, dynamic>>[];
+        await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: Text((pageData['title'] ?? pageKey).toString())),
+            body: ListView(
+              padding: const EdgeInsets.only(bottom: 16),
+              children: sections.map(_designerSection).toList(),
+            ),
+            floatingActionButton: _buildDesignerFloatingAction(pageKey),
+            bottomNavigationBar: _buildDesignerBottomNavigation(),
+          ),
+        ));
+    }
+  }
+
   Widget _designerCatalog() {
     final page = designerConfig['pages'] is Map ? (designerConfig['pages'] as Map)['home'] : null;
     final sections = page is Map && page['sections'] is List
@@ -1213,7 +1366,7 @@ class _StoreHomeState extends State<StoreHome> {
         : const <Map<String, dynamic>>[];
     final sectionWidgets = sections.map(_designerSection).toList();
     return Column(children: [
-      Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
+      Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(focusNode: searchFocusNode, controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
       Expanded(child: RefreshIndicator(
         onRefresh: _loadDesignerConfig,
         child: ListView(
@@ -1245,7 +1398,150 @@ class _StoreHomeState extends State<StoreHome> {
     else if (products.isEmpty) const Expanded(child: Center(child: Text('No products found. Try another search.')))
     else Expanded(child: GridView.builder(padding: const EdgeInsets.fromLTRB(12, 0, 12, 18), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .66, crossAxisSpacing: 10, mainAxisSpacing: 10), itemCount: products.length, itemBuilder: (_, i) => productCard(products[i]))),
   ]);
-  Widget account() => AccountPanel(onLogin: (token) { setState(() => customerToken = token); push.register(customerJwt: token); }, onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } try { await push.unlinkAccount(); } catch (_) {} final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() { customerToken = null; notificationCount = 0; }); }, token: customerToken, onRecentViewed: _openRecentlyViewed);
+  Future<void> _openNavigationItem(DesignerNavigationItem item, int index) async {
+    if (!mounted) return;
+    setState(() => selectedNavigationIndex = index);
+    final link = item.link.toLowerCase();
+    if (const ['home', 'store'].contains(link)) {
+      setState(() => tab = 0);
+      return;
+    }
+    if (link == 'categories') {
+      setState(() => tab = 1);
+      return;
+    }
+    if (link == 'wishlist') {
+      setState(() => tab = 2);
+      return;
+    }
+    if (link == 'cart') {
+      setState(() => tab = 3);
+      return;
+    }
+    if (link == 'account') {
+      setState(() => tab = 4);
+      return;
+    }
+    if (link == 'search') {
+      setState(() => tab = 0);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) FocusScope.of(context).requestFocus(searchFocusNode);
+      });
+      return;
+    }
+    if (link == 'page') {
+      final pageKey = item.linkValue.trim().replaceFirst(RegExp(r'^page:'), '');
+      final pages = designerConfig['pages'];
+      final pageData = pages is Map ? pages[pageKey] : null;
+      if (pageKey.isEmpty || pageData is! Map) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This native Page key was not found in the published Designer Pages.')),
+        );
+        return;
+      }
+      final sections = pageData['sections'] is List
+          ? (pageData['sections'] as List)
+              .whereType<Map>()
+              .where((section) => section['visible'] != false)
+              .map((section) => Map<String, dynamic>.from(section))
+              .toList()
+          : <Map<String, dynamic>>[];
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: Text((pageData['title'] ?? item.label).toString())),
+          body: ListView(
+            padding: const EdgeInsets.only(bottom: 16),
+            children: sections.map(_designerSection).toList(),
+          ),
+          floatingActionButton: _buildDesignerFloatingAction(pageKey),
+          bottomNavigationBar: _buildDesignerBottomNavigation(),
+        ),
+      ));
+      return;
+    }
+    if (link == 'orders') {
+      if (customerToken == null || customerToken!.isEmpty) {
+        setState(() => tab = 4);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please sign in to view your orders.')),
+        );
+        return;
+      }
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => CustomerSectionPage(
+          token: customerToken!, section: 'My Orders',
+          floatingActionButton: _buildDesignerFloatingAction('orders'),
+        ),
+      ));
+      return;
+    }
+
+    var target = item.linkValue.trim();
+    if (target.isEmpty) {
+      target = switch (link) {
+        'bookings' => '$storeUrl/bookings/',
+        'posts' => '$storeUrl/blog/',
+        'contact_form_7' => '$storeUrl/contact/',
+        _ => '',
+      };
+    }
+    if (target.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Add a Page URL for "${item.label}" in Navigation Bar settings.')),
+      );
+      return;
+    }
+    final uri = Uri.tryParse(target.contains('://') ? target : '$storeUrl/${target.replaceFirst(RegExp(r'^/+'), '')}');
+    if (uri == null || !const ['http', 'https'].contains(uri.scheme) || uri.host.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This Navigation link is not a valid HTTP or HTTPS URL.')),
+      );
+      return;
+    }
+    if (link == 'page') {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open this page.')));
+      }
+      return;
+    }
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NavigationWebPage(title: item.label, url: uri.toString()),
+    ));
+  }
+
+  Widget _buildDesignerBottomNavigation() {
+    final config = DesignerNavigationConfig.fromJson(designerConfig['navigation_bar']);
+    final items = config.items.take(5).toList();
+    if (items.isEmpty) return const SizedBox.shrink();
+    final safeIndex = selectedNavigationIndex.clamp(0, items.length - 1);
+    return BottomNavigationBar(
+      currentIndex: safeIndex,
+      onTap: (index) => _openNavigationItem(items[index], index),
+      type: config.type == 'shifting' ? BottomNavigationBarType.shifting : BottomNavigationBarType.fixed,
+      backgroundColor: navColorFromHex(config.backgroundColor),
+      selectedItemColor: navColorFromHex(config.selectedColor, fallback: purple),
+      unselectedItemColor: navColorFromHex(config.unselectedColor, fallback: Colors.grey),
+      showSelectedLabels: config.showLabels,
+      showUnselectedLabels: config.showLabels,
+      elevation: config.elevation,
+      items: items.map((item) {
+        final isCart = item.link == 'cart';
+        Widget withCartBadge(Widget child) {
+          if (!isCart || cartCount <= 0) return child;
+          return Badge(label: Text('$cartCount'), child: child);
+        }
+        return BottomNavigationBarItem(
+          icon: withCartBadge(DesignerNavIcons.icon(item.iconFamily, item.iconName, color: navColorFromHex(item.iconColor))),
+          activeIcon: withCartBadge(DesignerNavIcons.icon(item.activeIconFamily, item.activeIconName, color: navColorFromHex(item.activeIconColor))),
+          label: item.label,
+          backgroundColor: navColorFromHex(item.activeBackgroundColor),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget account() => AccountPanel(onLogin: (token) { setState(() => customerToken = token); push.register(customerJwt: token); }, onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } try { await push.unlinkAccount(); } catch (_) {} final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() { customerToken = null; notificationCount = 0; }); }, token: customerToken, onRecentViewed: _openRecentlyViewed, ordersFloatingActionButton: _buildDesignerFloatingAction('orders'));
   @override Widget build(BuildContext context) {
     final titles = ['Shopping', 'Categories', 'Wishlist', 'Cart', 'Account'];
     Widget page;
@@ -1266,22 +1562,22 @@ class _StoreHomeState extends State<StoreHome> {
           if (notificationCount > 0) Positioned(right: -2, top: -2, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5))))),
         ]),
       ),
-    ]), body: SafeArea(child: page), bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (v) => setState(() => tab = v), destinations: [
-      const NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-      const NavigationDestination(icon: Icon(Icons.grid_view), label: 'Categories'),
-      const NavigationDestination(icon: Icon(Icons.favorite_border), label: 'Wishlist'),
-      NavigationDestination(icon: Badge(label: Text('$cartCount'), child: const Icon(Icons.shopping_bag_outlined)), label: 'Cart'),
-      const NavigationDestination(icon: Icon(Icons.person_outline), label: 'Account'),
-    ]));
+    ]), body: SafeArea(child: page),
+      floatingActionButton: _buildDesignerFloatingAction(
+        tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home')
+          : tab == 1 ? 'categories' : tab == 2 ? 'wishlist' : tab == 3 ? 'cart' : 'account',
+      ),
+      bottomNavigationBar: _buildDesignerBottomNavigation());
   }
 }
 
 class AccountPanel extends StatefulWidget {
-  const AccountPanel({super.key, required this.onLogin, required this.onLogout, required this.token, required this.onRecentViewed});
+  const AccountPanel({super.key, required this.onLogin, required this.onLogout, required this.token, required this.onRecentViewed, this.ordersFloatingActionButton});
   final ValueChanged<String> onLogin;
   final VoidCallback onLogout;
   final VoidCallback onRecentViewed;
   final String? token;
+  final Widget? ordersFloatingActionButton;
   @override State<AccountPanel> createState() => _AccountPanelState();
 }
 
@@ -1401,7 +1697,7 @@ class _AccountPanelState extends State<AccountPanel> with SingleTickerProviderSt
         ),
         const SizedBox(height: 22),
         const Padding(padding: EdgeInsets.only(left: 3, bottom: 10), child: Text('MY ACCOUNT', style: TextStyle(fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.w800, color: purple))),
-        _menuTile(context, Icons.receipt_long_rounded, 'My Orders', 'Track, cancel and review your purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'My Orders')))),
+        _menuTile(context, Icons.receipt_long_rounded, 'My Orders', 'Track, cancel and review your purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'My Orders', floatingActionButton: widget.ordersFloatingActionButton)))),
         _menuTile(context, Icons.download_for_offline_rounded, 'Downloads', 'Your available digital purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Downloads')))),
         _menuTile(context, Icons.location_on_rounded, 'Saved Addresses', 'Manage delivery addresses', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Saved Addresses')))),
         _menuTile(context, Icons.person_rounded, 'Edit Profile', 'Update your name and contact details', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Edit Profile')))),

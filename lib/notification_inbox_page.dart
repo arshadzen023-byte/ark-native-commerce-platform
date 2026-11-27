@@ -4,8 +4,9 @@ import 'notification_service.dart';
 const _purple = Color(0xFF51408F);
 
 class NotificationInboxPage extends StatefulWidget {
-  const NotificationInboxPage({super.key, required this.service});
+  const NotificationInboxPage({super.key, required this.service, this.floatingActionButton});
   final GlowHitPushService service;
+  final Widget? floatingActionButton;
   @override State<NotificationInboxPage> createState() => _NotificationInboxPageState();
 }
 
@@ -100,6 +101,7 @@ class _NotificationInboxPageState extends State<NotificationInboxPage> with Sing
 
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Notifications'), actions: [IconButton(onPressed: loading ? null : load, icon: const Icon(Icons.refresh))]),
+    floatingActionButton: widget.floatingActionButton,
     body: loading
       ? const Center(child: CircularProgressIndicator())
       : error != null

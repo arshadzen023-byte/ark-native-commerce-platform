@@ -3,11 +3,141 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:glowhit_shopping/glowhit_designer_page.dart';
 import 'package:glowhit_shopping/designer_banner_carousel.dart';
 import 'package:glowhit_shopping/designer_layout_contract.dart';
+import 'package:glowhit_shopping/designer_navigation_bar.dart';
 import 'package:glowhit_shopping/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('Icon library exposes requested categories and no hamburger menu choice', () {
+    expect(DesignerNavIcons.categories, containsAll([
+      'Nature', 'Transport', 'Water', 'Weather', 'E-commerce',
+      'Social', 'Buildings', 'Digital', 'Internet',
+    ]));
+    expect(DesignerNavIcons.all.length, greaterThan(150));
+    expect(DesignerNavIcons.all.any((icon) =>
+      icon.label.toLowerCase() == 'menu' ||
+      icon.name == 'menu' ||
+      icon.name == 'menu_line' ||
+      icon.name == 'bars'), isFalse);
+
+    final material = DesignerNavIcons.all.where((icon) => icon.family == 'Material');
+    expect(material.any((icon) => icon.name == 'flight'), isTrue);
+    expect(material.any((icon) => icon.name == 'train'), isTrue);
+    expect(material.any((icon) => icon.name == 'water_drop'), isTrue);
+    expect(material.any((icon) => icon.name == 'cloud'), isTrue);
+    expect(material.any((icon) => icon.name == 'shopping_bag'), isTrue);
+    expect(material.any((icon) => icon.name == 'apartment'), isTrue);
+    expect(material.any((icon) => icon.name == 'wifi'), isTrue);
+  });
+
+  test('Navigation Bar defaults preserve the five native Shopping destinations', () {
+    final config = DesignerNavigationConfig();
+    expect(config.items.map((item) => item.link).toList(),
+      ['home', 'categories', 'wishlist', 'cart', 'account']);
+    expect(config.type, 'fixed');
+    expect(config.items, hasLength(5));
+  });
+
+  test('Navigation Bar JSON preserves order, links, icon packs and colors', () {
+    final config = DesignerNavigationConfig(
+      type: 'shifting',
+      backgroundColor: '#FFFFFFFF',
+      selectedColor: '#FF5B3A9E',
+      unselectedColor: '#FF77717F',
+      items: [
+        DesignerNavigationItem(
+          id: 'wishlist-tab',
+          label: 'Wishlist',
+          link: 'wishlist',
+          iconFamily: 'Remix Icons',
+          iconName: 'heart_line',
+          activeIconFamily: 'Font Awesome',
+          activeIconName: 'heart',
+          iconColor: '#FF77717F',
+          activeIconColor: '#FF5B3A9E',
+        ),
+      ],
+    );
+    final restored = DesignerNavigationConfig.fromJson(config.toJson());
+    expect(restored.type, 'shifting');
+    expect(restored.items.single.id, 'wishlist-tab');
+    expect(restored.items.single.link, 'wishlist');
+    expect(restored.items.single.iconFamily, 'Remix Icons');
+    expect(restored.items.single.activeIconFamily, 'Font Awesome');
+    expect(restored.items.single.activeIconName, 'heart');
+    expect(restored.items.single.iconColor, '#FF77717F');
+  });
+
+  test('Navigation publish verification reports changed root and item fields', () {
+    final requested = DesignerNavigationConfig();
+    final published = DesignerNavigationConfig(
+      items: [
+        DesignerNavigationItem(
+          id: 'nav-home',
+          label: 'Home',
+          link: 'home',
+          iconName: 'menu',
+        ),
+      ],
+      backgroundColor: '#F0F0F0',
+    );
+    final differences = requested.differencesFrom(published);
+    expect(differences, contains(contains('background_color')));
+    expect(differences, contains(contains('items[0].icon')));
+    expect(differences, contains(contains('Designer: 5, WordPress: 1')));
+  });
+
+  test('Navigation icon packs each provide selectable icons', () {
+    for (final family in DesignerNavIcons.families) {
+      expect(DesignerNavIcons.all.where((icon) => icon.family == family), isNotEmpty);
+    }
+    expect(DesignerNavIcons.find('Material', 'home'), isNotNull);
+    expect(DesignerNavIcons.find('Cupertino', 'house'), isNotNull);
+    expect(DesignerNavIcons.find('Font Awesome', 'house'), isNotNull);
+    expect(DesignerNavIcons.find('Remix Icons', 'home_3_line'), isNotNull);
+    expect(DesignerNavIcons.find('FluentUI', 'home_24_regular'), isNotNull);
+  });
+
+  test('Navigation icon library includes transport, nature, commerce, social, buildings and digital icons', () {
+    final expected = <(String, String)>[
+      ('Material', 'flight'),
+      ('Material', 'train'),
+      ('Material', 'water_drop'),
+      ('Material', 'wb_sunny'),
+      ('Material', 'shopping_bag'),
+      ('Material', 'apartment'),
+      ('Material', 'wifi'),
+      ('Material', 'database'),
+      ('Font Awesome', 'instagram'),
+      ('Font Awesome', 'whatsapp'),
+    ];
+    for (final pair in expected) {
+      expect(DesignerNavIcons.find(pair.$1, pair.$2), isNotNull,
+          reason: 'Missing ${pair.$1} icon ${pair.$2}');
+    }
+    expect(DesignerNavIcons.all.where((icon) => icon.family == 'Material').length, greaterThan(100));
+  });
+
+  testWidgets('Navigation Bar editor shows its white workspace and live preview', (tester) async {
+    DesignerNavigationConfig? saved;
+    await tester.pumpWidget(MaterialApp(
+      home: DesignerNavigationBarPage(
+        initialConfig: DesignerNavigationConfig(),
+        onSave: (value) => saved = value,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Navigation Bar'), findsOneWidget);
+    expect(find.text('Navigation Type'), findsOneWidget);
+    expect(find.text('Live Preview'), findsOneWidget);
+    expect(find.text('Add New Navigation Button'), findsNothing);
+    expect(find.byTooltip('Add New Navigation Button'), findsOneWidget);
+    expect(find.byType(BottomNavigationBar), findsOneWidget);
+    expect(saved, isNull);
+  });
 
   test('GlowHit remains configured for the live WooCommerce store', () {
     expect(storeUrl, 'https://pluginstore.shop');
@@ -100,14 +230,21 @@ void main() {
 
     // Save and publish actions live on their own Settings page, not in the
     // fixed bottom action bar, so the component canvas keeps its full width.
-    await tester.tap(find.byTooltip('Designer menu'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Settings').last);
+    expect(find.byTooltip('Designer menu'), findsNothing);
+    await tester.tap(find.byTooltip('Designer settings'));
     await tester.pumpAndSettle();
     expect(find.text('Designer Settings'), findsOneWidget);
     expect(find.text('Save Draft'), findsOneWidget);
     expect(find.text('Publish JSON'), findsOneWidget);
     expect(find.text('Layout consistency'), findsNothing);
+    // ListView lazily builds off-screen children, so scrollUntilVisible
+    // must be used before looking up the App Settings tile.
+    await tester.scrollUntilVisible(
+      find.text('App Settings'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('App Settings'), findsOneWidget);
     await tester.tap(find.text('App Settings'));
     await tester.pumpAndSettle();
