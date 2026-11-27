@@ -100,7 +100,7 @@ void main() {
       )),
     )));
     await tester.pumpAndSettle();
-    expect(find.text('Search products...'),findsOneWidget);
+    expect(find.text('watch'),findsOneWidget);
     expect(find.text('Deliver to your address'),findsOneWidget);
     expect(find.byTooltip('Voice Search'),findsOneWidget);
     expect(find.byType(TextField),findsOneWidget);
