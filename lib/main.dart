@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:url_launcher/url_launcher.dart';
 import 'designer_banner_carousel.dart';
 import 'product_details_page.dart';
@@ -18,6 +19,7 @@ import 'notification_inbox_page.dart';
 import 'glowhit_designer_page.dart';
 import 'designer_layout_contract.dart';
 import 'designer_navigation_bar.dart';
+import 'designer_app_bar.dart';
 
 const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
@@ -239,11 +241,14 @@ class _StoreHomeState extends State<StoreHome> {
   bool cartBusy = false;
   final searchController = TextEditingController();
   final FocusNode searchFocusNode = FocusNode();
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _voiceListening = false;
   String? customerToken;
   late final GlowHitPushService push;
   int notificationCount = 0;
   @override void initState() {
     super.initState();
+    searchFocusNode.addListener(_handleSearchFocusChange);
     customerToken = widget.initialToken;
     push = GlowHitPushService(onTap: _handleNotificationLink, onForeground: _refreshNotificationCount);
     push.initialize(customerJwt: customerToken).then((_) => _refreshNotificationCount());
@@ -273,6 +278,7 @@ class _StoreHomeState extends State<StoreHome> {
     await _refreshNotificationCount(markSeen: true);
     final link = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NotificationInboxPage(
       service: push,
+      appBar: _buildConfiguredAppBar('notifications'),
       floatingActionButton: _buildDesignerFloatingAction('notifications'),
     )));
     await _refreshNotificationCount();
@@ -298,7 +304,7 @@ class _StoreHomeState extends State<StoreHome> {
           }
         } catch (_) { if (mounted) setState(() => tab = 4); }
       } else {
-        if (mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders')));
+        if (mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders', appBar: _buildConfiguredAppBar('orders'))));
       }
       return;
     }
@@ -309,7 +315,7 @@ class _StoreHomeState extends State<StoreHome> {
           final product = jsonDecode(response.body);
           if (product is Map && mounted) {
             final p = Map<String, dynamic>.from(product);
-            await Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(product: p, onAddToCart: () => _addToCart(p), onBuyNow: () => _buyNow(p), isWishlisted: wishlist.any((e) => e['id'] == p['id']), onWishlist: () => setState(() { wishlist.any((e) => e['id'] == p['id']) ? wishlist.removeWhere((e) => e['id'] == p['id']) : wishlist.add(p); }), floatingActionButton: _buildDesignerFloatingAction('product'))));
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(product: p, onAddToCart: () => _addToCart(p), onBuyNow: () => _buyNow(p), isWishlisted: wishlist.any((e) => e['id'] == p['id']), onWishlist: () => setState(() { wishlist.any((e) => e['id'] == p['id']) ? wishlist.removeWhere((e) => e['id'] == p['id']) : wishlist.add(p); }), appBar: _buildConfiguredAppBar('product'), floatingActionButton: _buildDesignerFloatingAction('product'))));
           }
         }
       } catch (_) {}
@@ -385,7 +391,115 @@ class _StoreHomeState extends State<StoreHome> {
     await _handleNotificationLink(value);
   }
 
-  @override void dispose() { searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
+  void _handleSearchFocusChange() { if (mounted) setState(() {}); }
+
+  @override void dispose() { searchFocusNode.removeListener(_handleSearchFocusChange); _speech.stop(); searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
+
+  Future<void> _startVoiceSearch() async {
+    try {
+      final available = await _speech.initialize(
+        onStatus: (status) { if (mounted) setState(() => _voiceListening = status == 'listening'); },
+        onError: (error) { if (mounted) { setState(() => _voiceListening = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Voice Search: ${error.errorMsg}'))); } },
+      );
+      if (!available) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice Search is not available on this device.')));
+        return;
+      }
+      final locales = await _speech.locales();
+      String? selectedLocale;
+      for (final preferred in const ['en_IN', 'hi_IN']) {
+        for (final locale in locales) {
+          if (locale.localeId.toLowerCase() == preferred.toLowerCase()) {
+            selectedLocale = locale.localeId;
+            break;
+          }
+        }
+        if (selectedLocale != null) break;
+      }
+      if (mounted) setState(() => _voiceListening = true);
+      await _speech.listen(
+        localeId: selectedLocale,
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 4),
+        onResult: (result) {
+          final words = result.recognizedWords.trim();
+          if (words.isEmpty || !mounted) return;
+          setState(() { search = words; searchController.text = words; });
+          if (result.finalResult) {
+            setState(() => _voiceListening = false);
+            load();
+          }
+        },
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() => _voiceListening = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not start Voice Search: $error')));
+      }
+    }
+  }
+
+  Future<void> _stopVoiceSearch() async {
+    await _speech.stop();
+    if (mounted) setState(() => _voiceListening = false);
+  }
+
+  bool _isNestedAppBarPage(String pageKey) => !const ['home','search','categories','wishlist','cart','account'].contains(pageKey);
+
+  Future<void> _openAppBarMenu([String pageKey = 'home']) async {
+    final choice = await showModalBottomSheet<String>(context: context, builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      for (final item in const [('home','Home',Icons.home_outlined),('categories','Categories',Icons.grid_view),('wishlist','Wishlist',Icons.favorite_border),('cart','Cart',Icons.shopping_cart_outlined),('account','Account',Icons.person_outline),('designer','ARK Designer',Icons.design_services_outlined)])
+        ListTile(leading: Icon(item.$3), title: Text(item.$2), onTap: () => Navigator.pop(ctx, item.$1)),
+    ])));
+    if (!mounted || choice == null) return;
+    if (choice == 'designer') { await _openDesigner(); return; }
+    if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
+    setState(() => tab = switch (choice) {'home' => 0, 'categories' => 1, 'wishlist' => 2, 'cart' => 3, _ => 4});
+  }
+
+  Future<void> _openAppBarCustomAction(Map<String, dynamic> action) async {
+    final type = (action['link_type'] ?? 'page').toString();
+    final target = (action['link_value'] ?? '').toString().trim();
+    if (target.isEmpty) return;
+    if (type == 'url') {
+      final uri = Uri.tryParse(target);
+      if (uri != null && const ['http','https'].contains(uri.scheme.toLowerCase()) && uri.host.isNotEmpty) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
+    if (type == 'deep_link') { await _handleNotificationLink(target); return; }
+    if (type == 'page' && target.startsWith('custom_')) {
+      final pages=designerConfig['pages'];
+      final page=pages is Map ? pages[target] : null;
+      if(page is Map) {
+        final sections=page['sections'] is List ? (page['sections'] as List).whereType<Map>().where((e)=>e['visible']!=false).map((e)=>Map<String,dynamic>.from(e)).toList() : <Map<String,dynamic>>[];
+        await Navigator.of(context).push(MaterialPageRoute(builder:(_)=>Scaffold(appBar:_buildConfiguredAppBar(target),body:ListView(children:sections.map(_designerSection).toList()),floatingActionButton:_buildDesignerFloatingAction(target),bottomNavigationBar:_buildDesignerBottomNavigation())));
+      }
+      return;
+    }
+    switch (target.toLowerCase()) {
+      case 'home': setState(() => tab = 0); break;
+      case 'search': setState(() => tab = 0); WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) FocusScope.of(context).requestFocus(searchFocusNode); }); break;
+      case 'categories': setState(() => tab = 1); break;
+      case 'wishlist': setState(() => tab = 2); break;
+      case 'cart': setState(() => tab = 3); break;
+      case 'account': setState(() => tab = 4); break;
+      case 'orders':
+        if (customerToken != null) await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders', appBar: _buildConfiguredAppBar('orders'))));
+        else setState(() => tab = 4);
+        break;
+      case 'notifications': await _openNotifications(); break;
+      case 'product':
+        if(products.isNotEmpty) {
+          final p=products.first;
+          await Navigator.push(context,MaterialPageRoute(builder:(_)=>ProductDetailsPage(product:p,onAddToCart:()=>_addToCart(p),onBuyNow:()=>_buyNow(p),isWishlisted:wishlist.any((e)=>e['id']==p['id']),onWishlist:()=>setState((){wishlist.any((e)=>e['id']==p['id'])?wishlist.removeWhere((e)=>e['id']==p['id']):wishlist.add(p);}),appBar:_buildConfiguredAppBar('product'),floatingActionButton:_buildDesignerFloatingAction('product'))));
+        }
+        break;
+      default:
+        await _openNavigationItem(DesignerNavigationItem(id:'appbar-$target',label:(action['label']??'Action').toString(),link:'page',linkValue:'page:$target'),selectedNavigationIndex);
+    }
+  }
 
   Future<void> load({String order = 'date', bool sale = false}) async {
     setState(() { loading = true; error = null; });
@@ -489,7 +603,8 @@ class _StoreHomeState extends State<StoreHome> {
               ? wishlist.removeWhere((e) => e['id'] == product['id'])
               : wishlist.add(product);
           }),
-          floatingActionButton: _buildDesignerFloatingAction('product'),
+          appBar: _buildConfiguredAppBar('product'),
+            floatingActionButton: _buildDesignerFloatingAction('product'),
         )));
       },
     )));
@@ -517,7 +632,7 @@ class _StoreHomeState extends State<StoreHome> {
             onWishlist: () => setState(() {
               liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p);
             }),
-            floatingActionButton: _buildDesignerFloatingAction('product'),
+            appBar: _buildConfiguredAppBar('product'), floatingActionButton: _buildDesignerFloatingAction('product'),
           )));
         },
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1345,7 +1460,7 @@ class _StoreHomeState extends State<StoreHome> {
             : <Map<String, dynamic>>[];
         await Navigator.of(context).push(MaterialPageRoute<void>(
           builder: (_) => Scaffold(
-            appBar: AppBar(title: Text((pageData['title'] ?? pageKey).toString())),
+            appBar: _buildConfiguredAppBar(pageKey) ?? AppBar(title: Text((pageData['title'] ?? pageKey).toString())),
             body: ListView(
               padding: const EdgeInsets.only(bottom: 16),
               children: sections.map(_designerSection).toList(),
@@ -1366,7 +1481,6 @@ class _StoreHomeState extends State<StoreHome> {
         : const <Map<String, dynamic>>[];
     final sectionWidgets = sections.map(_designerSection).toList();
     return Column(children: [
-      Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(focusNode: searchFocusNode, controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
       Expanded(child: RefreshIndicator(
         onRefresh: _loadDesignerConfig,
         child: ListView(
@@ -1387,7 +1501,6 @@ class _StoreHomeState extends State<StoreHome> {
   Widget catalog() => designerConfig['pages'] is Map && ((designerConfig['pages'] as Map)['home'] is Map) && (((designerConfig['pages'] as Map)['home'] as Map)['sections'] is List)
       ? _designerCatalog()
       : Column(children: [
-    Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(controller: searchController, onSubmitted: (v) { search = v; load(); }, decoration: InputDecoration(hintText: 'Search products, brands and more', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: () { searchController.clear(); search = ''; load(); }, icon: const Icon(Icons.close)), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
     Container(margin: const EdgeInsets.symmetric(horizontal: 16), padding: const EdgeInsets.all(18), width: double.infinity, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF33205F), Color(0xFF92517F)]), borderRadius: BorderRadius.circular(18)), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('THE EVERYDAY EDIT', style: TextStyle(color: Colors.white70, letterSpacing: 2, fontSize: 10)), SizedBox(height: 8), Text('Find your next\nfavourite thing.', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)), SizedBox(height: 8), Text('SHOP THE COLLECTION  →', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))])),
     SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(12), child: Row(children: [
       for (final item in [('For You','date',false),('Deals','date',true),('Top Rated','rating',false),('Featured','popularity',false)])
@@ -1448,7 +1561,7 @@ class _StoreHomeState extends State<StoreHome> {
           : <Map<String, dynamic>>[];
       await Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (_) => Scaffold(
-          appBar: AppBar(title: Text((pageData['title'] ?? item.label).toString())),
+          appBar: _buildConfiguredAppBar(pageKey) ?? AppBar(title: Text((pageData['title'] ?? item.label).toString())),
           body: ListView(
             padding: const EdgeInsets.only(bottom: 16),
             children: sections.map(_designerSection).toList(),
@@ -1510,6 +1623,70 @@ class _StoreHomeState extends State<StoreHome> {
     ));
   }
 
+  PreferredSizeWidget? _buildConfiguredAppBar(String pageKey) {
+    final config = DesignerAppBarConfig(json: designerConfig['app_bar'] is Map
+        ? Map<String, dynamic>.from(designerConfig['app_bar'] as Map)
+        : const {});
+    if (!config.enabled || !config.visibleOn(pageKey)) return null;
+    final topInset = MediaQuery.paddingOf(context).top;
+    return PreferredSize(
+      preferredSize: Size.fromHeight(config.renderHeight),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: topInset),
+          SizedBox(
+            height: config.renderHeight,
+            child: DesignerAppBarView(
+        config: config,
+        pageKey: pageKey,
+        cartCount: cartCount,
+        searchController: searchController,
+        searchFocusNode: searchFocusNode,
+        onSearchSubmitted: (value) {
+          search = value.trim();
+          FocusScope.of(context).unfocus();
+          load();
+        },
+        onMenu: () => _openAppBarMenu(pageKey),
+        onCart: () {
+          if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
+          setState(() => tab = 3);
+        },
+        onSearch: () {
+          if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
+          if (tab != 0) setState(() => tab = 0);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) FocusScope.of(context).requestFocus(searchFocusNode);
+          });
+        },
+        onVoiceSearch: _voiceListening ? _stopVoiceSearch : () {
+          if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
+          if (tab != 0) setState(() => tab = 0);
+          WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _startVoiceSearch(); });
+        },
+        onWishlist: () {
+          if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
+          setState(() => tab = 2);
+        },
+        onRefresh: () { load(); _refreshCart(); _loadDesignerConfig(); },
+        onLocation: () async {
+          if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
+          if (customerToken == null) { setState(() => tab = 4); return; }
+          await Navigator.push(context, MaterialPageRoute(builder: (_) =>
+              CustomerSectionPage(token: customerToken!, section: 'Saved Addresses', appBar: _buildConfiguredAppBar('account'))));
+        },
+        onCustomAction: (action) {
+          if (_isNestedAppBarPage(pageKey) && (action['link_type'] ?? 'page') == 'page') Navigator.of(context).pop();
+          _openAppBarCustomAction(action);
+        },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDesignerBottomNavigation() {
     final config = DesignerNavigationConfig.fromJson(designerConfig['navigation_bar']);
     final items = config.items.take(5).toList();
@@ -1541,7 +1718,7 @@ class _StoreHomeState extends State<StoreHome> {
     );
   }
 
-  Widget account() => AccountPanel(onLogin: (token) { setState(() => customerToken = token); push.register(customerJwt: token); }, onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } try { await push.unlinkAccount(); } catch (_) {} final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() { customerToken = null; notificationCount = 0; }); }, token: customerToken, onRecentViewed: _openRecentlyViewed, ordersFloatingActionButton: _buildDesignerFloatingAction('orders'));
+  Widget account() => AccountPanel(ordersAppBar: _buildConfiguredAppBar('orders'), onLogin: (token) { setState(() => customerToken = token); push.register(customerJwt: token); }, onLogout: () async { final token = customerToken; if (token != null) { try { await ArkCustomerApi(token).request('customer/logout', method: 'POST'); } catch (_) {} } try { await push.unlinkAccount(); } catch (_) {} final prefs = await SharedPreferences.getInstance(); await prefs.remove('glowhit_customer_session'); if (mounted) setState(() { customerToken = null; notificationCount = 0; }); }, token: customerToken, onRecentViewed: _openRecentlyViewed, ordersFloatingActionButton: _buildDesignerFloatingAction('orders'));
   @override Widget build(BuildContext context) {
     final titles = ['Shopping', 'Categories', 'Wishlist', 'Cart', 'Account'];
     Widget page;
@@ -1550,7 +1727,8 @@ class _StoreHomeState extends State<StoreHome> {
     else if (tab == 2) page = wishlist.isEmpty ? const Center(child: Text('Your wishlist is empty')) : GridView.count(crossAxisCount: 2, childAspectRatio: .66, children: wishlist.map(productCard).toList());
     else if (tab == 3) page = _cartPage();
     else page = account();
-    return Scaffold(appBar: AppBar(title: Text(titles[tab]), actions: [
+    final currentPageKey = tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home') : tab == 1 ? 'categories' : tab == 2 ? 'wishlist' : tab == 3 ? 'cart' : 'account';
+    final PreferredSizeWidget activeAppBar = _buildConfiguredAppBar(currentPageKey) ?? AppBar(title: Text(titles[tab]), actions: [
       if (tab == 0) IconButton(tooltip: 'ARK Designer', onPressed: _openDesigner, icon: const Icon(Icons.design_services_rounded)),
       if (tab == 0) IconButton(tooltip: 'Sync published layout', onPressed: _loadDesignerConfig, icon: const Icon(Icons.sync_rounded)),
       if (tab == 0) IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
@@ -1562,22 +1740,37 @@ class _StoreHomeState extends State<StoreHome> {
           if (notificationCount > 0) Positioned(right: -2, top: -2, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5))))),
         ]),
       ),
-    ]), body: SafeArea(child: page),
+    ]);
+    return PopScope<void>(
+      canPop: tab == 0 && !searchFocusNode.hasFocus,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (searchFocusNode.hasFocus) {
+          searchFocusNode.unfocus();
+          return;
+        }
+        if (tab != 0) setState(() => tab = 0);
+      },
+      child: Scaffold(
+      appBar: activeAppBar,
+      body: SafeArea(top: false, child: page),
       floatingActionButton: _buildDesignerFloatingAction(
         tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home')
           : tab == 1 ? 'categories' : tab == 2 ? 'wishlist' : tab == 3 ? 'cart' : 'account',
       ),
-      bottomNavigationBar: _buildDesignerBottomNavigation());
+      bottomNavigationBar: _buildDesignerBottomNavigation()),
+    );
   }
 }
 
 class AccountPanel extends StatefulWidget {
-  const AccountPanel({super.key, required this.onLogin, required this.onLogout, required this.token, required this.onRecentViewed, this.ordersFloatingActionButton});
+  const AccountPanel({super.key, required this.onLogin, required this.onLogout, required this.token, required this.onRecentViewed, this.ordersFloatingActionButton, this.ordersAppBar});
   final ValueChanged<String> onLogin;
   final VoidCallback onLogout;
   final VoidCallback onRecentViewed;
   final String? token;
   final Widget? ordersFloatingActionButton;
+  final PreferredSizeWidget? ordersAppBar;
   @override State<AccountPanel> createState() => _AccountPanelState();
 }
 
@@ -1697,7 +1890,7 @@ class _AccountPanelState extends State<AccountPanel> with SingleTickerProviderSt
         ),
         const SizedBox(height: 22),
         const Padding(padding: EdgeInsets.only(left: 3, bottom: 10), child: Text('MY ACCOUNT', style: TextStyle(fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.w800, color: purple))),
-        _menuTile(context, Icons.receipt_long_rounded, 'My Orders', 'Track, cancel and review your purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'My Orders', floatingActionButton: widget.ordersFloatingActionButton)))),
+        _menuTile(context, Icons.receipt_long_rounded, 'My Orders', 'Track, cancel and review your purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'My Orders', floatingActionButton: widget.ordersFloatingActionButton, appBar: widget.ordersAppBar)))),
         _menuTile(context, Icons.download_for_offline_rounded, 'Downloads', 'Your available digital purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Downloads')))),
         _menuTile(context, Icons.location_on_rounded, 'Saved Addresses', 'Manage delivery addresses', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Saved Addresses')))),
         _menuTile(context, Icons.person_rounded, 'Edit Profile', 'Update your name and contact details', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Edit Profile')))),
