@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:url_launcher/url_launcher.dart';
 import 'designer_banner_carousel.dart';
 import 'product_details_page.dart';
@@ -18,6 +19,7 @@ import 'notification_inbox_page.dart';
 import 'glowhit_designer_page.dart';
 import 'designer_layout_contract.dart';
 import 'designer_navigation_bar.dart';
+import 'designer_app_bar.dart';
 
 const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
@@ -239,6 +241,8 @@ class _StoreHomeState extends State<StoreHome> {
   bool cartBusy = false;
   final searchController = TextEditingController();
   final FocusNode searchFocusNode = FocusNode();
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _voiceListening = false;
   String? customerToken;
   late final GlowHitPushService push;
   int notificationCount = 0;
@@ -385,7 +389,83 @@ class _StoreHomeState extends State<StoreHome> {
     await _handleNotificationLink(value);
   }
 
-  @override void dispose() { searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
+  @override void dispose() { _speech.stop(); searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
+
+  Future<void> _startVoiceSearch() async {
+    try {
+      final available = await _speech.initialize(
+        onStatus: (status) { if (mounted) setState(() => _voiceListening = status == 'listening'); },
+        onError: (error) { if (mounted) { setState(() => _voiceListening = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Voice Search: ${error.errorMsg}'))); } },
+      );
+      if (!available) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice Search is not available on this device.')));
+        return;
+      }
+      if (mounted) setState(() => _voiceListening = true);
+      await _speech.listen(
+        localeId: 'en_IN',
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 4),
+        onResult: (result) {
+          final words = result.recognizedWords.trim();
+          if (words.isEmpty || !mounted) return;
+          setState(() { search = words; searchController.text = words; });
+          if (result.finalResult) {
+            setState(() => _voiceListening = false);
+            load();
+          }
+        },
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() => _voiceListening = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not start Voice Search: $error')));
+      }
+    }
+  }
+
+  Future<void> _stopVoiceSearch() async {
+    await _speech.stop();
+    if (mounted) setState(() => _voiceListening = false);
+  }
+
+  Future<void> _openAppBarMenu() async {
+    final choice = await showModalBottomSheet<String>(context: context, builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      for (final item in const [('home','Home',Icons.home_outlined),('categories','Categories',Icons.grid_view),('wishlist','Wishlist',Icons.favorite_border),('cart','Cart',Icons.shopping_cart_outlined),('account','Account',Icons.person_outline),('designer','ARK Designer',Icons.design_services_outlined)])
+        ListTile(leading: Icon(item.$3), title: Text(item.$2), onTap: () => Navigator.pop(ctx, item.$1)),
+    ])));
+    if (!mounted || choice == null) return;
+    if (choice == 'designer') { await _openDesigner(); return; }
+    setState(() => tab = switch (choice) {'home' => 0, 'categories' => 1, 'wishlist' => 2, 'cart' => 3, _ => 4});
+  }
+
+  Future<void> _openAppBarCustomAction(Map<String, dynamic> action) async {
+    final type = (action['link_type'] ?? 'page').toString();
+    final target = (action['link_value'] ?? '').toString().trim();
+    if (target.isEmpty) return;
+    if (type == 'url') {
+      final uri = Uri.tryParse(target);
+      if (uri != null && const ['http','https'].contains(uri.scheme.toLowerCase()) && uri.host.isNotEmpty) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
+    if (type == 'deep_link') { await _handleNotificationLink(target); return; }
+    switch (target.toLowerCase()) {
+      case 'home': setState(() => tab = 0); break;
+      case 'search': setState(() => tab = 0); WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) FocusScope.of(context).requestFocus(searchFocusNode); }); break;
+      case 'categories': setState(() => tab = 1); break;
+      case 'wishlist': setState(() => tab = 2); break;
+      case 'cart': setState(() => tab = 3); break;
+      case 'account': setState(() => tab = 4); break;
+      case 'orders':
+        if (customerToken != null) await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders')));
+        else setState(() => tab = 4);
+        break;
+      case 'notifications': await _openNotifications(); break;
+      default: await _handleDesignerChildLink({'link_type':'in_app','link_value':'page:$target'});
+    }
+  }
 
   Future<void> load({String order = 'date', bool sale = false}) async {
     setState(() { loading = true; error = null; });
@@ -1550,19 +1630,47 @@ class _StoreHomeState extends State<StoreHome> {
     else if (tab == 2) page = wishlist.isEmpty ? const Center(child: Text('Your wishlist is empty')) : GridView.count(crossAxisCount: 2, childAspectRatio: .66, children: wishlist.map(productCard).toList());
     else if (tab == 3) page = _cartPage();
     else page = account();
-    return Scaffold(appBar: AppBar(title: Text(titles[tab]), actions: [
-      if (tab == 0) IconButton(tooltip: 'ARK Designer', onPressed: _openDesigner, icon: const Icon(Icons.design_services_rounded)),
-      if (tab == 0) IconButton(tooltip: 'Sync published layout', onPressed: _loadDesignerConfig, icon: const Icon(Icons.sync_rounded)),
-      if (tab == 0) IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
-      IconButton(
-        tooltip: 'Notifications',
-        onPressed: _openNotifications,
-        icon: Stack(clipBehavior: Clip.none, children: [
-          const Icon(Icons.notifications_none_rounded),
-          if (notificationCount > 0) Positioned(right: -2, top: -2, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5))))),
-        ]),
-      ),
-    ]), body: SafeArea(child: page),
+    final currentPageKey = tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home') : tab == 1 ? 'categories' : tab == 2 ? 'wishlist' : tab == 3 ? 'cart' : 'account';
+    final appBarConfig = DesignerAppBarConfig(json: designerConfig['app_bar'] is Map ? Map<String, dynamic>.from(designerConfig['app_bar'] as Map) : const {});
+    final useCustomAppBar = appBarConfig.enabled && appBarConfig.visibleOn(currentPageKey);
+    final Widget activeAppBar = useCustomAppBar
+      ? PreferredSize(
+          preferredSize: Size.fromHeight(appBarConfig.height),
+          child: DesignerAppBarView(
+            config: appBarConfig,
+            pageKey: currentPageKey,
+            cartCount: cartCount,
+            searchController: searchController,
+            onMenu: _openAppBarMenu,
+            onCart: () => setState(() => tab = 3),
+            onSearch: () {
+              if (tab != 0) setState(() => tab = 0);
+              WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) FocusScope.of(context).requestFocus(searchFocusNode); });
+            },
+            onVoiceSearch: _voiceListening ? _stopVoiceSearch : _startVoiceSearch,
+            onWishlist: () => setState(() => tab = 2),
+            onRefresh: () { load(); _refreshCart(); _loadDesignerConfig(); },
+            onLocation: () async {
+              if (customerToken == null) { setState(() => tab = 4); return; }
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: customerToken!, section: 'Saved Addresses')));
+            },
+            onCustomAction: _openAppBarCustomAction,
+          ),
+        )
+      : AppBar(title: Text(titles[tab]), actions: [
+          if (tab == 0) IconButton(tooltip: 'ARK Designer', onPressed: _openDesigner, icon: const Icon(Icons.design_services_rounded)),
+          if (tab == 0) IconButton(tooltip: 'Sync published layout', onPressed: _loadDesignerConfig, icon: const Icon(Icons.sync_rounded)),
+          if (tab == 0) IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
+          IconButton(
+            tooltip: 'Notifications',
+            onPressed: _openNotifications,
+            icon: Stack(clipBehavior: Clip.none, children: [
+              const Icon(Icons.notifications_none_rounded),
+              if (notificationCount > 0) Positioned(right: -2, top: -2, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5))))),
+            ]),
+          ),
+        ]);
+    return Scaffold(appBar: activeAppBar, body: SafeArea(child: page),
       floatingActionButton: _buildDesignerFloatingAction(
         tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home')
           : tab == 1 ? 'categories' : tab == 2 ? 'wishlist' : tab == 3 ? 'cart' : 'account',
