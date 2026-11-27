@@ -51,6 +51,37 @@ void main() {
     expect(fallback.searchTerms, isEmpty);
   });
 
+  test('App Bar menu editor contract preserves media, menu links, icons and sizing', () {
+    final config = DesignerAppBarConfig(json: {
+      'menu_header_image_url': 'https://pluginstore.shop/wp-content/uploads/menu-top.jpg',
+      'icon_size': 30,
+      'horizontal_padding': 18,
+      'menu_items': [
+        {
+          'id':'menu-help',
+          'title':'Help Centre',
+          'link_type':'url',
+          'link_value':'https://pluginstore.shop/help',
+          'leading_icon_family':'Material',
+          'leading_icon':'support_agent',
+          'leading_icon_style':'tile',
+          'trailing_icon_family':'Material',
+          'trailing_icon':'open_in_new',
+          'visible':true,
+        },
+      ],
+    });
+    final json = config.toJson();
+    expect(config.menuHeaderImageUrl, contains('menu-top.jpg'));
+    expect(config.iconSize, 30);
+    expect(config.horizontalPadding, 18);
+    expect(config.menuItems.single['title'], 'Help Centre');
+    expect(config.menuItems.single['link_value'], 'https://pluginstore.shop/help');
+    expect(config.menuItems.single['leading_icon_style'], 'tile');
+    expect(config.menuItems.single['trailing_icon'], 'open_in_new');
+    expect(json['menu_items'], hasLength(1));
+  });
+
   test('App Bar Builder limits custom action buttons to ten', () {
     final actions = List.generate(12, (i) => {
       'id':'a$i','label':'Action $i','icon_family':'Material','icon':'star',
