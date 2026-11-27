@@ -13,10 +13,12 @@ class GlowHitSearchPage extends StatefulWidget {
   const GlowHitSearchPage({
     super.key,
     this.initialQuery = '',
+    this.startVoice = false,
     required this.onOpenProduct,
   });
 
   final String initialQuery;
+  final bool startVoice;
   final ValueChanged<Map<String, dynamic>> onOpenProduct;
 
   @override
@@ -44,6 +46,9 @@ class _GlowHitSearchPageState extends State<GlowHitSearchPage> {
     _controller.text = _query;
     _controller.addListener(_onQueryChanged);
     _loadRecent();
+    if (widget.startVoice) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _startVoiceSearch());
+    }
     if (_query.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _search(_query, remember: true));
     } else {
