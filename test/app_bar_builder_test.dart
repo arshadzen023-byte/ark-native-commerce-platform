@@ -48,7 +48,7 @@ void main() {
     });
     expect(config.searchTerms, ['watch', 'books', 'clothing']);
     final fallback = DesignerAppBarConfig(json: {'search_placeholder_terms': []});
-    expect(fallback.searchTerms, ['watch', 'book', 'cloth']);
+    expect(fallback.searchTerms, isEmpty);
   });
 
   test('App Bar Builder limits custom action buttons to ten', () {
