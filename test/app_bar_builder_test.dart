@@ -42,6 +42,15 @@ void main() {
     expect(config.actions.single['link_value'], 'account');
   });
 
+  test('App Bar config normalizes custom moving search terms', () {
+    final config = DesignerAppBarConfig(json: {
+      'search_placeholder_terms': ['watch', 'books', 'clothing', '', '  '],
+    });
+    expect(config.searchTerms, ['watch', 'books', 'clothing']);
+    final fallback = DesignerAppBarConfig(json: {'search_placeholder_terms': []});
+    expect(fallback.searchTerms, ['watch', 'book', 'cloth']);
+  });
+
   test('App Bar Builder limits custom action buttons to ten', () {
     final actions = List.generate(12, (i) => {
       'id':'a$i','label':'Action $i','icon_family':'Material','icon':'star',
