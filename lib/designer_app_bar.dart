@@ -387,7 +387,7 @@ class DesignerAppBarView extends StatelessWidget {
       borderRadius:BorderRadius.circular(config.position=='floating'?config.radius:0),
       child: SizedBox(
         width:double.infinity,
-        height:config.height.clamp(88.0,220.0).toDouble(),
+        height:config.renderHeight,
         child:Stack(fit:StackFit.expand,children:[
           if(imageProvider!=null) Image(image:imageProvider,fit:BoxFit.cover,errorBuilder:(_,__,___)=>ColoredBox(color:bg)),
           body,
