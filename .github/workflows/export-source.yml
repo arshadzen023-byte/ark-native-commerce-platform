@@ -11,17 +11,76 @@ jobs:
     steps:
       - name: Checkout tested GlowHit source
         uses: actions/checkout@v4
+      - name: Set up Java and Flutter
+        uses: actions/setup-java@v4
         with:
-          ref: ${{ github.sha }}
-      - name: Prepare source archive
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate native Android project and preserve app identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter create --project-name glowhit --org com.ark --platforms android .
+          mkdir -p android/app
+          cp firebase/google-services.json android/app/google-services.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          app_candidates = [Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")]
+          app = next((path for path in app_candidates if path.is_file()), None)
+          if app is None:
+              raise SystemExit("Generated Android app Gradle file not found")
+          text = app.read_text(encoding="utf-8")
+          kotlin_dsl = app.suffix == ".kts"
+          for key in ("applicationId", "namespace"):
+              replacement = f'{key} = "com.ark.glowhit"'
+              pattern = rf'(?m)^\s*{key}\s*(?:=\s*)?"[^"]+"'
+              if re.search(pattern, text):
+                  text = re.sub(pattern, replacement, text, count=1)
+              elif key == "applicationId":
+                  text = text.replace("defaultConfig {", "defaultConfig {\n        " + replacement, 1)
+              else:
+                  text = text.replace("android {", "android {\n    " + replacement, 1)
+          plugin = 'id("com.google.gms.google-services")' if kotlin_dsl else "id 'com.google.gms.google-services'"
+          if "com.google.gms.google-services" not in text:
+              text = text.replace("plugins {", "plugins {\n    " + plugin, 1)
+          if "coreLibraryDesugaringEnabled" not in text:
+              text = text.replace("compileOptions {", "compileOptions {\n        " + ("isCoreLibraryDesugaringEnabled = true" if kotlin_dsl else "coreLibraryDesugaringEnabled true"), 1)
+          if "desugar_jdk_libs" not in text:
+              dependency = 'coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")' if kotlin_dsl else "coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'"
+              text += "\ndependencies {\n    " + dependency + "\n}\n"
+          app.write_text(text, encoding="utf-8")
+          settings_candidates = [Path("android/settings.gradle.kts"), Path("android/settings.gradle")]
+          settings = next((path for path in settings_candidates if path.is_file()), None)
+          if settings is None:
+              raise SystemExit("Generated Android settings Gradle file not found")
+          st = settings.read_text(encoding="utf-8")
+          if "com.google.gms.google-services" not in st:
+              decl = ('id("com.google.gms.google-services") version "4.4.2" apply false'
+                      if settings.suffix == ".kts"
+                      else 'id "com.google.gms.google-services" version "4.4.2" apply false')
+              st = st.replace("plugins {", "plugins {\n    " + decl, 1)
+              settings.write_text(st, encoding="utf-8")
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          m = manifest.read_text(encoding="utf-8")
+          m = re.sub(r'android:label="[^"]+"', 'android:label="GlowHit"', m, count=1)
+          manifest.write_text(m, encoding="utf-8")
+          print("Generated Android native project for com.ark.glowhit with Firebase and notification desugaring")
+          PY
+      - name: Create complete source archive
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/glowhit-source
-          git archive HEAD | tar -x -C /tmp/glowhit-source
+          tar --exclude=.git --exclude=.dart_tool --exclude=build --exclude=.packages --exclude=.flutter-plugins --exclude=.flutter-plugins-dependencies -cf - . | tar -xf - -C /tmp/glowhit-source
           rm -f /tmp/glowhit-source/.github/workflows/export-source.yml
-          printf 'Repository: %s\\nCommit: %s\\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" > /tmp/glowhit-source/SOURCE_COMMIT.txt
-      - name: Upload full Flutter source ZIP
+          printf 'Repository: %s\nCommit: %s\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" > /tmp/glowhit-source/SOURCE_COMMIT.txt
+      - name: Upload complete Flutter and Android source ZIP
         uses: actions/upload-artifact@v4
         with:
           name: glowhit-full-source-${{ github.sha }}
