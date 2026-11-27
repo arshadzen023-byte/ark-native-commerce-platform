@@ -85,7 +85,7 @@ void main() {
     });
     await tester.pumpWidget(MaterialApp(home:Scaffold(
       appBar:PreferredSize(preferredSize:Size.fromHeight(config.height),child:DesignerAppBarView(
-        config:config,pageKey:'home',cartCount:0,searchController:TextEditingController(),
+        config:config,pageKey:'home',cartCount:0,searchController:TextEditingController(),searchFocusNode:FocusNode(),onSearchSubmitted:(_){},
         onMenu:(){},onCart:(){},onSearch:(){},onVoiceSearch:(){},onWishlist:(){},onRefresh:(){},onLocation:(){},onCustomAction:(_){},
       )),
     )));
@@ -93,7 +93,7 @@ void main() {
     expect(find.text('Search products...'),findsOneWidget);
     expect(find.text('Deliver to your address'),findsOneWidget);
     expect(find.byTooltip('Voice Search'),findsOneWidget);
-    expect(find.byType(TextField),findsNothing);
+    expect(find.byType(TextField),findsOneWidget);
   });
 
   testWidgets('App Bar Builder pins the preview outside the scrolling properties', (tester) async {
@@ -129,7 +129,7 @@ void main() {
           config: config,
           pageKey: 'home',
           cartCount: 3,
-          searchController: TextEditingController(),
+          searchController: TextEditingController(), searchFocusNode: FocusNode(), onSearchSubmitted: (_) {},
           onMenu: () {}, onCart: () {}, onSearch: () {}, onVoiceSearch: () {},
           onWishlist: () {}, onRefresh: () {}, onLocation: () {}, onCustomAction: (_) {},
         ),
