@@ -7,7 +7,6 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:url_launcher/url_launcher.dart';
 import 'designer_banner_carousel.dart';
 import 'product_details_page.dart';
@@ -245,8 +244,6 @@ class _StoreHomeState extends State<StoreHome> {
   bool cartBusy = false;
   final searchController = TextEditingController();
   final FocusNode searchFocusNode = FocusNode();
-  final stt.SpeechToText _speech = stt.SpeechToText();
-  bool _voiceListening = false;
   String? customerToken;
   late final GlowHitPushService push;
   int notificationCount = 0;
@@ -420,56 +417,7 @@ class _StoreHomeState extends State<StoreHome> {
 
   void _handleSearchFocusChange() { if (mounted) setState(() {}); }
 
-  @override void dispose() { searchFocusNode.removeListener(_handleSearchFocusChange); _speech.stop(); searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
-
-  Future<void> _startVoiceSearch() async {
-    try {
-      final available = await _speech.initialize(
-        onStatus: (status) { if (mounted) setState(() => _voiceListening = status == 'listening'); },
-        onError: (error) { if (mounted) { setState(() => _voiceListening = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Voice Search: ${error.errorMsg}'))); } },
-      );
-      if (!available) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voice Search is not available on this device.')));
-        return;
-      }
-      final locales = await _speech.locales();
-      String? selectedLocale;
-      for (final preferred in const ['en_IN', 'hi_IN']) {
-        for (final locale in locales) {
-          if (locale.localeId.toLowerCase() == preferred.toLowerCase()) {
-            selectedLocale = locale.localeId;
-            break;
-          }
-        }
-        if (selectedLocale != null) break;
-      }
-      if (mounted) setState(() => _voiceListening = true);
-      await _speech.listen(
-        localeId: selectedLocale,
-        listenFor: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 4),
-        onResult: (result) {
-          final words = result.recognizedWords.trim();
-          if (words.isEmpty || !mounted) return;
-          setState(() { search = words; searchController.text = words; });
-          if (result.finalResult) {
-            setState(() => _voiceListening = false);
-            load();
-          }
-        },
-      );
-    } catch (error) {
-      if (mounted) {
-        setState(() => _voiceListening = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not start Voice Search: $error')));
-      }
-    }
-  }
-
-  Future<void> _stopVoiceSearch() async {
-    await _speech.stop();
-    if (mounted) setState(() => _voiceListening = false);
-  }
+  @override void dispose() { searchFocusNode.removeListener(_handleSearchFocusChange); searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
 
   bool _isNestedAppBarPage(String pageKey) => !const ['home','search','categories','wishlist','cart','account'].contains(pageKey);
 
