@@ -828,9 +828,14 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             }
           }
 
-          final savedFloatingActions = serverConfig['floating_actions'];
-          if (savedFloatingActions is! Map) {
-            throw Exception('WordPress did not return the saved per-page Floating Action Button settings. Update the active ARK App Designer plugin to version 1.17.7 or newer.');
+          final savedFloatingActionsRaw = serverConfig['floating_actions'];
+          final savedFloatingActions = savedFloatingActionsRaw is Map
+              ? Map<String, dynamic>.from(savedFloatingActionsRaw)
+              : (savedFloatingActionsRaw is List && savedFloatingActionsRaw.isEmpty
+                  ? <String, dynamic>{}
+                  : null);
+          if (savedFloatingActions == null) {
+            throw Exception('WordPress returned an invalid per-page Floating Action Button configuration. Update the active ARK App Designer plugin to version 1.17.7 or newer.');
           }
           for (final entry in floatingActions.entries) {
             if (entry.value is! Map) continue;
