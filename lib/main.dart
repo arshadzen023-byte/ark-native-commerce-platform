@@ -156,6 +156,94 @@ class StoreApi {
 
 void main() => runApp(const GlowHitApp());
 
+class GlowHitSplashGate extends StatefulWidget {
+  const GlowHitSplashGate({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<GlowHitSplashGate> createState() => _GlowHitSplashGateState();
+}
+
+class _GlowHitSplashGateState extends State<GlowHitSplashGate> {
+  bool _ready = false;
+  bool _showSplash = false;
+  Map<String, dynamic> _config = const {};
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSplash();
+  }
+
+  Future<void> _loadSplash() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('glowhit_designer_splash_config');
+      if (raw != null && raw.isNotEmpty) {
+        _config = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      }
+      final url = (_config['image_url'] ?? '').toString().trim();
+      if (url.isEmpty) {
+        if (mounted) setState(() => _ready = true);
+        return;
+      }
+      try {
+        await precacheImage(NetworkImage(url), context).timeout(const Duration(seconds: 6));
+      } catch (_) {
+        if (mounted) setState(() => _ready = true);
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _showSplash = true);
+      final seconds = ((_config['duration_seconds'] as num?)?.toInt() ?? 3).clamp(1, 15);
+      _timer = Timer(Duration(seconds: seconds), () {
+        if (mounted) setState(() => _ready = true);
+      });
+    } catch (_) {
+      if (mounted) setState(() => _ready = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_ready) return widget.child;
+    if (!_showSplash) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final fitName = (_config['fit'] ?? 'contain').toString();
+    final fit = fitName == 'cover' ? BoxFit.cover : fitName == 'fill' ? BoxFit.fill : BoxFit.contain;
+    final scale = ((_config['image_scale'] as num?)?.toDouble() ?? 1).clamp(.25, 2.0);
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SizedBox.expand(
+        child: ClipRect(
+          child: Transform.scale(
+            scale: scale,
+            child: Image.network(
+              (_config['image_url'] ?? '').toString(),
+              fit: fit,
+              width: double.infinity,
+              height: double.infinity,
+              gaplessPlayback: true,
+              errorBuilder: (_, __, ___) => widget.child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class SessionGate extends StatefulWidget {
   const SessionGate({super.key});
   @override State<SessionGate> createState() => _SessionGateState();
@@ -216,7 +304,7 @@ class GlowHitApp extends StatelessWidget {
     title: 'GlowHit Shopping',
     debugShowCheckedModeBanner: false,
     theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: purple), scaffoldBackgroundColor: const Color(0xFFF7F6FA)),
-    home: const SessionGate(),
+    home: const GlowHitSplashGate(child: SessionGate()),
   );
 }
 
@@ -266,6 +354,53 @@ class _GlowHitPinnedSearchAddressHeaderDelegate extends SliverPersistentHeaderDe
       maxHeight != oldDelegate.maxHeight ||
       backgroundColor != oldDelegate.backgroundColor ||
       child != oldDelegate.child;
+}
+
+class _DesignerCountdownBadge extends StatefulWidget {
+  const _DesignerCountdownBadge({required this.target});
+  final DateTime target;
+
+  @override
+  State<_DesignerCountdownBadge> createState() => _DesignerCountdownBadgeState();
+}
+
+class _DesignerCountdownBadgeState extends State<_DesignerCountdownBadge> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = widget.target.difference(DateTime.now());
+    final seconds = remaining.isNegative ? 0 : remaining.inSeconds;
+    final days = seconds ~/ 86400;
+    final hours = (seconds % 86400) ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    final secs = seconds % 60;
+    final label = days > 0
+        ? '${days}d ${hours.toString().padLeft(2, '0')}h'
+        : '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF51408F).withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF51408F))),
+    );
+  }
 }
 
 class StoreHome extends StatefulWidget {
@@ -1096,7 +1231,11 @@ class _StoreHomeState extends State<StoreHome> {
               padding: EdgeInsets.only(
                 bottom: (config['title_bottom_spacing'] as num?)?.toDouble() ?? 8,
               ),
-              child: SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle())),
+              child: Row(children: [
+                Expanded(child: SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle()))),
+                if (countdownEnabled && countdownExpiry != null)
+                  _DesignerCountdownBadge(target: countdownExpiry),
+              ]),
             ),
             bannerGrid
                 ? SizedBox(
@@ -1353,7 +1492,11 @@ class _StoreHomeState extends State<StoreHome> {
             padding: EdgeInsets.only(
               bottom: (config['title_bottom_spacing'] as num?)?.toDouble() ?? 8,
             ),
-            child: Text(title, style: sectionTitleStyle()),
+            child: Row(children: [
+              Expanded(child: SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle()))),
+              if (countdownEnabled && countdownExpiry != null)
+                _DesignerCountdownBadge(target: countdownExpiry),
+            ]),
           ),
           if (layout.contains('list_tile'))
             Column(children: rows.map((category) => ListTile(
@@ -1446,7 +1589,11 @@ class _StoreHomeState extends State<StoreHome> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (showTitle) Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Text(title, style: sectionTitleStyle()),
+            child: Row(children: [
+              Expanded(child: SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle()))),
+              if (countdownEnabled && countdownExpiry != null)
+                _DesignerCountdownBadge(target: countdownExpiry),
+            ]),
           ),
           if (layout.contains('carousel') || layout.contains('slider') || layout.contains('scroll'))
             SizedBox(
@@ -1667,9 +1814,11 @@ class _StoreHomeState extends State<StoreHome> {
         : const {});
     // The App Bar collapses its top action/logo row during Home scrolling,
     // while Search and Delivery Address remain visible as pinned rows.
-    final pinnedRowsHeight = ((config.show('show_search') ? 54.0 : 0.0)
-        + (config.show('show_location') ? 40.0 : 0.0)).clamp(48.0, 120.0).toDouble();
-    final fullHeaderHeight = config.renderHeight.toDouble().clamp(pinnedRowsHeight, 260.0);
+    final statusInset = MediaQuery.paddingOf(context).top;
+    final pinnedRowsHeight = (statusInset + (config.show('show_search') ? 54.0 : 0.0)
+        + (config.show('show_location') ? 40.0 : 0.0)).clamp(48.0, 160.0).toDouble();
+    final fullHeaderHeight = (statusInset + config.renderHeight.toDouble())
+        .clamp(pinnedRowsHeight, 280.0).toDouble();
     return RefreshIndicator(
       onRefresh: _loadDesignerConfig,
       child: CustomScrollView(
