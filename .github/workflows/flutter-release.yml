@@ -201,6 +201,29 @@ jobs:
               raise SystemExit("INTERNET permission was not added")
           print("Verified INTERNET permission")
           PY
+      - name: Ensure Android microphone permission for Voice Search
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          content = manifest.read_text(encoding="utf-8")
+          permission = '    <uses-permission android:name="android.permission.RECORD_AUDIO" />'
+          if "android.permission.RECORD_AUDIO" not in content:
+              marker = "    <uses-permission android:name=" + chr(34) + "android.permission.INTERNET" + chr(34) + " />"
+              if marker in content:
+                  content = content.replace(marker, marker + chr(10) + permission, 1)
+              else:
+                  start = content.find("<manifest")
+                  end = content.find(">", start)
+                  if start < 0 or end < 0:
+                      raise SystemExit("Could not find opening manifest tag")
+                  content = content[:end + 1] + chr(10) + permission + content[end + 1:]
+              manifest.write_text(content, encoding="utf-8")
+          if "android.permission.RECORD_AUDIO" not in manifest.read_text(encoding="utf-8"):
+              raise SystemExit("RECORD_AUDIO permission was not added")
+          print("Verified RECORD_AUDIO permission for native Voice Search")
+          PY
       - name: Resolve dependencies
         run: flutter pub get
       - name: Flutter analyze
