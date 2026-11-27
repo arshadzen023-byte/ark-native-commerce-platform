@@ -441,13 +441,16 @@ class _StoreHomeState extends State<StoreHome> {
     if (mounted) setState(() => _voiceListening = false);
   }
 
-  Future<void> _openAppBarMenu() async {
+  bool _isNestedAppBarPage(String pageKey) => !const ['home','search','categories','wishlist','cart','account'].contains(pageKey);
+
+  Future<void> _openAppBarMenu([String pageKey = 'home']) async {
     final choice = await showModalBottomSheet<String>(context: context, builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
       for (final item in const [('home','Home',Icons.home_outlined),('categories','Categories',Icons.grid_view),('wishlist','Wishlist',Icons.favorite_border),('cart','Cart',Icons.shopping_cart_outlined),('account','Account',Icons.person_outline),('designer','ARK Designer',Icons.design_services_outlined)])
         ListTile(leading: Icon(item.$3), title: Text(item.$2), onTap: () => Navigator.pop(ctx, item.$1)),
     ])));
     if (!mounted || choice == null) return;
     if (choice == 'designer') { await _openDesigner(); return; }
+    if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
     setState(() => tab = switch (choice) {'home' => 0, 'categories' => 1, 'wishlist' => 2, 'cart' => 3, _ => 4});
   }
 
@@ -1615,23 +1618,38 @@ class _StoreHomeState extends State<StoreHome> {
         pageKey: pageKey,
         cartCount: cartCount,
         searchController: searchController,
-        onMenu: _openAppBarMenu,
-        onCart: () => setState(() => tab = 3),
+        onMenu: () => _openAppBarMenu(pageKey),
+        onCart: () {
+          if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
+          setState(() => tab = 3);
+        },
         onSearch: () {
+          if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
           if (tab != 0) setState(() => tab = 0);
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) FocusScope.of(context).requestFocus(searchFocusNode);
           });
         },
-        onVoiceSearch: _voiceListening ? _stopVoiceSearch : _startVoiceSearch,
-        onWishlist: () => setState(() => tab = 2),
+        onVoiceSearch: _voiceListening ? _stopVoiceSearch : () {
+          if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
+          if (tab != 0) setState(() => tab = 0);
+          WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _startVoiceSearch(); });
+        },
+        onWishlist: () {
+          if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
+          setState(() => tab = 2);
+        },
         onRefresh: () { load(); _refreshCart(); _loadDesignerConfig(); },
         onLocation: () async {
+          if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
           if (customerToken == null) { setState(() => tab = 4); return; }
           await Navigator.push(context, MaterialPageRoute(builder: (_) =>
               CustomerSectionPage(token: customerToken!, section: 'Saved Addresses', appBar: _buildConfiguredAppBar('account'))));
         },
-        onCustomAction: _openAppBarCustomAction,
+        onCustomAction: (action) {
+          if (_isNestedAppBarPage(pageKey) && (action['link_type'] ?? 'page') == 'page') Navigator.of(context).pop();
+          _openAppBarCustomAction(action);
+        },
       ),
     );
   }
