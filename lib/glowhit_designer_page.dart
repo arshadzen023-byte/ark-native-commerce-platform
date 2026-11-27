@@ -2015,6 +2015,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       onMyTemplates: _openMyTemplates,
       onSaveDraft: () => _persist(),
       onPublish: () => _persist(publish: true),
+      onChooseMedia: _chooseMedia,
     )));
   }
 
@@ -2103,6 +2104,7 @@ class _DesignerSettingsPage extends StatefulWidget {
     required this.onMyTemplates,
     required this.onSaveDraft,
     required this.onPublish,
+    required this.onChooseMedia,
   });
   final bool saving;
   final bool publishing;
@@ -2117,6 +2119,7 @@ class _DesignerSettingsPage extends StatefulWidget {
   final VoidCallback onMyTemplates;
   final Future<void> Function() onSaveDraft;
   final Future<void> Function() onPublish;
+  final Future<Map<String, dynamic>?> Function() onChooseMedia;
 
   @override
   State<_DesignerSettingsPage> createState() => _DesignerSettingsPageState();
@@ -2248,7 +2251,7 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => _DesignerAppSettingsPage(onChooseMedia: _chooseMedia),
+                      builder: (_) => _DesignerAppSettingsPage(onChooseMedia: widget.onChooseMedia),
                     ),
                   ),
                 ),
