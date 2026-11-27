@@ -245,6 +245,23 @@ class DesignerNavIcons {
     const NavIconChoice('Material', 'notifications_none', 'Notifications', Icons.notifications_none),
     const NavIconChoice('Material', 'more_horiz', 'More', Icons.more_horiz),
 
+    // Music, websites, payment methods and extra vehicle choices
+    const NavIconChoice('Material', 'audiotrack', 'Audio Track', Icons.audiotrack),
+    const NavIconChoice('Material', 'library_music', 'Music Library', Icons.library_music),
+    const NavIconChoice('Material', 'music_video', 'Music Video', Icons.music_video),
+    const NavIconChoice('Material', 'headphones', 'Headphones', Icons.headphones),
+    const NavIconChoice('Material', 'speaker', 'Speaker', Icons.speaker),
+    const NavIconChoice('Material', 'web', 'Website', Icons.web),
+    const NavIconChoice('Material', 'web_asset', 'Web Page', Icons.web_asset),
+    const NavIconChoice('Material', 'link', 'Website Link', Icons.link),
+    const NavIconChoice('Material', 'payment', 'Payment', Icons.payment),
+    const NavIconChoice('Material', 'credit_score', 'Card Payment', Icons.credit_score),
+    const NavIconChoice('Material', 'directions_car_filled', 'Car Filled', Icons.directions_car_filled),
+    const NavIconChoice('Material', 'commute', 'Commute', Icons.commute),
+    const NavIconChoice('Material', 'local_taxi', 'Taxi', Icons.local_taxi),
+    const NavIconChoice('Material', 'flight_land', 'Flight Landing', Icons.flight_land),
+    const NavIconChoice('Material', 'electric_bike', 'Electric Bike', Icons.electric_bike),
+    const NavIconChoice('Material', 'directions_walk', 'Walking', Icons.directions_walk),
     // Transport
     const NavIconChoice('Material', 'flight', 'Flight', Icons.flight),
     const NavIconChoice('Material', 'flight_takeoff', 'Flight Takeoff', Icons.flight_takeoff),
