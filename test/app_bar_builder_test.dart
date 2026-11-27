@@ -32,6 +32,7 @@ void main() {
     expect(json['show_voice_search'], isTrue);
     expect(json['show_cart'], isFalse);
     expect(config.height, 88);
+    expect(config.renderHeight, greaterThanOrEqualTo(132));
     expect(json['spacing'], 12);
     expect(json['radius'], 18);
     expect(json['background_mime_type'], 'image/gif');
@@ -94,6 +95,36 @@ void main() {
     expect(find.text('Deliver to your address'),findsOneWidget);
     expect(find.byTooltip('Voice Search'),findsOneWidget);
     expect(find.byType(TextField),findsOneWidget);
+  });
+
+
+  testWidgets('Native App Bar submits typed product searches', (tester) async {
+    String? submitted;
+    final controller = TextEditingController();
+    final focus = FocusNode();
+    final config = DesignerAppBarConfig(json: {'show_search': true, 'show_location': false});
+    await tester.pumpWidget(MaterialApp(home: Scaffold(
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(config.renderHeight),
+        child: DesignerAppBarView(
+          config: config,
+          pageKey: 'home',
+          cartCount: 0,
+          searchController: controller,
+          searchFocusNode: focus,
+          onSearchSubmitted: (value) => submitted = value,
+          onMenu: () {}, onCart: () {}, onSearch: () {}, onVoiceSearch: () {},
+          onWishlist: () {}, onRefresh: () {}, onLocation: () {}, onCustomAction: (_) {},
+        ),
+      ),
+    )));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'red shirt');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    expect(submitted, 'red shirt');
+    controller.dispose();
+    focus.dispose();
   });
 
   testWidgets('App Bar Builder pins the preview outside the scrolling properties', (tester) async {
