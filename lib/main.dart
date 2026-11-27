@@ -20,6 +20,7 @@ import 'glowhit_designer_page.dart';
 import 'designer_layout_contract.dart';
 import 'designer_navigation_bar.dart';
 import 'designer_app_bar.dart';
+import 'search_page.dart';
 
 const storeUrl = 'https://pluginstore.shop';
 const purple = Color(0xFF51408F);
@@ -230,6 +231,7 @@ class _StoreHomeState extends State<StoreHome> {
   bool loading = false;
   String? error;
   String search = '';
+  String deliveryAddressLabel = 'Deliver to your address';
   List<Map<String, dynamic>> products = [];
   List<Map<String, dynamic>> wishlist = [];
   List<Map<String, dynamic>> storeCategories = [];
@@ -256,6 +258,25 @@ class _StoreHomeState extends State<StoreHome> {
     _loadDesignerConfig();
     _loadStoreCategories();
     _refreshCart();
+    _loadSelectedDeliveryAddress();
+  }
+  Future<void> _loadSelectedDeliveryAddress() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('glowhit_selected_delivery_address');
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      final address = Map<String, dynamic>.from(decoded);
+      final locality = [address['address_1'], address['address_2'], address['city'], address['postcode']]
+          .where((v) => v != null && v.toString().trim().isNotEmpty)
+          .map((v) => v.toString().trim()).join(', ');
+      final label = (address['label'] ?? '').toString().trim();
+      final full = locality.isNotEmpty ? locality : label;
+      final compact = full.isEmpty ? 'Deliver to your address' : 'Deliver to $full';
+      final display = compact.length > 20 ? '${compact.substring(0, 19)}…' : compact;
+      if (mounted) setState(() => deliveryAddressLabel = display);
+    } catch (_) {}
   }
   Future<void> _refreshNotificationCount({bool markSeen = false}) async {
     try {
@@ -480,7 +501,7 @@ class _StoreHomeState extends State<StoreHome> {
     }
     switch (target.toLowerCase()) {
       case 'home': setState(() => tab = 0); break;
-      case 'search': setState(() => tab = 0); WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) FocusScope.of(context).requestFocus(searchFocusNode); }); break;
+      case 'search': await _openSearchPage(); break;
       case 'categories': setState(() => tab = 1); break;
       case 'wishlist': setState(() => tab = 2); break;
       case 'cart': setState(() => tab = 3); break;
@@ -526,6 +547,7 @@ class _StoreHomeState extends State<StoreHome> {
   Future<void> _openCheckout() async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => WooCheckoutPage(api: woo, customerToken: customerToken)));
     await _refreshCart();
+    await _loadSelectedDeliveryAddress();
   }
   Widget _cartPage() {
     final items = (liveCart['items'] as List? ?? []).whereType<Map>().toList();
@@ -1623,10 +1645,37 @@ class _StoreHomeState extends State<StoreHome> {
     ));
   }
 
+  Future<void> _openSearchPage({String initialQuery = '', bool startVoice = false}) async {
+    if (!mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => GlowHitSearchPage(
+        initialQuery: initialQuery,
+        startVoice: startVoice,
+        onOpenProduct: (product) {
+          Navigator.of(context).push(MaterialPageRoute(builder: (_) => ProductDetailsPage(
+            product: product,
+            onAddToCart: () => _addToCart(product),
+            onBuyNow: () => _buyNow(product),
+            isWishlisted: wishlist.any((e) => e['id'] == product['id']),
+            onWishlist: () => setState(() {
+              wishlist.any((e) => e['id'] == product['id'])
+                  ? wishlist.removeWhere((e) => e['id'] == product['id'])
+                  : wishlist.add(product);
+            }),
+            appBar: _buildConfiguredAppBar('product'),
+            floatingActionButton: _buildDesignerFloatingAction('product'),
+          )));
+        },
+      ),
+    ));
+  }
+
   PreferredSizeWidget? _buildConfiguredAppBar(String pageKey) {
-    final config = DesignerAppBarConfig(json: designerConfig['app_bar'] is Map
+    final rawAppBar = designerConfig['app_bar'] is Map
         ? Map<String, dynamic>.from(designerConfig['app_bar'] as Map)
-        : const {});
+        : <String, dynamic>{};
+    rawAppBar['address_label'] = deliveryAddressLabel;
+    final config = DesignerAppBarConfig(json: rawAppBar);
     if (!config.enabled || !config.visibleOn(pageKey)) return null;
     final topInset = MediaQuery.paddingOf(context).top;
     return PreferredSize(
@@ -1644,9 +1693,7 @@ class _StoreHomeState extends State<StoreHome> {
         searchController: searchController,
         searchFocusNode: searchFocusNode,
         onSearchSubmitted: (value) {
-          search = value.trim();
-          FocusScope.of(context).unfocus();
-          load();
+          _openSearchPage(initialQuery: value.trim());
         },
         onMenu: () => _openAppBarMenu(pageKey),
         onCart: () {
@@ -1654,16 +1701,10 @@ class _StoreHomeState extends State<StoreHome> {
           setState(() => tab = 3);
         },
         onSearch: () {
-          if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
-          if (tab != 0) setState(() => tab = 0);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) FocusScope.of(context).requestFocus(searchFocusNode);
-          });
+          _openSearchPage(initialQuery: searchController.text);
         },
-        onVoiceSearch: _voiceListening ? _stopVoiceSearch : () {
-          if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
-          if (tab != 0) setState(() => tab = 0);
-          WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _startVoiceSearch(); });
+        onVoiceSearch: () {
+          _openSearchPage(initialQuery: searchController.text, startVoice: true);
         },
         onWishlist: () {
           if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
