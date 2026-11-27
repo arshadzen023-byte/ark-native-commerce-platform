@@ -257,9 +257,6 @@ void main() {
     expect(find.text('3'), findsOneWidget);
     expect(find.byTooltip('Help'), findsOneWidget);
   });
-}
-
-
   test('component title alignment and countdown values use stable additive properties', () {
     const alignments = ['left', 'center', 'right'];
     expect(alignments, contains('center'));
@@ -274,3 +271,4 @@ void main() {
     expect(DateTime.tryParse(properties['countdown_time'] as String), DateTime(2027, 1, 15, 18, 30));
     expect(properties['countdown_auto_hide'], isTrue);
   });
+}
