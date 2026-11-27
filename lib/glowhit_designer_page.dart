@@ -208,12 +208,35 @@ class DesignerComponent {
         ? (values['children'] as List).whereType<Map>().map((rawChild) {
             final child = Map<String, dynamic>.from(rawChild);
             final kind = (child['type'] ?? 'image').toString().toLowerCase();
-            final rawId = child['attachment_id'] ?? child['media_id'] ?? child['id'];
+            final nestedMedia = child['media'] ?? child['attachment'] ?? child['image'];
+            final mediaMap = nestedMedia is Map
+                ? Map<String, dynamic>.from(nestedMedia)
+                : <String, dynamic>{};
+            final rawId = child['attachment_id'] ??
+                child['media_id'] ??
+                mediaMap['attachment_id'] ??
+                mediaMap['media_id'] ??
+                mediaMap['id'] ??
+                child['id'];
             final attachmentId = rawId is num
                 ? rawId.toInt()
                 : int.tryParse((rawId ?? '').toString()) ?? 0;
-            dynamic rawImage = child['image_url'] ?? child['source_url'] ?? child['url'] ?? child['src'] ?? child['image'] ?? '';
-            if (rawImage is Map) rawImage = rawImage['url'] ?? rawImage['src'] ?? '';
+            dynamic rawImage = child['image_url'] ??
+                child['source_url'] ??
+                child['url'] ??
+                child['src'] ??
+                mediaMap['image_url'] ??
+                mediaMap['source_url'] ??
+                mediaMap['url'] ??
+                mediaMap['src'] ??
+                (nestedMedia is String ? nestedMedia : '');
+            if (rawImage is Map) {
+              rawImage = rawImage['image_url'] ??
+                  rawImage['source_url'] ??
+                  rawImage['url'] ??
+                  rawImage['src'] ??
+                  '';
+            }
             final imageUrl = rawImage.toString().trim();
             final supported = kind == 'image' || kind == 'video';
             if (!supported || (attachmentId < 1 && imageUrl.isEmpty)) return null;
