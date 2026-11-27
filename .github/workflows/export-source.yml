@@ -72,9 +72,9 @@ jobs:
           for permission in ("android.permission.INTERNET", "android.permission.RECORD_AUDIO"):
               if permission not in m:
                   pos = m.find(">")
-                  m = m[:pos + 1] + f'\\n    <uses-permission android:name="{permission}" />' + m[pos + 1:]
+                  m = m[:pos + 1] + f'\n    <uses-permission android:name="{permission}" />' + m[pos + 1:]
           if "android.speech.RecognitionService" not in m:
-              m = m.replace("    <application", '  <queries>\\n    <intent>\\n      <action android:name="android.speech.RecognitionService" />\\n    </intent>\\n  </queries>\\n    <application', 1)
+              m = m.replace("    <application", '  <queries>\n    <intent>\n      <action android:name="android.speech.RecognitionService" />\n    </intent>\n  </queries>\n    <application', 1)
           manifest.write_text(m, encoding="utf-8")
           print("Generated Android native project for com.ark.glowhit with Firebase, network/microphone permissions and notification desugaring")
           PY
