@@ -31,7 +31,7 @@ void main() {
     final json = config.toJson();
     expect(json['show_voice_search'], isTrue);
     expect(json['show_cart'], isFalse);
-    expect(config.height, 132);
+    expect(config.height, 88);
     expect(json['spacing'], 12);
     expect(json['radius'], 18);
     expect(json['background_mime_type'], 'image/gif');
