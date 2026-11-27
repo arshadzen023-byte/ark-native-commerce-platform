@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'designer_app_bar.dart' show DesignerAppBarConfig;
 import 'designer_navigation_bar.dart';
 
 const _menuEditorAccent = Color(0xFF5B3A9E);
@@ -35,11 +34,6 @@ class _DesignerAppBarMenuEditorPageState extends State<DesignerAppBarMenuEditorP
   void initState() {
     super.initState();
     items = widget.initialItems.map((item) => Map<String, dynamic>.from(item)).toList();
-    if (items.isEmpty) {
-      items = DesignerAppBarConfig.defaultMenuItems
-          .map((item) => Map<String, dynamic>.from(item))
-          .toList();
-    }
     imageUrl = widget.initialImageUrl;
     imageId = widget.initialImageId;
   }
