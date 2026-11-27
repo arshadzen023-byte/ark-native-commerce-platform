@@ -12,6 +12,7 @@ class ProductDetailsPage extends StatelessWidget {
     required this.isWishlisted,
     required this.onWishlist,
     this.floatingActionButton,
+    this.appBar,
   });
 
   final Map<String, dynamic> product;
@@ -20,6 +21,7 @@ class ProductDetailsPage extends StatelessWidget {
   final bool isWishlisted;
   final VoidCallback onWishlist;
   final Widget? floatingActionButton;
+  final PreferredSizeWidget? appBar;
 
   String _plainText(dynamic value) => (value ?? '')
       .toString()
@@ -47,7 +49,7 @@ class ProductDetailsPage extends StatelessWidget {
     final shortDescription = _plainText(product['short_description']);
     final name = (product['name'] ?? 'Product').toString();
     return Scaffold(
-      appBar: AppBar(
+      appBar: appBar ?? AppBar(
         title: const Text('Product details'),
         actions: [
           IconButton(onPressed: onWishlist, icon: Icon(isWishlisted ? Icons.favorite : Icons.favorite_border, color: isWishlisted ? Colors.red : null)),
