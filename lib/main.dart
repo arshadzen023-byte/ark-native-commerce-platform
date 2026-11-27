@@ -1270,7 +1270,7 @@ class _StoreHomeState extends State<StoreHome> {
         );
         return;
       }
-      final opened = await launchUrl(uri!, mode: LaunchMode.externalApplication);
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!opened && mounted) ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not open this link.')),
       );
