@@ -126,10 +126,11 @@ class DesignerAppBarConfig {
 }
 
 class DesignerAppBarBuilderPage extends StatefulWidget {
-  const DesignerAppBarBuilderPage({super.key,required this.initialConfig,required this.availablePages,required this.onUpload,required this.onSave});
+  const DesignerAppBarBuilderPage({super.key,required this.initialConfig,required this.availablePages,required this.onUpload,required this.onChooseMedia,required this.onSave});
   final DesignerAppBarConfig initialConfig;
   final List<Map<String,String>> availablePages;
   final Future<Map<String,dynamic>?> Function() onUpload;
+  final Future<Map<String,dynamic>?> Function() onChooseMedia;
   final Future<void> Function(DesignerAppBarConfig) onSave;
   @override State<DesignerAppBarBuilderPage> createState()=>_DesignerAppBarBuilderPageState();
 }
@@ -157,19 +158,28 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
   @override void dispose(){colorController.dispose();placeholderController.dispose();searchTermsController.dispose();previewController.dispose();previewFocusNode.dispose();settingsScrollController.dispose();super.dispose();}
   void setValue(String key,dynamic value)=>setState(()=>data[key]=value);
   Future<void> apply() async { await widget.onSave(DesignerAppBarConfig(json:data)); if(mounted) Navigator.pop(context); }
+  void _applyMedia(String key,Map<String,dynamic> media) {
+    final url=(media['source_url']??media['url']??'').toString();
+    if(url.isEmpty)return;
+    final idValue=media['id']??media['attachment_id']??0;
+    final attachmentId=idValue is num?idValue.toInt():int.tryParse(idValue.toString())??0;
+    setState(() {
+      data[key]=url;
+      if(key=='background_image_url') { data['background_image_id']=attachmentId; data['background_mime_type']=(media['mime_type']??'').toString(); }
+      if(key=='menu_header_image_url') data['menu_header_image_id']=attachmentId;
+    });
+  }
   Future<void> upload(String key) async {
     if(uploading)return;
     setState(()=>uploading=true);
-    try {
-      final media=await widget.onUpload(); if(media==null||!mounted)return;
-      final url=(media['source_url']??media['url']??'').toString(); if(url.isEmpty)return;
-      final attachmentId=(media['id']??media['attachment_id']??0) is num ? ((media['id']??media['attachment_id']??0) as num).toInt() : int.tryParse((media['id']??media['attachment_id']??'0').toString()) ?? 0;
-      setState(() {
-        data[key]=url;
-        if(key=='background_image_url') { data['background_image_id']=attachmentId; data['background_mime_type']=(media['mime_type']??'').toString(); }
-        if(key=='menu_header_image_url') data['menu_header_image_id']=attachmentId;
-      });
-    } finally { if(mounted)setState(()=>uploading=false); }
+    try { final media=await widget.onUpload(); if(media!=null&&mounted)_applyMedia(key,media); }
+    finally { if(mounted)setState(()=>uploading=false); }
+  }
+  Future<void> chooseExistingMedia(String key) async {
+    if(uploading)return;
+    setState(()=>uploading=true);
+    try { final media=await widget.onChooseMedia(); if(media!=null&&mounted)_applyMedia(key,media); }
+    finally { if(mounted)setState(()=>uploading=false); }
   }
   void removeMedia(String key) {
     setState(() { data[key]=''; if(key=='background_image_url') { data['background_image_id']=0; data['background_mime_type']=''; } if(key=='menu_header_image_url') data['menu_header_image_id']=0; });
@@ -192,6 +202,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
       initialImageUrl:config.menuHeaderImageUrl,
       initialImageId:config.menuHeaderImageId,
       onUpload:widget.onUpload,
+      onChooseMedia:widget.onChooseMedia,
     )));
     if(result==null||!mounted)return;
     setState(() {
@@ -312,8 +323,8 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
       ]))),
       Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('Logo & Background',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold)),
-        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.image_outlined),title:const Text('Upload Logo'),subtitle:Text(config.logoUrl.isEmpty?'No logo selected':'Logo uploaded · tap to replace'),onTap:uploading?null:()=>upload('logo_url'),trailing:config.logoUrl.isEmpty?null:IconButton(tooltip:'Delete logo',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>removeMedia('logo_url'))),
-        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.wallpaper_outlined),title:const Text('Upload Background Image / GIF'),subtitle:Text(config.backgroundImageUrl.isEmpty?'No background selected':'Background media uploaded · tap to replace'),onTap:uploading?null:()=>upload('background_image_url'),trailing:config.backgroundImageUrl.isEmpty?null:IconButton(tooltip:'Delete background',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>removeMedia('background_image_url'))),
+        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.image_outlined),title:const Text('WordPress Media Library · Logo'),subtitle:Text(config.logoUrl.isEmpty?'No logo selected':'Logo selected · tap to replace'),onTap:uploading?null:()=>chooseExistingMedia('logo_url'),trailing:config.logoUrl.isEmpty?null:IconButton(tooltip:'Delete logo',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>removeMedia('logo_url'))),
+        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.wallpaper_outlined),title:const Text('WordPress Media Library · Background Image / GIF'),subtitle:Text(config.backgroundImageUrl.isEmpty?'No background selected':'Background media selected · tap to replace'),onTap:uploading?null:()=>chooseExistingMedia('background_image_url'),trailing:config.backgroundImageUrl.isEmpty?null:IconButton(tooltip:'Delete background',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>removeMedia('background_image_url'))),
         if(uploading) const LinearProgressIndicator(),
         backgroundColorPicker(),
         TextField(controller:placeholderController,decoration:const InputDecoration(labelText:'Search placeholder'),onChanged:(v)=>setValue('search_placeholder',v)),
@@ -371,11 +382,13 @@ class DesignerAppBarMenuEditorPage extends StatefulWidget {
     required this.initialImageUrl,
     required this.initialImageId,
     required this.onUpload,
+    required this.onChooseMedia,
   });
   final List<Map<String,dynamic>> initialItems;
   final String initialImageUrl;
   final int initialImageId;
   final Future<Map<String,dynamic>?> Function() onUpload;
+  final Future<Map<String,dynamic>?> Function() onChooseMedia;
 
   @override
   State<DesignerAppBarMenuEditorPage> createState()=>_DesignerAppBarMenuEditorPageState();
@@ -396,11 +409,11 @@ class _DesignerAppBarMenuEditorPageState extends State<DesignerAppBarMenuEditorP
     imageId=widget.initialImageId;
   }
 
-  Future<void> _uploadImage() async {
+  Future<void> _selectImage({bool uploadFromPhone=false}) async {
     if(uploading)return;
     setState(()=>uploading=true);
     try {
-      final media=await widget.onUpload();
+      final media=uploadFromPhone?await widget.onUpload():await widget.onChooseMedia();
       if(media==null||!mounted)return;
       final url=(media['source_url']??media['url']??'').toString();
       final idValue=media['id']??media['attachment_id']??0;
@@ -408,7 +421,7 @@ class _DesignerAppBarMenuEditorPageState extends State<DesignerAppBarMenuEditorP
       if(url.isEmpty) throw Exception('WordPress returned no Media Library URL.');
       setState(() { imageUrl=url; imageId=id; });
     } catch(error) {
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Menu image upload failed: $error')));
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Menu image selection failed: $error')));
     } finally {
       if(mounted)setState(()=>uploading=false);
     }
@@ -443,7 +456,9 @@ class _DesignerAppBarMenuEditorPageState extends State<DesignerAppBarMenuEditorP
           const SizedBox(height:8),
           if(imageUrl.isNotEmpty) ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(imageUrl,width:double.infinity,height:150,fit:BoxFit.cover,gaplessPlayback:true,errorBuilder:(_,__,___)=>const SizedBox(height:70,child:Center(child:Text('Image preview unavailable'))))),
           Row(children:[
-            Expanded(child:OutlinedButton.icon(onPressed:uploading?null:_uploadImage,icon:const Icon(Icons.photo_library_outlined),label:Text(imageUrl.isEmpty?'Choose from Media Library':'Replace image'))),
+            Expanded(child:OutlinedButton.icon(onPressed:uploading?null:()=>_selectImage(),icon:const Icon(Icons.photo_library_outlined),label:Text(imageUrl.isEmpty?'Choose from WordPress Media Library':'Replace from Media Library'))),
+            const SizedBox(width:8),
+            IconButton(tooltip:'Upload from phone Gallery',onPressed:uploading?null:()=>_selectImage(uploadFromPhone:true),icon:const Icon(Icons.add_photo_alternate_outlined)),
             if(imageUrl.isNotEmpty) IconButton(tooltip:'Remove image',onPressed:()=>setState(() { imageUrl=''; imageId=0; }),icon:const Icon(Icons.delete_outline,color:Colors.red)),
           ]),
           if(uploading) const LinearProgressIndicator(),
@@ -763,7 +778,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     final items=List<Map<String,dynamic>>.from(DesignerAppBarConfig(json:data).toJson()['menu_items'] as List);
     return Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Row(children:[const Expanded(child:Text('Menu Edit',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold))),TextButton.icon(onPressed:items.length>=30?null:addMenuItem,icon:const Icon(Icons.add),label:const Text('Add item'))]),
-      ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.image_outlined),title:const Text('Menu Top Image · WordPress Gallery'),subtitle:Text((data['menu_header_image_url']??'').toString().isEmpty?'No menu image selected':'Image selected · tap to replace'),onTap:uploading?null:()=>upload('menu_header_image_url'),trailing:(data['menu_header_image_url']??'').toString().isEmpty?null:IconButton(tooltip:'Delete menu image',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>setValue('menu_header_image_url',''))),
+      ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.image_outlined),title:const Text('Menu Top Image · WordPress Gallery'),subtitle:Text((data['menu_header_image_url']??'').toString().isEmpty?'No menu image selected':'Image selected · tap to replace'),onTap:uploading?null:()=>chooseExistingMedia('menu_header_image_url'),trailing:(data['menu_header_image_url']??'').toString().isEmpty?null:IconButton(tooltip:'Delete menu image',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>setValue('menu_header_image_url',''))),
       if((data['menu_header_image_url']??'').toString().isNotEmpty) ClipRRect(borderRadius:BorderRadius.circular(10),child:Image.network(data['menu_header_image_url'].toString(),height:100,width:double.infinity,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const SizedBox(height:40,child:Text('Menu image preview unavailable')))),
       for(var i=0;i<items.length;i++) Card(color:const Color(0xFFF8F7FC),child:Padding(padding:const EdgeInsets.all(9),child:Column(children:[
         Row(children:[Expanded(child:TextFormField(initialValue:(items[i]['title']??'').toString(),decoration:const InputDecoration(labelText:'Title'),onChanged:(v){items[i]['title']=v;setValue('menu_items',items);})),IconButton(onPressed:(){final next=List<Map<String,dynamic>>.from(items)..removeAt(i);setValue('menu_items',next);},icon:const Icon(Icons.delete_outline,color:Colors.red))]),
