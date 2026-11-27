@@ -353,6 +353,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
   Map<String, dynamic> templates = {};
   Map<String, dynamic> wordpressConfig = <String, dynamic>{};
   DesignerNavigationConfig navigationConfig = DesignerNavigationConfig();
+  Map<String, dynamic> floatingActions = <String, dynamic>{};
   final Map<int, Offset> _componentPointerDown = <int, Offset>{};
   late final TextEditingController _titleController = TextEditingController();
   late final TextEditingController _descriptionController = TextEditingController();
@@ -528,6 +529,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             wordpressConfig = Map<String, dynamic>.from(remote)
               ..remove('published_pages');
           navigationConfig = DesignerNavigationConfig.fromJson(remote['navigation_bar']);
+          floatingActions = remote['floating_actions'] is Map
+              ? Map<String, dynamic>.from(remote['floating_actions'] as Map)
+              : <String, dynamic>{};
             pages[page] = <DesignerComponent>[];
             for (final section in sections) {
               if (section is Map) {
@@ -559,6 +563,9 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               templates = Map<String, dynamic>.from(decoded['templates'] as Map);
             }
             navigationConfig = DesignerNavigationConfig.fromJson(decoded['navigation_bar']);
+            floatingActions = decoded['floating_actions'] is Map
+                ? Map<String, dynamic>.from(decoded['floating_actions'] as Map)
+                : <String, dynamic>{};
           }
         } catch (_) {
           error = 'Saved draft could not be read. A fresh draft was loaded.';
@@ -615,6 +622,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
         'templates': templates,
         'navigation_bar': navigationConfig.toJson(),
+        'floating_actions': floatingActions,
       };
       final localJson = const JsonEncoder.withIndent('  ').convert(localData);
       final publishedConfig = Map<String, dynamic>.from(wordpressConfig);
@@ -638,6 +646,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       publishedConfig['native_editor_snapshot'] = true;
       publishedConfig['pages'] = configPages;
       publishedConfig['navigation_bar'] = navigationConfig.toJson();
+      publishedConfig['floating_actions'] = floatingActions;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, localJson);
       try {
@@ -819,6 +828,23 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             }
           }
 
+          final savedFloatingActions = serverConfig['floating_actions'];
+          if (savedFloatingActions is! Map) {
+            throw Exception('WordPress did not return the saved per-page Floating Action Button settings. Update the active ARK App Designer plugin to version 1.17.7 or newer.');
+          }
+          for (final entry in floatingActions.entries) {
+            if (entry.value is! Map) continue;
+            final savedAction = savedFloatingActions[entry.key];
+            if (savedAction is! Map) {
+              throw Exception('WordPress did not preserve the Floating Action Button for page "${entry.key}".');
+            }
+            final requestedAction = Map<String, dynamic>.from(entry.value as Map);
+            for (final key in ['enabled','icon_family','icon','icon_color','background_color','size','margin_bottom','margin_right','link_type','link_value','tooltip']) {
+              if (jsonEncode(requestedAction[key]) != jsonEncode(savedAction[key])) {
+                throw Exception('WordPress changed Floating Action Button "$key" on page "${entry.key}".');
+              }
+            }
+          }
           acceptedConfig = serverConfig;
           await prefs.setString('glowhit_published_designer_config', jsonEncode(acceptedConfig));
         }
@@ -1832,6 +1858,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
       'templates': templates,
       'navigation_bar': navigationConfig.toJson(),
+      'floating_actions': floatingActions,
     };
     await prefs.setString(_storageKey, const JsonEncoder.withIndent('  ').convert(localData));
     if (mounted) setState(() {});
@@ -1857,11 +1884,83 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     ));
   }
 
+  List<Map<String, String>> _floatingActionPages() {
+    final pages = <Map<String, String>>[
+      {'key':'home','title':'Home'},
+      {'key':'search','title':'Search'},
+      {'key':'categories','title':'Categories'},
+      {'key':'wishlist','title':'Wishlist'},
+      {'key':'product','title':'Product'},
+      {'key':'account','title':'Account'},
+      {'key':'cart','title':'Cart'},
+      {'key':'orders','title':'Orders'},
+      {'key':'notifications','title':'Notifications'},
+    ];
+    final rawPages = wordpressConfig['pages'];
+    if (rawPages is Map) {
+      for (final entry in rawPages.entries) {
+        final key = entry.key.toString();
+        if (key.startsWith('custom_') && entry.value is Map) {
+          pages.add({'key':key,'title':(entry.value['title'] ?? key).toString()});
+        }
+      }
+    }
+    return pages;
+  }
+
+  Future<void> _saveFloatingActionLocal(String pageKey, Map<String, dynamic>? value) async {
+    if (value == null) {
+      floatingActions.remove(pageKey);
+    } else {
+      floatingActions[pageKey] = Map<String, dynamic>.from(value);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final localData = <String, dynamic>{
+      'schema': 'ark-glowhit-designer/v1',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      'pages': pages.map((key, value) => MapEntry(key, value.map((e) => e.toJson()).toList())),
+      'templates': templates,
+      'navigation_bar': navigationConfig.toJson(),
+      'floating_actions': floatingActions,
+    };
+    await prefs.setString(_storageKey, const JsonEncoder.withIndent('  ').convert(localData));
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openFloatingActionPages() async {
+    await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => _DesignerFloatingActionPagesPage(
+      availablePages: _floatingActionPages(),
+      configuredActions: floatingActions,
+      onEdit: (page) async {
+        final pageKey = page['key']!;
+        final initial = floatingActions[pageKey] is Map
+            ? Map<String, dynamic>.from(floatingActions[pageKey] as Map)
+            : <String, dynamic>{
+                'enabled': true, 'icon_family': 'Material', 'icon': 'add',
+                'icon_color': '#FFFFFF', 'background_color': '#5B3A9E',
+                'size': 56, 'margin_bottom': 16, 'margin_right': 16,
+                'link_type': 'in_app', 'link_value': 'page:home', 'tooltip': page['title'] ?? '',
+              };
+        final result = await Navigator.push<Map<String, dynamic>?>(context, MaterialPageRoute(
+          builder: (_) => _DesignerFloatingActionSettingsPage(
+            pageTitle: page['title']!,
+            initialConfig: initial,
+            availablePages: _floatingActionPages(),
+          ),
+        ));
+        if (result != null) await _saveFloatingActionLocal(pageKey, result);
+      },
+      onRemove: (pageKey) => _saveFloatingActionLocal(pageKey, null),
+    )));
+  }
+
   Future<void> _openDesignerSettings() async {
     await Navigator.push<void>(context, MaterialPageRoute(builder: (_) => _DesignerSettingsPage(
       saving: saving,
       publishing: publishing,
       navigationConfig: navigationConfig,
+      floatingActions: floatingActions,
+      onOpenFloatingActions: _openFloatingActionPages,
       onOpenNavigation: _openNavigationBar,
       onReorder: _openReorder,
       onTemplates: _openTemplates,
@@ -1946,6 +2045,8 @@ class _DesignerSettingsPage extends StatefulWidget {
     required this.saving,
     required this.publishing,
     required this.navigationConfig,
+    required this.floatingActions,
+    required this.onOpenFloatingActions,
     required this.onOpenNavigation,
     required this.onReorder,
     required this.onTemplates,
@@ -1956,6 +2057,8 @@ class _DesignerSettingsPage extends StatefulWidget {
   final bool saving;
   final bool publishing;
   final DesignerNavigationConfig navigationConfig;
+  final Map<String, dynamic> floatingActions;
+  final VoidCallback onOpenFloatingActions;
   final VoidCallback onOpenNavigation;
   final VoidCallback onReorder;
   final VoidCallback onTemplates;
@@ -2045,6 +2148,18 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
                       onTap: working ? null : widget.onMyTemplates,
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: const Icon(Icons.add_circle_outline_rounded, color: _designerPurple),
+                  title: const Text('Floating Action Button', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text('${widget.floatingActions.length} page(s) configured · choose pages, icons and links'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: working ? null : widget.onOpenFloatingActions,
                 ),
               ),
               const SizedBox(height: 12),
