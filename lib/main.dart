@@ -1572,11 +1572,12 @@ class _StoreHomeState extends State<StoreHome> {
 }
 
 class AccountPanel extends StatefulWidget {
-  const AccountPanel({super.key, required this.onLogin, required this.onLogout, required this.token, required this.onRecentViewed});
+  const AccountPanel({super.key, required this.onLogin, required this.onLogout, required this.token, required this.onRecentViewed, this.ordersFloatingActionButton});
   final ValueChanged<String> onLogin;
   final VoidCallback onLogout;
   final VoidCallback onRecentViewed;
   final String? token;
+  final Widget? ordersFloatingActionButton;
   @override State<AccountPanel> createState() => _AccountPanelState();
 }
 
@@ -1696,7 +1697,7 @@ class _AccountPanelState extends State<AccountPanel> with SingleTickerProviderSt
         ),
         const SizedBox(height: 22),
         const Padding(padding: EdgeInsets.only(left: 3, bottom: 10), child: Text('MY ACCOUNT', style: TextStyle(fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.w800, color: purple))),
-        _menuTile(context, Icons.receipt_long_rounded, 'My Orders', 'Track, cancel and review your purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'My Orders')))),
+        _menuTile(context, Icons.receipt_long_rounded, 'My Orders', 'Track, cancel and review your purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'My Orders', floatingActionButton: widget.ordersFloatingActionButton)))),
         _menuTile(context, Icons.download_for_offline_rounded, 'Downloads', 'Your available digital purchases', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Downloads')))),
         _menuTile(context, Icons.location_on_rounded, 'Saved Addresses', 'Manage delivery addresses', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Saved Addresses')))),
         _menuTile(context, Icons.person_rounded, 'Edit Profile', 'Update your name and contact details', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: widget.token!, section: 'Edit Profile')))),
