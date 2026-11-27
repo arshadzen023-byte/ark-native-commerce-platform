@@ -309,7 +309,7 @@ class _StoreHomeState extends State<StoreHome> {
           final product = jsonDecode(response.body);
           if (product is Map && mounted) {
             final p = Map<String, dynamic>.from(product);
-            await Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(product: p, onAddToCart: () => _addToCart(p), onBuyNow: () => _buyNow(p), isWishlisted: wishlist.any((e) => e['id'] == p['id']), onWishlist: () => setState(() { wishlist.any((e) => e['id'] == p['id']) ? wishlist.removeWhere((e) => e['id'] == p['id']) : wishlist.add(p); }))));
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailsPage(product: p, onAddToCart: () => _addToCart(p), onBuyNow: () => _buyNow(p), isWishlisted: wishlist.any((e) => e['id'] == p['id']), onWishlist: () => setState(() { wishlist.any((e) => e['id'] == p['id']) ? wishlist.removeWhere((e) => e['id'] == p['id']) : wishlist.add(p); }), floatingActionButton: _buildDesignerFloatingAction('product'))));
           }
         }
       } catch (_) {}
@@ -489,6 +489,7 @@ class _StoreHomeState extends State<StoreHome> {
               ? wishlist.removeWhere((e) => e['id'] == product['id'])
               : wishlist.add(product);
           }),
+          floatingActionButton: _buildDesignerFloatingAction('product'),
         )));
       },
     )));
@@ -516,6 +517,7 @@ class _StoreHomeState extends State<StoreHome> {
             onWishlist: () => setState(() {
               liked ? wishlist.removeWhere((e) => e['id'] == id) : wishlist.add(p);
             }),
+            floatingActionButton: _buildDesignerFloatingAction('product'),
           )));
         },
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
