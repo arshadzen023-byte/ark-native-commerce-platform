@@ -48,9 +48,10 @@ class ArkCustomerApi {
 }
 
 class CustomerSectionPage extends StatefulWidget {
-  const CustomerSectionPage({super.key, required this.token, required this.section});
+  const CustomerSectionPage({super.key, required this.token, required this.section, this.floatingActionButton});
   final String token;
   final String section;
+  final Widget? floatingActionButton;
   @override State<CustomerSectionPage> createState() => _CustomerSectionPageState();
 }
 
@@ -117,6 +118,7 @@ class _CustomerSectionPageState extends State<CustomerSectionPage> {
     body: loading ? const Center(child: CircularProgressIndicator()) : error != null
       ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [Text(error!, textAlign: TextAlign.center), const SizedBox(height: 12), FilledButton(onPressed: load, child: const Text('RETRY'))])))
       : _body(),
+    floatingActionButton: widget.floatingActionButton,
   );
   Widget _body() {
     if (widget.section == 'Edit Profile') {
