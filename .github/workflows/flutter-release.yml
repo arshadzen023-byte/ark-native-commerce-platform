@@ -53,26 +53,26 @@ jobs:
           app_id = 'applicationId = "com.ark.glowhit"' if kotlin_dsl else 'applicationId "com.ark.glowhit"'
           namespace = 'namespace = "com.ark.glowhit"' if kotlin_dsl else 'namespace "com.ark.glowhit"'
           for key, replacement in (("applicationId", app_id), ("namespace", namespace)):
-              pattern = rf'(?m)^\\s*{key}\\s*(?:=\\s*)?["\\'][^"\\']+["\\']'
+              pattern = rf'(?m)^\s*{key}\s*(?:=\s*)?["\\'][^"\\']+["\\']'
               if re.search(pattern, text):
                   text = re.sub(pattern, replacement, text, count=1)
               elif key == "applicationId":
                   marker = "defaultConfig {"
                   if marker not in text:
                       raise SystemExit("Android defaultConfig block not found")
-                  text = text.replace(marker, marker + "\\n        " + replacement, 1)
+                  text = text.replace(marker, marker + "\n        " + replacement, 1)
               else:
                   marker = "android {"
                   if marker not in text:
                       raise SystemExit("Android block not found for namespace")
-                  text = text.replace(marker, marker + "\\n    " + replacement, 1)
+                  text = text.replace(marker, marker + "\n    " + replacement, 1)
 
           plugin = 'id("com.google.gms.google-services")' if kotlin_dsl else "id 'com.google.gms.google-services'"
           if "com.google.gms.google-services" not in text:
               marker = "plugins {"
               if marker not in text:
                   raise SystemExit("App Gradle plugins block not found")
-              text = text.replace(marker, marker + "\\n    " + plugin, 1)
+              text = text.replace(marker, marker + "\n    " + plugin, 1)
           app.write_text(text, encoding="utf-8")
 
           settings_candidates = [Path("android/settings.gradle.kts"), Path("android/settings.gradle")]
@@ -87,7 +87,7 @@ jobs:
               marker = "plugins {"
               if marker not in settings_text:
                   raise SystemExit("Android settings plugins block not found")
-              settings_text = settings_text.replace(marker, marker + "\\n    " + plugin_decl, 1)
+              settings_text = settings_text.replace(marker, marker + "\n    " + plugin_decl, 1)
               settings.write_text(settings_text, encoding="utf-8")
 
           manifest = Path("android/app/src/main/AndroidManifest.xml")
