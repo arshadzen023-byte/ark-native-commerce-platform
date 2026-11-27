@@ -406,7 +406,7 @@ class _DesignerAppBarMenuEditorPageState extends State<DesignerAppBarMenuEditorP
       final idValue=media['id']??media['attachment_id']??0;
       final id=idValue is num?idValue.toInt():int.tryParse(idValue.toString())??0;
       if(url.isEmpty) throw Exception('WordPress returned no Media Library URL.');
-      setState(()=>{imageUrl=url,imageId=id});
+      setState(() { imageUrl=url; imageId=id; });
     } catch(error) {
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Menu image upload failed: $error')));
     } finally {
@@ -444,7 +444,7 @@ class _DesignerAppBarMenuEditorPageState extends State<DesignerAppBarMenuEditorP
           if(imageUrl.isNotEmpty) ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(imageUrl,width:double.infinity,height:150,fit:BoxFit.cover,gaplessPlayback:true,errorBuilder:(_,__,___)=>const SizedBox(height:70,child:Center(child:Text('Image preview unavailable'))))),
           Row(children:[
             Expanded(child:OutlinedButton.icon(onPressed:uploading?null:_uploadImage,icon:const Icon(Icons.photo_library_outlined),label:Text(imageUrl.isEmpty?'Choose from Media Library':'Replace image'))),
-            if(imageUrl.isNotEmpty) IconButton(tooltip:'Remove image',onPressed:()=>setState(()=>{imageUrl='',imageId=0}),icon:const Icon(Icons.delete_outline,color:Colors.red)),
+            if(imageUrl.isNotEmpty) IconButton(tooltip:'Remove image',onPressed:()=>setState(() { imageUrl=''; imageId=0; }),icon:const Icon(Icons.delete_outline,color:Colors.red)),
           ]),
           if(uploading) const LinearProgressIndicator(),
           if(imageId>0) Text('Attachment ID: $imageId',style:const TextStyle(fontSize:12,color:Colors.black54)),
