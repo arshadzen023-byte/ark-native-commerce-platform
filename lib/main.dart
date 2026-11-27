@@ -902,6 +902,11 @@ class _StoreHomeState extends State<StoreHome> {
     final background = (config['section_background'] ?? 'transparent').toString();
     final backgroundImageUrl = (config['background_image_url'] ?? '').toString().trim();
     final textColor = (config['text_color'] ?? config['title_color'] ?? '#202733').toString();
+    final titleAlignment = switch ((config['title_text_align'] ?? 'left').toString()) {
+      'center' => TextAlign.center,
+      'right' => TextAlign.right,
+      _ => TextAlign.left,
+    };
     TextStyle sectionTitleStyle() {
       final weight = (config['title_font_weight'] ?? 'bold').toString();
       final titleBackground = (config['title_background_color'] ?? '').toString();
@@ -985,7 +990,7 @@ class _StoreHomeState extends State<StoreHome> {
               padding: EdgeInsets.only(
                 bottom: (config['title_bottom_spacing'] as num?)?.toDouble() ?? 8,
               ),
-              child: Text(title, style: sectionTitleStyle()),
+              child: SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle())),
             ),
             bannerGrid
                 ? SizedBox(
@@ -1538,22 +1543,58 @@ class _StoreHomeState extends State<StoreHome> {
             .map((section) => Map<String, dynamic>.from(section)).toList()
         : const <Map<String, dynamic>>[];
     final sectionWidgets = sections.map(_designerSection).toList();
-    return Column(children: [
-      Expanded(child: RefreshIndicator(
-        onRefresh: _loadDesignerConfig,
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 20),
-          children: [
-            if (designerConfigLoading && sections.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
+    final config = DesignerAppBarConfig(json: designerConfig['app_bar'] is Map
+        ? Map<String, dynamic>.from(designerConfig['app_bar'] as Map)
+        : const {});
+    // The App Bar collapses its top action/logo row during Home scrolling,
+    // while Search and Delivery Address remain visible as pinned rows.
+    final pinnedRowsHeight = (config.show('show_search') ? 54.0 : 0.0)
+        + (config.show('show_location') ? 40.0 : 0.0);
+    final fullHeaderHeight = config.renderHeight.toDouble();
+    final expandedHeight = (fullHeaderHeight - pinnedRowsHeight)
+        .clamp(0.0, fullHeaderHeight).toDouble();
+    return RefreshIndicator(
+      onRefresh: _loadDesignerConfig,
+      child: CustomScrollView(
+        key: const PageStorageKey<String>('glowhit-home-scroll'),
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverAppBar(
+            automaticallyImplyLeading: false,
+            primary: false,
+            pinned: true,
+            floating: false,
+            snap: false,
+            toolbarHeight: pinnedRowsHeight,
+            collapsedHeight: pinnedRowsHeight,
+            expandedHeight: fullHeaderHeight,
+            backgroundColor: DesignerAppBarConfig.color(config.backgroundColor),
+            surfaceTintColor: Colors.transparent,
+            flexibleSpace: FlexibleSpaceBar(
+              collapseMode: CollapseMode.pin,
+              background: SizedBox.expand(
+                child: ClipRect(
+                  child: _buildConfiguredAppBar('home') ?? const SizedBox.shrink(),
+                ),
               ),
-            ...sectionWidgets,
-          ],
-        ),
-      )),
-    ]);
+            ),
+          ),
+          if (designerConfigLoading && sections.isEmpty)
+            const SliverToBoxAdapter(child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            )),
+          if (sectionWidgets.isNotEmpty)
+            SliverList(delegate: SliverChildBuilderDelegate(
+              (context, index) => sectionWidgets[index],
+              childCount: sectionWidgets.length,
+            )),
+          if (sectionWidgets.isEmpty && !designerConfigLoading)
+            const SliverFillRemaining(hasScrollBody: false, child: Center(child: Text('No components on this page.'))),
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+        ],
+      ),
+    );
   }
 
   Widget catalog() => designerConfig['pages'] is Map && ((designerConfig['pages'] as Map)['home'] is Map) && (((designerConfig['pages'] as Map)['home'] as Map)['sections'] is List)
