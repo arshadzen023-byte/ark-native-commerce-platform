@@ -119,6 +119,12 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
   void initState() {
     super.initState();
     data = widget.initialConfig.toJson();
+    final visibility = Map<String, dynamic>.from(data['visible_pages'] as Map? ?? {});
+    for (final page in widget.availablePages) {
+      final key = page['key'] ?? 'home';
+      visibility.putIfAbsent(key, () => true);
+    }
+    data['visible_pages'] = visibility;
     _color.text = (data['background_color'] ?? '#FFFFFF').toString();
     _placeholder.text = (data['search_placeholder'] ?? 'Search products...').toString();
   }
