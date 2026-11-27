@@ -9,6 +9,10 @@ class DesignerAppBarConfig {
   Map<String, dynamic> toJson() => Map<String, dynamic>.from(_json);
   bool get enabled => _json['enabled'] != false;
   double get height => ((_json['height'] as num?)?.toDouble() ?? 72).clamp(88.0,220.0).toDouble();
+  double get renderHeight {
+    final minimum = 50.0 + (show('show_search') ? 50.0 : 0.0) + (show('show_location') ? 32.0 : 0.0);
+    return height < minimum ? minimum : height;
+  }
   double get spacing => ((_json['spacing'] as num?)?.toDouble() ?? 8).clamp(0.0,32.0).toDouble();
   double get radius => ((_json['radius'] as num?)?.toDouble() ?? 12).clamp(0.0,36.0).toDouble();
   String get preset => (_json['preset'] ?? 'custom').toString();
@@ -85,6 +89,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
   final colorController=TextEditingController();
   final placeholderController=TextEditingController();
   final previewController=TextEditingController();
+  final FocusNode previewFocusNode=FocusNode();
   final ScrollController settingsScrollController=ScrollController();
   bool uploading=false;
 
@@ -96,7 +101,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     colorController.text=(data['background_color']??'#FFFFFF').toString();
     placeholderController.text=(data['search_placeholder']??'Search products...').toString();
   }
-  @override void dispose(){colorController.dispose();placeholderController.dispose();previewController.dispose();settingsScrollController.dispose();super.dispose();}
+  @override void dispose(){colorController.dispose();placeholderController.dispose();previewController.dispose();previewFocusNode.dispose();settingsScrollController.dispose();super.dispose();}
   void setValue(String key,dynamic value)=>setState(()=>data[key]=value);
   Future<void> apply() async { await widget.onSave(DesignerAppBarConfig(json:data)); if(mounted) Navigator.pop(context); }
   Future<void> upload(String key) async {
@@ -144,13 +149,13 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     final config=DesignerAppBarConfig(json:data);
     return ClipRRect(borderRadius:BorderRadius.circular(14),child:Column(children:[
       Container(width:double.infinity,padding:const EdgeInsets.all(6),color:Colors.black12,child:const Text('LIVE PREVIEW · GLOWHIT',style:TextStyle(fontSize:10,fontWeight:FontWeight.bold))),
-      SizedBox(height:config.height.clamp(88.0,220.0).toDouble(),child:DesignerAppBarView(config:config,pageKey:'home',cartCount:2,searchController:previewController,onMenu:(){},onCart:(){},onSearch:(){},onVoiceSearch:(){},onWishlist:(){},onRefresh:(){},onLocation:(){},onCustomAction:(_){ })),
+      SizedBox(height:config.renderHeight,child:DesignerAppBarView(config:config,pageKey:'home',cartCount:2,searchController:previewController,searchFocusNode:previewFocusNode,onSearchSubmitted:(_){},onMenu:(){},onCart:(){},onSearch:(){},onVoiceSearch:(){},onWishlist:(){},onRefresh:(){},onLocation:(){},onCustomAction:(_){ })),
     ]));
   }
 
   @override Widget build(BuildContext context){
     final config=DesignerAppBarConfig(json:data);
-    final previewHeight=(config.height+50).clamp(150.0,240.0).toDouble();
+    final previewHeight=(config.renderHeight+50).clamp(150.0,270.0).toDouble();
     return Scaffold(
       resizeToAvoidBottomInset:true,
       appBar:AppBar(title:const Text('App Bar Builder'),actions:[TextButton(onPressed:apply,child:const Text('Apply'))]),
@@ -217,9 +222,9 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
       DropdownButtonFormField<String>(value:(action['link_type']??'page').toString(),decoration:const InputDecoration(labelText:'Destination type'),items:const [DropdownMenuItem(value:'page',child:Text('App Page')),DropdownMenuItem(value:'url',child:Text('Website URL')),DropdownMenuItem(value:'deep_link',child:Text('App Deep Link'))],onChanged:(v){actions[index]['link_type']=v??'page';setValue('actions',actions);}),
       if((action['link_type']??'page')=='page')
         DropdownButtonFormField<String>(
-          value: const ['home','search','categories','wishlist','cart','account','orders','notifications','product'].contains((action['link_value']??'home').toString())?(action['link_value']??'home').toString():'home',
+          value: <String>{'home','search','categories','wishlist','cart','account','orders','notifications','product',...widget.availablePages.map((page)=>page['key']??'')}.contains((action['link_value']??'home').toString())?(action['link_value']??'home').toString():'home',
           decoration:const InputDecoration(labelText:'Destination App Page'),
-          items:const ['home','search','categories','wishlist','cart','account','orders','notifications','product'].map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
+          items: <String>{'home','search','categories','wishlist','cart','account','orders','notifications','product',...widget.availablePages.map((page)=>page['key']??'')}.where((value)=>value.isNotEmpty).map((value)=>DropdownMenuItem(value:value,child:Text(widget.availablePages.firstWhere((page)=>page['key']==value,orElse:()=>{'title':value})['title']??value))).toList(),
           onChanged:(v){actions[index]['link_value']=v??'home';setValue('actions',actions);},
         )
       else TextFormField(initialValue:(action['link_value']??'').toString(),decoration:InputDecoration(labelText:action['link_type']=='url'?'Website URL (https://...)':'App Deep Link (ark://...)'),onChanged:(v){actions[index]['link_value']=v;setValue('actions',actions);}),
@@ -229,8 +234,8 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
 }
 
 class DesignerAppBarView extends StatelessWidget {
-  const DesignerAppBarView({super.key,required this.config,required this.pageKey,required this.cartCount,required this.searchController,required this.onMenu,required this.onCart,required this.onSearch,required this.onVoiceSearch,required this.onWishlist,required this.onRefresh,required this.onLocation,required this.onCustomAction});
-  final DesignerAppBarConfig config;final String pageKey;final int cartCount;final TextEditingController searchController;
+  const DesignerAppBarView({super.key,required this.config,required this.pageKey,required this.cartCount,required this.searchController,required this.searchFocusNode,required this.onSearchSubmitted,required this.onMenu,required this.onCart,required this.onSearch,required this.onVoiceSearch,required this.onWishlist,required this.onRefresh,required this.onLocation,required this.onCustomAction});
+  final DesignerAppBarConfig config;final String pageKey;final int cartCount;final TextEditingController searchController;final FocusNode searchFocusNode;final ValueChanged<String> onSearchSubmitted;
   final VoidCallback onMenu,onCart,onSearch,onVoiceSearch,onWishlist,onRefresh,onLocation;
   final ValueChanged<Map<String,dynamic>> onCustomAction;
   @override Widget build(BuildContext context){
@@ -259,24 +264,46 @@ class DesignerAppBarView extends StatelessWidget {
       onPressed:()=>onCustomAction(action),
       icon:DesignerNavIcons.icon((action['icon_family']??'Material').toString(),(action['icon']??'star_outline').toString(),color:fg,size:20),
     );
-    Widget searchField({bool compact=false}) => InkWell(
-      onTap:onSearch,
-      borderRadius:BorderRadius.circular(config.radius),
-      child:Container(
-        height:compact?38:46,
-        padding:const EdgeInsets.symmetric(horizontal:12),
-        decoration:BoxDecoration(color:Colors.white.withOpacity(.96),borderRadius:BorderRadius.circular(config.radius)),
-        child:Row(children:[
-          DesignerNavIcons.icon((data['search_icon_family']??'Material').toString(),(data['search_icon']??'search').toString(),color:Colors.black54,size:22),
-          const SizedBox(width:10),
-          Expanded(child:Text((data['search_placeholder']??'Search products, brands and more').toString(),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.black54,fontSize:14))),
-          if(config.show('show_voice_search')) IconButton(
-            visualDensity:VisualDensity.compact,
-            tooltip:'Voice Search',
-            onPressed:onVoiceSearch,
-            icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:_appBarAccent,size:22),
+    Widget searchField() => Container(
+      height:46,
+      decoration:BoxDecoration(
+        color:DesignerAppBarConfig.color((data['search_background_color']??'#FFFFFF').toString()),
+        borderRadius:BorderRadius.circular(config.radius),
+      ),
+      child:TextField(
+        controller:searchController,
+        focusNode:searchFocusNode,
+        textInputAction:TextInputAction.search,
+        onTap:onSearch,
+        onSubmitted:onSearchSubmitted,
+        style:TextStyle(color:DesignerAppBarConfig.color((data['search_foreground_color']??'#555555').toString()),fontSize:15),
+        decoration:InputDecoration(
+          isDense:true,
+          hintText:(data['search_placeholder']??'Search products, brands and more').toString(),
+          hintStyle:const TextStyle(color:Colors.black54,fontSize:14),
+          prefixIcon:DesignerNavIcons.icon((data['search_icon_family']??'Material').toString(),(data['search_icon']??'search').toString(),color:Colors.black54,size:22),
+          suffixIcon:Row(
+            mainAxisSize:MainAxisSize.min,
+            children:[
+              if(config.show('show_voice_search')) IconButton(
+                tooltip:'Voice Search',
+                onPressed:onVoiceSearch,
+                icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:_appBarAccent,size:22),
+              ),
+              IconButton(
+                tooltip:'Clear search',
+                onPressed:(){
+                  searchController.clear();
+                  onSearchSubmitted('');
+                  searchFocusNode.requestFocus();
+                },
+                icon:const Icon(Icons.close,color:Colors.black54),
+              ),
+            ],
           ),
-        ]),
+          border:InputBorder.none,
+          contentPadding:const EdgeInsets.symmetric(vertical:12),
+        ),
       ),
     );
     final imageProvider=config.backgroundImageUrl.isEmpty?null:NetworkImage(config.backgroundImageUrl);
@@ -306,7 +333,6 @@ class DesignerAppBarView extends StatelessWidget {
       decoration:BoxDecoration(
         color:bg,
         borderRadius:BorderRadius.circular(config.position=='floating'?config.radius:0),
-        image:imageProvider==null?null:DecorationImage(image:imageProvider,fit:BoxFit.cover,onError:(_,__){}),
         boxShadow:config.position=='floating'?[BoxShadow(color:Colors.black.withOpacity(.12),blurRadius:10,offset:const Offset(0,3))]:null,
       ),
       child:Column(
