@@ -1948,7 +1948,13 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             availablePages: _floatingActionPages(),
           ),
         ));
-        if (result != null) await _saveFloatingActionLocal(pageKey, result);
+        if (result != null) {
+          if (result['_remove'] == true) {
+            await _saveFloatingActionLocal(pageKey, null);
+          } else {
+            await _saveFloatingActionLocal(pageKey, result);
+          }
+        }
       },
       onRemove: (pageKey) => _saveFloatingActionLocal(pageKey, null),
     )));
@@ -3653,14 +3659,14 @@ class _DesignerReorderPage extends StatelessWidget {
                 Text('Button size · \${config['size']} px'),
                 Slider(
                   min: 40, max: 76, divisions: 18,
-                  value: ((config['size'] as num?)?.toDouble() ?? 56).clamp(40, 76),
+                  value: ((config['size'] as num?)?.toDouble() ?? 56).clamp(40, 76).toDouble(),
                   activeColor: _designerPurple,
                   onChanged: (value) => setState(() => config['size'] = value.round()),
                 ),
                 Text('Bottom offset · \${config['margin_bottom']} px'),
                 Slider(
                   min: 0, max: 120, divisions: 24,
-                  value: ((config['margin_bottom'] as num?)?.toDouble() ?? 16).clamp(0, 120),
+                  value: ((config['margin_bottom'] as num?)?.toDouble() ?? 16).clamp(0, 120).toDouble(),
                   activeColor: _designerPurple,
                   onChanged: (value) => setState(() => config['margin_bottom'] = value.round()),
                 ),
@@ -3761,7 +3767,7 @@ class _DesignerReorderPage extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () => Navigator.pop(context, null),
+              onPressed: () => Navigator.pop(context, <String, dynamic>{'_remove': true}),
               icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
               label: const Text('Remove Floating Button', style: TextStyle(color: Colors.red)),
             ),
