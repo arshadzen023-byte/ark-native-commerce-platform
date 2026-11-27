@@ -74,7 +74,7 @@ class DesignerAppBarBuilderPage extends StatefulWidget {
   final DesignerAppBarConfig initialConfig;
   final List<Map<String,String>> availablePages;
   final Future<Map<String,dynamic>?> Function() onUpload;
-  final ValueChanged<DesignerAppBarConfig> onSave;
+  final Future<void> Function(DesignerAppBarConfig) onSave;
   @override State<DesignerAppBarBuilderPage> createState()=>_DesignerAppBarBuilderPageState();
 }
 
@@ -94,7 +94,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
   }
   @override void dispose(){colorController.dispose();placeholderController.dispose();previewController.dispose();super.dispose();}
   void setValue(String key,dynamic value)=>setState(()=>data[key]=value);
-  void apply(){widget.onSave(DesignerAppBarConfig(json:data));Navigator.pop(context);}
+  Future<void> apply() async { await widget.onSave(DesignerAppBarConfig(json:data)); if(mounted) Navigator.pop(context); }
   Future<void> upload(String key) async {
     final media=await widget.onUpload(); if(media==null||!mounted)return;
     final url=(media['source_url']??media['url']??'').toString(); if(url.isEmpty)return;
