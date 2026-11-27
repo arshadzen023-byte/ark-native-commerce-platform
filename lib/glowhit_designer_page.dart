@@ -2248,7 +2248,7 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => const _DesignerAppSettingsPage(),
+                      builder: (_) => _DesignerAppSettingsPage(onChooseMedia: _chooseMedia),
                     ),
                   ),
                 ),
@@ -2282,31 +2282,258 @@ class _DesignerSettingsPageState extends State<_DesignerSettingsPage> {
   }
 }
 
-class _DesignerAppSettingsPage extends StatelessWidget {
-  const _DesignerAppSettingsPage();
+class _CountdownDateTimeSettings extends StatefulWidget {
+  const _CountdownDateTimeSettings({required this.initialValue, required this.onChanged});
+  final String initialValue;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_CountdownDateTimeSettings> createState() => _CountdownDateTimeSettingsState();
+}
+
+class _CountdownDateTimeSettingsState extends State<_CountdownDateTimeSettings> {
+  DateTime? _value;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = DateTime.tryParse(widget.initialValue);
+  }
+
+  String _label() {
+    final value = _value;
+    if (value == null) return 'Select countdown date and time';
+    final date = '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+    final time = '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+    return '$date · $time';
+  }
+
+  Future<void> _pick() async {
+    final now = DateTime.now();
+    final initial = _value ?? now.add(const Duration(hours: 1));
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(now) ? now : initial,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 3650)),
+    );
+    if (!mounted || date == null) return;
+    final time = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(initial));
+    if (!mounted || time == null) return;
+    final next = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    if (!next.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose a future date and time.')),
+      );
+      return;
+    }
+    setState(() => _value = next);
+    widget.onChanged(next.toIso8601String());
+  }
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    onPressed: _pick,
+    icon: const Icon(Icons.event_available_outlined),
+    label: Text(_label()),
+  );
+}
+
+class _DesignerAppSettingsPage extends StatefulWidget {
+  const _DesignerAppSettingsPage({required this.onChooseMedia});
+  final Future<Map<String, dynamic>?> Function() onChooseMedia;
+
+  @override
+  State<_DesignerAppSettingsPage> createState() => _DesignerAppSettingsPageState();
+}
+
+class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
+  static const _storageKey = 'glowhit_designer_splash_config';
+  final _durationController = TextEditingController(text: '3');
+  String _imageUrl = '';
+  int _attachmentId = 0;
+  String _fit = 'contain';
+  double _imageScale = 1;
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _durationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_storageKey);
+    if (raw != null) {
+      try {
+        final data = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+        _imageUrl = (data['image_url'] ?? '').toString();
+        _attachmentId = (data['attachment_id'] as num?)?.toInt() ?? 0;
+        _durationController.text = ((data['duration_seconds'] as num?)?.toInt() ?? 3).toString();
+        _imageScale = ((data['image_scale'] as num?)?.toDouble() ?? 1).clamp(.25, 2.0);
+        _fit = (data['fit'] ?? 'contain').toString();
+      } catch (_) {}
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _save() async {
+    final seconds = int.tryParse(_durationController.text.trim());
+    if (seconds == null || seconds < 1 || seconds > 15) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Splash duration must be between 1 and 15 seconds.')),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_storageKey, jsonEncode({
+        'image_url': _imageUrl,
+        'attachment_id': _attachmentId,
+        'duration_seconds': seconds,
+        'image_scale': _imageScale,
+        'fit': _fit,
+      }));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Splash settings saved on this device.')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _chooseImage() async {
+    final media = await widget.onChooseMedia();
+    if (!mounted || media == null) return;
+    final url = (media['source_url'] ?? media['url'] ?? '').toString().trim();
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selected Media Library image has no URL.')),
+      );
+      return;
+    }
+    setState(() {
+      _imageUrl = url;
+      _attachmentId = (media['id'] as num?)?.toInt() ?? int.tryParse((media['id'] ?? '0').toString()) ?? 0;
+    });
+  }
+
+  void _removeImage() => setState(() {
+    _imageUrl = '';
+    _attachmentId = 0;
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    final fit = switch (_fit) {
+      'cover' => BoxFit.cover,
+      'fill' => BoxFit.fill,
+      _ => BoxFit.contain,
+    };
     return Theme(
-      data: ThemeData.light().copyWith(
-        scaffoldBackgroundColor: Colors.white,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Color(0xFF24212B),
-          elevation: 0,
-        ),
-      ),
+      data: ThemeData.light().copyWith(scaffoldBackgroundColor: Colors.white),
       child: Scaffold(
         key: const ValueKey('designer-app-settings-page'),
         backgroundColor: Colors.white,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF24212B),
-          title: const Text('App Settings'),
-        ),
-        body: const ColoredBox(
-          color: Colors.white,
-          child: SizedBox.expand(),
+        appBar: AppBar(title: const Text('App Settings')),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Card(
+              elevation: 0,
+              color: const Color(0xFFF4F1F8),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Splash Screen · Live Preview', style: TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 10),
+                  Container(
+                    height: 210,
+                    width: double.infinity,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                    child: _imageUrl.isEmpty
+                        ? const Center(child: Text('Choose a WordPress image or GIF'))
+                        : Center(
+                            child: Transform.scale(
+                              scale: _imageScale,
+                              child: Image.network(
+                                _imageUrl,
+                                fit: fit,
+                                gaplessPlayback: true,
+                                errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image_outlined)),
+                              ),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(_imageUrl.isEmpty ? 'No splash image selected' : 'WordPress attachment #$_attachmentId',
+                    style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _chooseImage,
+              icon: const Icon(Icons.photo_library_outlined),
+              label: const Text('Choose from WordPress Media Library'),
+            ),
+            if (_imageUrl.isNotEmpty)
+              TextButton.icon(
+                onPressed: _removeImage,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Remove splash image'),
+              ),
+            TextField(
+              controller: _durationController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Splash duration (seconds)',
+                helperText: '1 to 15 seconds',
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _fit,
+              decoration: const InputDecoration(labelText: 'Image display size'),
+              items: const [
+                DropdownMenuItem(value: 'contain', child: Text('Contain · show full image')),
+                DropdownMenuItem(value: 'cover', child: Text('Cover · fill screen')),
+                DropdownMenuItem(value: 'fill', child: Text('Fill · stretch to screen')),
+              ],
+              onChanged: (value) => setState(() => _fit = value ?? 'contain'),
+            ),
+            const SizedBox(height: 8),
+            Row(children: [
+              const Expanded(child: Text('Image scale')),
+              Text('${(_imageScale * 100).round()}%'),
+            ]),
+            Slider(
+              min: .25,
+              max: 2,
+              divisions: 35,
+              value: _imageScale,
+              onChanged: (value) => setState(() => _imageScale = value),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _saving ? null : _save,
+              icon: _saving
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.save_outlined),
+              label: const Text('Save Splash Settings'),
+            ),
+          ],
         ),
       ),
     );
@@ -2627,13 +2854,26 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           onChanged: (value) => _change('description', value),
         ),
         _switch('Show Title', 'show_title'),
+        const SizedBox(height: 8),
+        const Text('Title alignment', style: TextStyle(fontWeight: FontWeight.w700)),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'left', label: Text('Left'), icon: Icon(Icons.format_align_left)),
+            ButtonSegment(value: 'center', label: Text('Center'), icon: Icon(Icons.format_align_center)),
+            ButtonSegment(value: 'right', label: Text('Right'), icon: Icon(Icons.format_align_right)),
+          ],
+          selected: {(item.properties['title_text_align'] ?? 'left').toString()},
+          onSelectionChanged: (selection) => _change('title_text_align', selection.first),
+        ),
+        const SizedBox(height: 10),
         _switch('Countdown Time', 'countdown_enabled'),
-        if (item.properties['countdown_enabled'] == true)
-          TextFormField(
+        if (item.properties['countdown_enabled'] == true) ...[
+          _CountdownDateTimeSettings(
             initialValue: (item.properties['countdown_time'] ?? '').toString(),
-            decoration: const InputDecoration(labelText: 'Countdown date and time'),
             onChanged: (value) => _change('countdown_time', value),
           ),
+          _switch('Hide component when countdown ends', 'countdown_auto_hide'),
+        ],
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: _openTextStyle,
@@ -3217,6 +3457,18 @@ class _DesignerTextStylePageState extends State<_DesignerTextStylePage> {
               ),
             ),
             const SizedBox(height: 20),
+            const Text('Title alignment', style: TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'left', label: Text('Left'), icon: Icon(Icons.format_align_left)),
+                ButtonSegment(value: 'center', label: Text('Center'), icon: Icon(Icons.format_align_center)),
+                ButtonSegment(value: 'right', label: Text('Right'), icon: Icon(Icons.format_align_right)),
+              ],
+              selected: {(values['title_text_align'] ?? 'left').toString()},
+              onSelectionChanged: (selection) => _set('title_text_align', selection.first),
+            ),
+            const SizedBox(height: 16),
             _swatches('Color', 'title_color', _textColors),
             _swatches('Background Color', 'title_background_color', _backgroundColors),
             DropdownButtonFormField<String>(
