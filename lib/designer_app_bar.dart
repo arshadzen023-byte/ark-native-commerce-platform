@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'designer_navigation_bar.dart';
 
@@ -19,6 +21,7 @@ class DesignerAppBarConfig {
   String get position => (_json['position'] ?? 'top').toString();
   String get backgroundImageUrl => (_json['background_image_url'] ?? '').toString();
   String get logoUrl => (_json['logo_url'] ?? '').toString();
+  List<String> get searchTerms => (_json['search_placeholder_terms'] as List? ?? const ['watch','book','cloth']).map((e) => e.toString()).where((e) => e.trim().isNotEmpty).take(12).toList();
   bool show(String key) => _json[key] != false;
   bool visibleOn(String page) => (_json['visible_pages'] as Map?)?[page] != false;
   List<Map<String,dynamic>> get actions => (_json['actions'] as List? ?? const []).whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).take(10).toList();
@@ -29,6 +32,7 @@ class DesignerAppBarConfig {
     'background_image_url':'','background_mime_type':'','logo_url':'','height':156.0,'spacing':8.0,'radius':12.0,'position':'top',
     'show_menu':true,'show_logo':true,'show_cart':true,'show_voice_search':true,'show_search':true,'show_wishlist':true ,'show_refresh':false,'show_location':true,
     'search_placeholder':'Search products...',
+    'search_placeholder_terms':<String>['watch','book','cloth'],
     'menu_icon_family':'Material','menu_icon':'menu','cart_icon_family':'Material','cart_icon':'shopping_cart_outlined',
     'voice_icon_family':'Material','voice_icon':'mic_none','search_icon_family':'Material','search_icon':'search',
     'wishlist_icon_family':'Material','wishlist_icon':'favorite_border','refresh_icon_family':'Material','refresh_icon':'refresh',
@@ -47,6 +51,8 @@ class DesignerAppBarConfig {
       'link_type':(e['link_type']??'page').toString(),'link_value':(e['link_value']??'home').toString(),'visible':e['visible']!=false,
     }).toList() : <Map<String,dynamic>>[];
     out['actions']=normalizeActions(source['actions']);
+    final terms = source['search_placeholder_terms'];
+    out['search_placeholder_terms'] = terms is List ? terms.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).take(12).toList() : <String>['watch','book','cloth'];
     out['height']=((out['height'] as num?)?.toDouble()??156).clamp(88.0,220.0).toDouble();
     out['spacing']=((out['spacing'] as num?)?.toDouble()??8).clamp(0.0,32.0).toDouble();
     out['radius']=((out['radius'] as num?)?.toDouble()??12).clamp(0.0,36.0).toDouble();
@@ -88,6 +94,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
   late Map<String,dynamic> data;
   final colorController=TextEditingController();
   final placeholderController=TextEditingController();
+  final searchTermsController=TextEditingController();
   final previewController=TextEditingController();
   final FocusNode previewFocusNode=FocusNode();
   final ScrollController settingsScrollController=ScrollController();
@@ -100,8 +107,10 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     data['visible_pages']=visibility;
     colorController.text=(data['background_color']??'#FFFFFF').toString();
     placeholderController.text=(data['search_placeholder']??'Search products...').toString();
+    searchTermsController.text=configTermsText(data['search_placeholder_terms']);
   }
-  @override void dispose(){colorController.dispose();placeholderController.dispose();previewController.dispose();previewFocusNode.dispose();settingsScrollController.dispose();super.dispose();}
+  String configTermsText(dynamic value) => value is List ? value.map((e)=>e.toString()).join(', ') : 'watch, book, cloth';
+  @override void dispose(){colorController.dispose();placeholderController.dispose();searchTermsController.dispose();previewController.dispose();previewFocusNode.dispose();settingsScrollController.dispose();super.dispose();}
   void setValue(String key,dynamic value)=>setState(()=>data[key]=value);
   Future<void> apply() async { await widget.onSave(DesignerAppBarConfig(json:data)); if(mounted) Navigator.pop(context); }
   Future<void> upload(String key) async {
@@ -131,6 +140,19 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     final choice=await pickIcon();if(choice==null||!mounted)return;
     final actions=DesignerAppBarConfig(json:data).actions;actions[index]['icon_family']=choice.family;actions[index]['icon']=choice.name;setValue('actions',actions);
   }
+  Future<void> _pickBackgroundColor() async {
+    const colors = <Color>[Color(0xFFFFFFFF),Color(0xFFF0EAFE),Color(0xFFEAF2FF),Color(0xFFFFF3D6),Color(0xFFFFE8EF),Color(0xFFE5F7EE),Color(0xFF171923),Color(0xFF202124),Color(0xFF2874F0),Color(0xFF5B3A9E),Color(0xFF008577),Color(0xFFFFD814),Color(0xFFFCEAF3),Color(0xFFD9E8FF),Color(0xFFE8F5E9),Color(0xFFFFE0B2)];
+    final picked = await showDialog<Color>(context:context,builder:(ctx)=>AlertDialog(title:const Text('Choose App Bar Background'),content:SizedBox(width:300,child:GridView.count(shrinkWrap:true,crossAxisCount:4,crossAxisSpacing:10,mainAxisSpacing:10,children:colors.map((color)=>InkWell(onTap:()=>Navigator.pop(ctx,color),child:Container(decoration:BoxDecoration(color:color,shape:BoxShape.circle,border:Border.all(color:Colors.black26,width:1.2))))).toList())),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel'))]));
+    if(picked==null||!mounted)return;
+    final hex='#${picked.value.toRadixString(16).substring(2).toUpperCase()}';
+    setState(()=>data['background_color']=hex);
+    colorController.text=hex;
+  }
+  Widget backgroundColorPicker() => Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+    const Text('Background colour'),
+    const SizedBox(height:7),
+    InkWell(onTap:_pickBackgroundColor,child:Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:11),decoration:BoxDecoration(border:Border.all(color:Colors.black26),borderRadius:BorderRadius.circular(10)),child:Row(children:[Container(width:28,height:28,decoration:BoxDecoration(color:DesignerAppBarConfig.color((data['background_color']??'#FFFFFF').toString()),borderRadius:BorderRadius.circular(6),border:Border.all(color:Colors.black26))),const SizedBox(width:10),Expanded(child:Text((data['background_color']??'#FFFFFF').toString(),style:const TextStyle(fontWeight:FontWeight.w700))),const Icon(Icons.palette_outlined)]))),
+  ]);
   Widget switchTile(String key,String title,IconData icon)=>SwitchListTile(contentPadding:EdgeInsets.zero,secondary:Icon(icon,color:_appBarAccent),title:Text(title),value:data[key]!=false,onChanged:(v)=>setValue(key,v));
   Widget slider(String title,String key,double min,double max){
     final value=((data[key] as num?)?.toDouble()??min).clamp(min,max).toDouble();
@@ -186,8 +208,9 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
         ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.image_outlined),title:const Text('Upload Logo'),subtitle:Text(config.logoUrl.isEmpty?'No logo selected':'Logo uploaded · tap to replace'),onTap:uploading?null:()=>upload('logo_url'),trailing:config.logoUrl.isEmpty?null:IconButton(tooltip:'Delete logo',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>removeMedia('logo_url'))),
         ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.wallpaper_outlined),title:const Text('Upload Background Image / GIF'),subtitle:Text(config.backgroundImageUrl.isEmpty?'No background selected':'Background media uploaded · tap to replace'),onTap:uploading?null:()=>upload('background_image_url'),trailing:config.backgroundImageUrl.isEmpty?null:IconButton(tooltip:'Delete background',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>removeMedia('background_image_url'))),
         if(uploading) const LinearProgressIndicator(),
-        TextField(controller:colorController,decoration:const InputDecoration(labelText:'Background HEX colour'),onChanged:(v)=>setValue('background_color',v)),
+        backgroundColorPicker(),
         TextField(controller:placeholderController,decoration:const InputDecoration(labelText:'Search placeholder'),onChanged:(v)=>setValue('search_placeholder',v)),
+        TextField(controller:searchTermsController,decoration:const InputDecoration(labelText:'Moving search words (comma separated)',hintText:'watch, book, cloth'),onChanged:(v)=>setValue('search_placeholder_terms',v.split(',').map((e)=>e.trim()).where((e)=>e.isNotEmpty).take(12).toList())),
       ]))),
       Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('Dimensions & Position',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold)),
@@ -279,7 +302,7 @@ class DesignerAppBarView extends StatelessWidget {
         style:TextStyle(color:DesignerAppBarConfig.color((data['search_foreground_color']??'#555555').toString()),fontSize:15),
         decoration:InputDecoration(
           isDense:true,
-          hintText:(data['search_placeholder']??'Search products, brands and more').toString(),
+          hint: _RotatingSearchHint(terms: config.searchTerms.isEmpty ? [(data['search_placeholder']??'Search products...').toString()] : config.searchTerms, style: const TextStyle(color:Colors.black54,fontSize:14)),
           hintStyle:const TextStyle(color:Colors.black54,fontSize:14),
           prefixIcon:DesignerNavIcons.icon((data['search_icon_family']??'Material').toString(),(data['search_icon']??'search').toString(),color:Colors.black54,size:22),
           suffixIcon:Row(
@@ -294,8 +317,7 @@ class DesignerAppBarView extends StatelessWidget {
                 tooltip:'Clear search',
                 onPressed:(){
                   searchController.clear();
-                  onSearchSubmitted('');
-                  searchFocusNode.requestFocus();
+                  searchFocusNode.unfocus();
                 },
                 icon:const Icon(Icons.close,color:Colors.black54),
               ),
@@ -363,7 +385,7 @@ class DesignerAppBarView extends StatelessWidget {
       borderRadius:BorderRadius.circular(config.position=='floating'?config.radius:0),
       child: SizedBox(
         width:double.infinity,
-        height:config.height.clamp(88.0,220.0).toDouble(),
+        height:config.renderHeight,
         child:Stack(fit:StackFit.expand,children:[
           if(imageProvider!=null) Image(image:imageProvider,fit:BoxFit.cover,errorBuilder:(_,__,___)=>ColoredBox(color:bg)),
           body,
@@ -371,6 +393,21 @@ class DesignerAppBarView extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RotatingSearchHint extends StatefulWidget {
+  const _RotatingSearchHint({required this.terms,required this.style});
+  final List<String> terms;
+  final TextStyle style;
+  @override State<_RotatingSearchHint> createState()=>_RotatingSearchHintState();
+}
+class _RotatingSearchHintState extends State<_RotatingSearchHint> {
+  Timer? _timer;
+  int _index=0;
+  @override void initState(){super.initState();_timer=Timer.periodic(const Duration(seconds:2),(_){if(mounted&&widget.terms.length>1)setState(()=>_index=(_index+1)%widget.terms.length);});}
+  @override void didUpdateWidget(covariant _RotatingSearchHint oldWidget){super.didUpdateWidget(oldWidget);if(_index>=widget.terms.length)_index=0;}
+  @override void dispose(){_timer?.cancel();super.dispose();}
+  @override Widget build(BuildContext context){final term=widget.terms.isEmpty?'Search products...':widget.terms[_index%widget.terms.length];return AnimatedSwitcher(duration:const Duration(milliseconds:280),transitionBuilder:(child,animation)=>FadeTransition(opacity:animation,child:SlideTransition(position:Tween<Offset>(begin:const Offset(0,.25),end:Offset.zero).animate(animation),child:child)),child:Text(term,key:ValueKey(term),maxLines:1,overflow:TextOverflow.ellipsis,style:widget.style));}
 }
 
 class _AppBarIconPicker extends StatefulWidget {
