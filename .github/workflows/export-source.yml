@@ -1,0 +1,30 @@
+name: Export GlowHit Flutter source
+on:
+  push:
+    branches:
+      - export/source-*
+permissions:
+  contents: read
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tested source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Prepare complete source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/glowhit-source
+          git archive HEAD | tar -x -C /tmp/glowhit-source
+          rm -f /tmp/glowhit-source/.github/workflows/export-source.yml
+          printf 'Repository: %s\\nCommit: %s\\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" > /tmp/glowhit-source/SOURCE_COMMIT.txt
+      - name: Upload full source ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: glowhit-full-source-${{ github.sha }}
+          path: /tmp/glowhit-source/
+          if-no-files-found: error
+          retention-days: 14
