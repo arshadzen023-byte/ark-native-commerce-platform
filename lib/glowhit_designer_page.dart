@@ -685,7 +685,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
           }
           final requestedAppBar = appBarConfig.toJson();
           final publishedAppBar = DesignerAppBarConfig(json: Map<String, dynamic>.from(savedAppBar)).toJson();
-          for (final key in ['version','preset','enabled','background_color','foreground_color','background_image_url','background_mime_type','logo_url','height','spacing','radius','position','show_menu','show_logo','show_cart','show_voice_search','show_search','show_wishlist','show_refresh','show_location','search_placeholder','visible_pages','actions','menu_icon_family','menu_icon','cart_icon_family','cart_icon','voice_icon_family','voice_icon','search_icon_family','search_icon','wishlist_icon_family','wishlist_icon','refresh_icon_family','refresh_icon','location_icon_family','location_icon']) {
+          for (final key in ['version','preset','enabled','background_color','foreground_color','background_image_url','background_image_id','background_mime_type','logo_url','menu_header_image_url','menu_header_image_id','menu_items','address_text_color','extend_under_status_bar','status_bar_background','status_bar_icon_brightness','icon_size','horizontal_padding','left_padding','right_padding','height','spacing','radius','position','show_menu','show_logo','show_cart','show_voice_search','show_search','show_wishlist','show_refresh','show_location','search_placeholder','visible_pages','actions','menu_icon_family','menu_icon','cart_icon_family','cart_icon','voice_icon_family','voice_icon','search_icon_family','search_icon','wishlist_icon_family','wishlist_icon','refresh_icon_family','refresh_icon','location_icon_family','location_icon']) {
             if (jsonEncode(requestedAppBar[key]) != jsonEncode(publishedAppBar[key])) {
               throw Exception('WordPress changed App Bar "$key" during publish. Designer: ${requestedAppBar[key]}, WordPress: ${publishedAppBar[key]}.');
             }
@@ -1904,6 +1904,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       initialConfig: appBarConfig,
       availablePages: _floatingActionPages(),
       onUpload: _uploadGalleryMedia,
+      onChooseMedia: _chooseMedia,
       onSave: _saveAppBarLocal,
     )));
   }
