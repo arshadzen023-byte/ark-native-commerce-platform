@@ -271,7 +271,10 @@ class _StoreHomeState extends State<StoreHome> {
   }
   Future<void> _openNotifications() async {
     await _refreshNotificationCount(markSeen: true);
-    final link = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NotificationInboxPage(service: push)));
+    final link = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => NotificationInboxPage(
+      service: push,
+      floatingActionButton: _buildDesignerFloatingAction('notifications'),
+    )));
     await _refreshNotificationCount();
     if (link != null && link.isNotEmpty) await _handleNotificationLink(link);
   }
@@ -1207,6 +1210,151 @@ class _StoreHomeState extends State<StoreHome> {
     return Color(parsed == null ? 0xFF202733 : (raw.length == 6 ? 0xFF000000 | parsed : parsed));
   }
 
+  Map<String, dynamic>? _floatingActionForPage(String pageKey) {
+    final raw = designerConfig['floating_actions'];
+    if (raw is! Map || raw[pageKey] is! Map) return null;
+    final action = Map<String, dynamic>.from(raw[pageKey] as Map);
+    return action['enabled'] == true ? action : null;
+  }
+
+  Widget? _buildDesignerFloatingAction(String pageKey) {
+    final action = _floatingActionForPage(pageKey);
+    if (action == null) return null;
+    final size = ((action['size'] as num?)?.toDouble() ?? 56).clamp(40.0, 76.0);
+    final right = ((action['margin_right'] as num?)?.toDouble() ?? 16).clamp(0.0, 120.0);
+    final bottom = ((action['margin_bottom'] as num?)?.toDouble() ?? 16).clamp(0.0, 120.0);
+    final family = (action['icon_family'] ?? 'Material').toString();
+    final iconName = (action['icon'] ?? 'add').toString();
+    return Padding(
+      padding: EdgeInsets.only(right: right, bottom: bottom),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: FloatingActionButton(
+          heroTag: 'ark-designer-fab-$pageKey',
+          tooltip: (action['tooltip'] ?? '').toString().trim().isEmpty
+              ? 'Open action' : action['tooltip'].toString(),
+          backgroundColor: _safeColor((action['background_color'] ?? '#5B3A9E').toString()),
+          foregroundColor: _safeColor((action['icon_color'] ?? '#FFFFFF').toString()),
+          onPressed: () => _handleDesignerFloatingAction(pageKey, action),
+          child: DesignerNavIcons.icon(
+            family, iconName,
+            color: _safeColor((action['icon_color'] ?? '#FFFFFF').toString()),
+            size: size * .43,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleDesignerFloatingAction(String sourcePage, Map<String, dynamic> action) async {
+    final type = (action['link_type'] ?? 'in_app').toString();
+    final target = (action['link_value'] ?? '').toString().trim();
+    if (target.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose a destination for this Floating Action Button in Designer Settings.')),
+      );
+      return;
+    }
+    if (type == 'chrome' || type == 'deeplink') {
+      final uri = Uri.tryParse(target);
+      final allowed = uri != null && uri.scheme.isNotEmpty &&
+          (type == 'chrome'
+              ? const ['http', 'https'].contains(uri.scheme.toLowerCase()) && uri.host.isNotEmpty
+              : const ['http', 'https', 'ark', 'glowhit', 'mailto', 'tel'].contains(uri.scheme.toLowerCase()));
+      if (!allowed) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This Floating Action Button link is invalid.')),
+        );
+        return;
+      }
+      final opened = await launchUrl(uri!, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open this link.')),
+      );
+      return;
+    }
+
+    final pageKey = target.replaceFirst(RegExp(r'^page:'), '').trim();
+    switch (pageKey) {
+      case 'home':
+      case 'store':
+        if (mounted) setState(() => tab = 0);
+        return;
+      case 'search':
+        if (mounted) {
+          setState(() => tab = 0);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) FocusScope.of(context).requestFocus(searchFocusNode);
+          });
+        }
+        return;
+      case 'categories':
+        if (mounted) setState(() => tab = 1);
+        return;
+      case 'wishlist':
+        if (mounted) setState(() => tab = 2);
+        return;
+      case 'cart':
+        if (mounted) setState(() => tab = 3);
+        return;
+      case 'account':
+        if (mounted) setState(() => tab = 4);
+        return;
+      case 'orders':
+        if (customerToken == null || customerToken!.isEmpty) {
+          if (mounted) {
+            setState(() => tab = 4);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please sign in to view your orders.')),
+            );
+          }
+          return;
+        }
+        await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => CustomerSectionPage(
+            token: customerToken!,
+            section: 'My Orders',
+            floatingActionButton: _buildDesignerFloatingAction('orders'),
+          ),
+        ));
+        return;
+      case 'notifications':
+        await _openNotifications();
+        return;
+      case 'product':
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Open a product first to use its Product page action.')),
+        );
+        return;
+      default:
+        final pages = designerConfig['pages'];
+        final pageData = pages is Map ? pages[pageKey] : null;
+        if (pageData is! Map) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('The selected Designer page was not found.')),
+          );
+          return;
+        }
+        final sections = pageData['sections'] is List
+            ? (pageData['sections'] as List).whereType<Map>()
+                .where((section) => section['visible'] != false)
+                .map((section) => Map<String, dynamic>.from(section)).toList()
+            : <Map<String, dynamic>>[];
+        await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: Text((pageData['title'] ?? pageKey).toString())),
+            body: ListView(
+              padding: const EdgeInsets.only(bottom: 16),
+              children: sections.map(_designerSection).toList(),
+            ),
+            floatingActionButton: _buildDesignerFloatingAction(pageKey),
+            bottomNavigationBar: _buildDesignerBottomNavigation(),
+          ),
+        ));
+    }
+  }
+
   Widget _designerCatalog() {
     final page = designerConfig['pages'] is Map ? (designerConfig['pages'] as Map)['home'] : null;
     final sections = page is Map && page['sections'] is List
@@ -1303,6 +1451,7 @@ class _StoreHomeState extends State<StoreHome> {
             padding: const EdgeInsets.only(bottom: 16),
             children: sections.map(_designerSection).toList(),
           ),
+          floatingActionButton: _buildDesignerFloatingAction(pageKey),
           bottomNavigationBar: _buildDesignerBottomNavigation(),
         ),
       ));
@@ -1317,7 +1466,10 @@ class _StoreHomeState extends State<StoreHome> {
         return;
       }
       await Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => CustomerSectionPage(token: customerToken!, section: 'My Orders'),
+        builder: (_) => CustomerSectionPage(
+          token: customerToken!, section: 'My Orders',
+          floatingActionButton: _buildDesignerFloatingAction('orders'),
+        ),
       ));
       return;
     }
@@ -1408,7 +1560,12 @@ class _StoreHomeState extends State<StoreHome> {
           if (notificationCount > 0) Positioned(right: -2, top: -2, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5))))),
         ]),
       ),
-    ]), body: SafeArea(child: page), bottomNavigationBar: _buildDesignerBottomNavigation());
+    ]), body: SafeArea(child: page),
+      floatingActionButton: _buildDesignerFloatingAction(
+        tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home')
+          : tab == 1 ? 'categories' : tab == 2 ? 'wishlist' : tab == 3 ? 'cart' : 'account',
+      ),
+      bottomNavigationBar: _buildDesignerBottomNavigation());
   }
 }
 
