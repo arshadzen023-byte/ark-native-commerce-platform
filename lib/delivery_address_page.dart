@@ -76,8 +76,14 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
           entry.value.text = (savedAddresses.first[entry.key] ?? '').toString();
         }
         addressLabel = (savedAddresses.first['label'] ?? 'Home').toString();
+        _persistSelectedAddress(savedAddresses.first);
       }
     });
+  }
+
+  Future<void> _persistSelectedAddress(Map<String, dynamic> value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('glowhit_selected_delivery_address', jsonEncode(value));
   }
 
   Future<void> _saveCurrentAddress() async {
@@ -110,6 +116,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       (e['address_1'] ?? '') == value['address_1'] &&
       (e['postcode'] ?? '') == value['postcode'] &&
       (e['first_name'] ?? '') == value['first_name']);
+    await _persistSelectedAddress(value);
     if (mounted) setState(() {});
   }
 
@@ -119,6 +126,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
     }
     // A shipping quote belongs to the address that produced it. Never reuse
     // the previous address' rates/cart after selecting a different saved card.
+    _persistSelectedAddress(value);
     setState(() {
       addressLabel = (value['label'] ?? 'Home').toString();
       selectedSavedAddress = savedAddresses.indexOf(value);
