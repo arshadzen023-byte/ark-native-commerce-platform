@@ -569,7 +569,8 @@ class _StoreHomeState extends State<StoreHome> {
               ? wishlist.removeWhere((e) => e['id'] == product['id'])
               : wishlist.add(product);
           }),
-          floatingActionButton: _buildDesignerFloatingAction('product'),
+          appBar: _buildConfiguredAppBar('product'),
+            floatingActionButton: _buildDesignerFloatingAction('product'),
         )));
       },
     )));
@@ -1590,6 +1591,39 @@ class _StoreHomeState extends State<StoreHome> {
     ));
   }
 
+  PreferredSizeWidget? _buildConfiguredAppBar(String pageKey) {
+    final config = DesignerAppBarConfig(json: designerConfig['app_bar'] is Map
+        ? Map<String, dynamic>.from(designerConfig['app_bar'] as Map)
+        : const {});
+    if (!config.enabled || !config.visibleOn(pageKey)) return null;
+    return PreferredSize(
+      preferredSize: Size.fromHeight(config.height),
+      child: DesignerAppBarView(
+        config: config,
+        pageKey: pageKey,
+        cartCount: cartCount,
+        searchController: searchController,
+        onMenu: _openAppBarMenu,
+        onCart: () => setState(() => tab = 3),
+        onSearch: () {
+          if (tab != 0) setState(() => tab = 0);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) FocusScope.of(context).requestFocus(searchFocusNode);
+          });
+        },
+        onVoiceSearch: _voiceListening ? _stopVoiceSearch : _startVoiceSearch,
+        onWishlist: () => setState(() => tab = 2),
+        onRefresh: () { load(); _refreshCart(); _loadDesignerConfig(); },
+        onLocation: () async {
+          if (customerToken == null) { setState(() => tab = 4); return; }
+          await Navigator.push(context, MaterialPageRoute(builder: (_) =>
+              CustomerSectionPage(token: customerToken!, section: 'Saved Addresses')));
+        },
+        onCustomAction: _openAppBarCustomAction,
+      ),
+    );
+  }
+
   Widget _buildDesignerBottomNavigation() {
     final config = DesignerNavigationConfig.fromJson(designerConfig['navigation_bar']);
     final items = config.items.take(5).toList();
@@ -1631,45 +1665,19 @@ class _StoreHomeState extends State<StoreHome> {
     else if (tab == 3) page = _cartPage();
     else page = account();
     final currentPageKey = tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home') : tab == 1 ? 'categories' : tab == 2 ? 'wishlist' : tab == 3 ? 'cart' : 'account';
-    final appBarConfig = DesignerAppBarConfig(json: designerConfig['app_bar'] is Map ? Map<String, dynamic>.from(designerConfig['app_bar'] as Map) : const {});
-    final useCustomAppBar = appBarConfig.enabled && appBarConfig.visibleOn(currentPageKey);
-    final PreferredSizeWidget activeAppBar = useCustomAppBar
-      ? PreferredSize(
-          preferredSize: Size.fromHeight(appBarConfig.height),
-          child: DesignerAppBarView(
-            config: appBarConfig,
-            pageKey: currentPageKey,
-            cartCount: cartCount,
-            searchController: searchController,
-            onMenu: _openAppBarMenu,
-            onCart: () => setState(() => tab = 3),
-            onSearch: () {
-              if (tab != 0) setState(() => tab = 0);
-              WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) FocusScope.of(context).requestFocus(searchFocusNode); });
-            },
-            onVoiceSearch: _voiceListening ? _stopVoiceSearch : _startVoiceSearch,
-            onWishlist: () => setState(() => tab = 2),
-            onRefresh: () { load(); _refreshCart(); _loadDesignerConfig(); },
-            onLocation: () async {
-              if (customerToken == null) { setState(() => tab = 4); return; }
-              await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerSectionPage(token: customerToken!, section: 'Saved Addresses')));
-            },
-            onCustomAction: _openAppBarCustomAction,
-          ),
-        )
-      : AppBar(title: Text(titles[tab]), actions: [
-          if (tab == 0) IconButton(tooltip: 'ARK Designer', onPressed: _openDesigner, icon: const Icon(Icons.design_services_rounded)),
-          if (tab == 0) IconButton(tooltip: 'Sync published layout', onPressed: _loadDesignerConfig, icon: const Icon(Icons.sync_rounded)),
-          if (tab == 0) IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
-          IconButton(
-            tooltip: 'Notifications',
-            onPressed: _openNotifications,
-            icon: Stack(clipBehavior: Clip.none, children: [
-              const Icon(Icons.notifications_none_rounded),
-              if (notificationCount > 0) Positioned(right: -2, top: -2, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5))))),
-            ]),
-          ),
-        ]);
+    final PreferredSizeWidget activeAppBar = _buildConfiguredAppBar(currentPageKey) ?? AppBar(title: Text(titles[tab]), actions: [
+      if (tab == 0) IconButton(tooltip: 'ARK Designer', onPressed: _openDesigner, icon: const Icon(Icons.design_services_rounded)),
+      if (tab == 0) IconButton(tooltip: 'Sync published layout', onPressed: _loadDesignerConfig, icon: const Icon(Icons.sync_rounded)),
+      if (tab == 0) IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
+      IconButton(
+        tooltip: 'Notifications',
+        onPressed: _openNotifications,
+        icon: Stack(clipBehavior: Clip.none, children: [
+          const Icon(Icons.notifications_none_rounded),
+          if (notificationCount > 0) Positioned(right: -2, top: -2, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5))))),
+        ]),
+      ),
+    ]);
     return Scaffold(appBar: activeAppBar, body: SafeArea(child: page),
       floatingActionButton: _buildDesignerFloatingAction(
         tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home')
