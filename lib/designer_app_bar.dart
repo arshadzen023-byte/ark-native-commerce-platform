@@ -8,7 +8,7 @@ class DesignerAppBarConfig {
   final Map<String, dynamic> _json;
   Map<String, dynamic> toJson() => Map<String, dynamic>.from(_json);
   bool get enabled => _json['enabled'] != false;
-  double get height => ((_json['height'] as num?)?.toDouble() ?? 72).clamp(48.0,160.0).toDouble();
+  double get height => ((_json['height'] as num?)?.toDouble() ?? 72).clamp(88.0,220.0).toDouble();
   double get spacing => ((_json['spacing'] as num?)?.toDouble() ?? 8).clamp(0.0,32.0).toDouble();
   double get radius => ((_json['radius'] as num?)?.toDouble() ?? 12).clamp(0.0,36.0).toDouble();
   String get preset => (_json['preset'] ?? 'custom').toString();
@@ -22,7 +22,7 @@ class DesignerAppBarConfig {
   static const pageKeys = ['home','search','categories','wishlist','product','account','cart','orders','notifications'];
   static const defaults = <String,dynamic>{
     'version':1,'enabled':true,'preset':'custom','background_color':'#FFFFFF','foreground_color':'#202124',
-    'background_image_url':'','background_mime_type':'','logo_url':'','height':72.0,'spacing':8.0,'radius':12.0,'position':'top',
+    'background_image_url':'','background_mime_type':'','logo_url':'','height':156.0,'spacing':8.0,'radius':12.0,'position':'top',
     'show_menu':true,'show_logo':true,'show_cart':true,'show_voice_search':true,'show_search':true,'show_wishlist':true,'show_refresh':false,'show_location':false,
     'search_placeholder':'Search products...',
     'menu_icon_family':'Material','menu_icon':'menu','cart_icon_family':'Material','cart_icon':'shopping_cart_outlined',
@@ -30,6 +30,7 @@ class DesignerAppBarConfig {
     'wishlist_icon_family':'Material','wishlist_icon':'favorite_border','refresh_icon_family':'Material','refresh_icon':'refresh',
     'location_icon_family':'Material','location_icon':'location_on_outlined','visible_pages':<String,dynamic>{},'actions':<dynamic>[],
     'menu_label':'GlowHit','search_background_color':'#FFFFFF','search_foreground_color':'#555555',
+    'top_actions':<dynamic>[],
     'show_location':true,
   };
 
@@ -38,13 +39,14 @@ class DesignerAppBarConfig {
     final visibility=source['visible_pages'];
     final custom=visibility is Map ? visibility.keys.map((e)=>e.toString()).where((e)=>RegExp(r'^custom_[a-z0-9_]{1,40}$').hasMatch(e)).toList() : <String>[];
     out['visible_pages'] = <String,dynamic>{for(final page in [...pageKeys,...custom]) page: visibility is Map ? visibility[page]!=false : true};
-    final raw=source['actions'];
-    out['actions']=raw is List ? raw.whereType<Map>().take(10).map((e)=><String,dynamic>{
+    List<Map<String,dynamic>> normalizeActions(dynamic raw) => raw is List ? raw.whereType<Map>().take(10).map((e)=><String,dynamic>{
       'id':(e['id']??'').toString(),'label':(e['label']??'Action').toString(),
       'icon_family':(e['icon_family']??'Material').toString(),'icon':(e['icon']??'star_outline').toString(),
       'link_type':(e['link_type']??'page').toString(),'link_value':(e['link_value']??'home').toString(),'visible':e['visible']!=false,
     }).toList() : <Map<String,dynamic>>[];
-    out['height']=((out['height'] as num?)?.toDouble()??72).clamp(48.0,160.0).toDouble();
+    out['actions']=normalizeActions(source['actions']);
+    out['top_actions']=normalizeActions(source['top_actions']);
+    out['height']=((out['height'] as num?)?.toDouble()??156).clamp(88.0,220.0).toDouble();
     out['spacing']=((out['spacing'] as num?)?.toDouble()??8).clamp(0.0,32.0).toDouble();
     out['radius']=((out['radius'] as num?)?.toDouble()??12).clamp(0.0,36.0).toDouble();
     out['position']=['top','floating','overlay'].contains(out['position'])?out['position']:'top';
@@ -286,6 +288,7 @@ class DesignerAppBarView extends StatelessWidget {
         visualDensity:VisualDensity.compact,
         constraints:const BoxConstraints(minWidth:40,minHeight:40),
         padding:EdgeInsets.zero,
+        tooltip:'Menu',
         onPressed:onMenu,
         icon:DesignerNavIcons.icon((data['menu_icon_family']??'Material').toString(),(data['menu_icon']??'menu').toString(),color:fg,size:24),
       ),
@@ -298,7 +301,7 @@ class DesignerAppBarView extends StatelessWidget {
       if(config.show('show_wishlist')) iconButton('wishlist',onWishlist),
       if(config.show('show_cart')) iconButton('cart',onCart,badge:true),
       if(config.show('show_refresh')) iconButton('refresh',onRefresh),
-      for(final action in config.actions.where((a)=>a['visible']!=false).take(3)) actionButton(action),
+      for(final action in (data['top_actions'] as List? ?? const []).whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).where((a)=>a['visible']!=false).take(3)) actionButton(action),
     ]);
     final body=Container(
       padding:EdgeInsets.symmetric(horizontal:config.spacing,vertical:5),
@@ -328,6 +331,14 @@ class DesignerAppBarView extends StatelessWidget {
                 ]),
               ),
             ),
+          ),
+          for(final action in config.actions.where((a)=>a['visible']!=false).take(10)) Padding(
+            padding:const EdgeInsets.only(top:3),
+            child:InkWell(onTap:()=>onCustomAction(action),child:Row(children:[
+              DesignerNavIcons.icon((action['icon_family']??'Material').toString(),(action['icon']??'star_outline').toString(),color:fg,size:19),
+              const SizedBox(width:7),
+              Text((action['label']??'Action').toString(),style:TextStyle(color:fg,fontSize:12)),
+            ])),
           ),
         ],
       ),
