@@ -196,7 +196,7 @@ class _GlowHitSplashGateState extends State<GlowHitSplashGate> {
       }
       if (!mounted) return;
       setState(() => _showSplash = true);
-      final seconds = ((_config['duration_seconds'] as num?)?.toInt() ?? 3).clamp(1, 15);
+      final seconds = ((_config['duration_seconds'] as num?)?.toInt() ?? 3).clamp(1, 15).toInt();
       _timer = Timer(Duration(seconds: seconds), () {
         if (mounted) setState(() => _ready = true);
       });
@@ -222,7 +222,7 @@ class _GlowHitSplashGateState extends State<GlowHitSplashGate> {
     }
     final fitName = (_config['fit'] ?? 'contain').toString();
     final fit = fitName == 'cover' ? BoxFit.cover : fitName == 'fill' ? BoxFit.fill : BoxFit.contain;
-    final scale = ((_config['image_scale'] as num?)?.toDouble() ?? 1).clamp(.25, 2.0);
+    final scale = ((_config['image_scale'] as num?)?.toDouble() ?? 1).clamp(.25, 2.0).toDouble();
     return Scaffold(
       backgroundColor: Colors.white,
       body: SizedBox.expand(
@@ -948,7 +948,9 @@ class _StoreHomeState extends State<StoreHome> {
         if (decoded is Map) {
           final value = Map<String, dynamic>.from(decoded);
           if (mounted) setState(() => designerConfig = value);
-          unawaited(_precacheDesignerImages(value));
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) unawaited(_precacheDesignerImages(value));
+          });
         }
       } catch (_) {}
     }
@@ -993,7 +995,9 @@ class _StoreHomeState extends State<StoreHome> {
       // Cache only the same published shape that the public Home renderer reads.
       await prefs.setString('glowhit_published_designer_config', jsonEncode(value));
       // Warm Home component assets after updating the published configuration.
-      unawaited(_precacheDesignerImages(value));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_precacheDesignerImages(value));
+      });
       _sliderFutures.clear();
       if (mounted) setState(() => designerConfig = value);
       debugPrint('[ARK Designer Sync] Published Home v${value['version'] ?? value['published_version'] ?? 'unknown'}: ${sections.length} visible sections');
