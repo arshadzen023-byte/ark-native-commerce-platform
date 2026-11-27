@@ -149,6 +149,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       savedAddresses.removeAt(selectedSavedAddress);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_savedAddressKey, jsonEncode(savedAddresses));
+      await prefs.remove('glowhit_selected_delivery_address');
       if (mounted) setState(() { selectedSavedAddress = -1; formVisible = false; });
     } catch (e) {
       if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
