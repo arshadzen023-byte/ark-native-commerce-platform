@@ -484,7 +484,7 @@ class _StoreHomeState extends State<StoreHome> {
           if (config.menuHeaderImageUrl.isNotEmpty)
             ClipRRect(borderRadius:BorderRadius.circular(14),child:Padding(padding:const EdgeInsets.fromLTRB(14,4,14,10),child:Image.network(config.menuHeaderImageUrl,width:double.infinity,height:118,fit:BoxFit.cover,gaplessPlayback:true,filterQuality:FilterQuality.medium,errorBuilder:(_,__,___)=>const SizedBox.shrink()))),
           Flexible(child:ListView(shrinkWrap:true,padding:const EdgeInsets.fromLTRB(12,4,12,18),children:[
-            for(final item in menuItems.where((e)=>e['visible']!=false && (e['admin_only']!=true || canManageDesigner)))
+            for(final item in menuItems.where((e){final target=(e['link_value']??'').toString();final isDesigner=target=='ark_designer'||target=='designer';return e['visible']!=false && (canManageDesigner || (e['admin_only']!=true && !isDesigner));}))
               ListTile(
                 leading: _menuLeadingIcon(item),
                 title: Text((item['title']??'Menu item').toString(),style:const TextStyle(fontWeight:FontWeight.w700)),
