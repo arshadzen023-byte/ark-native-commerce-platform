@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glowhit_shopping/designer_app_bar.dart';
+import 'package:glowhit_shopping/designer_navigation_bar.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -114,6 +115,15 @@ void main() {
     expect(config.menuItems.map((item) => item['title']), containsAll(['Home','Categories','Wishlist','Cart','Account','ARK Designer']));
     final designer = config.menuItems.singleWhere((item) => item['title'] == 'ARK Designer');
     expect(designer['admin_only'], isTrue);
+  });
+
+  test('Searchable native icon library includes 200 additional Material icons', () {
+    final extraMaterial = DesignerNavIcons.all
+        .where((icon) => icon.family == 'Material' && icon.name == 'account_box')
+        .toList();
+    expect(extraMaterial, hasLength(1));
+    expect(DesignerNavIcons.find('Material', 'local_bar'), isNotNull);
+    expect(DesignerNavIcons.all.length, greaterThanOrEqualTo(430));
   });
 
   test('App Bar Builder limits custom action buttons to ten', () {
