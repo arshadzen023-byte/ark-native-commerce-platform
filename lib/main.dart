@@ -335,13 +335,19 @@ class _GlowHitPinnedSearchAddressHeaderDelegate extends SliverPersistentHeaderDe
     // upper Menu/Logo/Actions row is clipped smoothly during scrolling.
     return ColoredBox(
       color: backgroundColor,
-      child: ClipRect(
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: SizedBox(
-            height: maxExtent,
-            width: double.infinity,
-            child: child,
+      child: LayoutBuilder(
+        builder: (context, constraints) => ClipRect(
+          child: OverflowBox(
+            alignment: Alignment.bottomCenter,
+            minWidth: constraints.maxWidth,
+            maxWidth: constraints.maxWidth,
+            minHeight: maxExtent,
+            maxHeight: maxExtent,
+            child: SizedBox(
+              height: maxExtent,
+              width: constraints.maxWidth,
+              child: child,
+            ),
           ),
         ),
       ),
@@ -1819,8 +1825,9 @@ class _StoreHomeState extends State<StoreHome> {
     // The App Bar collapses its top action/logo row during Home scrolling,
     // while Search and Delivery Address remain visible as pinned rows.
     final statusInset = MediaQuery.paddingOf(context).top;
-    final pinnedRowsHeight = (statusInset + (config.show('show_search') ? 54.0 : 0.0)
-        + (config.show('show_location') ? 40.0 : 0.0)).clamp(48.0, 160.0).toDouble();
+    final pinnedRowsHeight = statusInset
+        + (config.show('show_search') ? 50.0 : 0.0)
+        + (config.show('show_location') ? 32.0 : 0.0);
     final fullHeaderHeight = (statusInset + config.renderHeight.toDouble())
         .clamp(pinnedRowsHeight, 280.0).toDouble();
     return RefreshIndicator(
