@@ -375,15 +375,22 @@ class DesignerAppBarView extends StatelessWidget {
           hint: _RotatingSearchHint(terms: config.searchTerms.isEmpty ? [(data['search_placeholder']??'Search products...').toString()] : config.searchTerms, style: const TextStyle(color:Colors.black54,fontSize:14)),
           hintStyle:const TextStyle(color:Colors.black54,fontSize:14),
           prefixIcon:DesignerNavIcons.icon((data['search_icon_family']??'Material').toString(),(data['search_icon']??'search').toString(),color:Colors.black54,size:config.iconSize),
+          prefixIconConstraints:const BoxConstraints(minWidth:44,minHeight:46),
           suffixIcon:Row(
             mainAxisSize:MainAxisSize.min,
             children:[
               if(config.show('show_voice_search')) IconButton(
+                visualDensity:VisualDensity.compact,
+                constraints:const BoxConstraints(minWidth:38,minHeight:40),
+                padding:EdgeInsets.zero,
                 tooltip:'Voice Search',
                 onPressed:onVoiceSearch,
                 icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:_appBarAccent,size:config.iconSize),
               ),
               IconButton(
+                visualDensity:VisualDensity.compact,
+                constraints:const BoxConstraints(minWidth:38,minHeight:40),
+                padding:EdgeInsets.zero,
                 tooltip:'Clear search',
                 onPressed:(){
                   searchController.clear();
@@ -394,7 +401,7 @@ class DesignerAppBarView extends StatelessWidget {
             ],
           ),
           border:InputBorder.none,
-          contentPadding:const EdgeInsets.symmetric(vertical:12),
+          contentPadding:const EdgeInsets.only(left:0,right:6,top:12,bottom:12),
         ),
       ),
     );
