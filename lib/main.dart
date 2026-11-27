@@ -466,6 +466,15 @@ class _StoreHomeState extends State<StoreHome> {
       return;
     }
     if (type == 'deep_link') { await _handleNotificationLink(target); return; }
+    if (type == 'page' && target.startsWith('custom_')) {
+      final pages=designerConfig['pages'];
+      final page=pages is Map ? pages[target] : null;
+      if(page is Map) {
+        final sections=page['sections'] is List ? (page['sections'] as List).whereType<Map>().where((e)=>e['visible']!=false).map((e)=>Map<String,dynamic>.from(e)).toList() : <Map<String,dynamic>>[];
+        await Navigator.of(context).push(MaterialPageRoute(builder:(_)=>Scaffold(appBar:_buildConfiguredAppBar(target),body:ListView(children:sections.map(_designerSection).toList()),floatingActionButton:_buildDesignerFloatingAction(target),bottomNavigationBar:_buildDesignerBottomNavigation())));
+      }
+      return;
+    }
     switch (target.toLowerCase()) {
       case 'home': setState(() => tab = 0); break;
       case 'search': setState(() => tab = 0); WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) FocusScope.of(context).requestFocus(searchFocusNode); }); break;
