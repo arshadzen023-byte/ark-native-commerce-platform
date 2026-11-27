@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
@@ -238,6 +239,9 @@ class _StoreHomeState extends State<StoreHome> {
   List<Map<String, dynamic>> storeCategories = [];
   Map<String, dynamic> designerConfig = {};
   bool designerConfigLoading = false;
+  bool _designerAdminVerified = false;
+  bool _designerAdminCheckComplete = false;
+  DateTime? _designerAdminVerifiedAt;
   final Map<String, Future<Map<String, dynamic>>> _sliderFutures = {};
   final WooStoreApi woo = WooStoreApi();
   Map<String, dynamic> liveCart = {};
@@ -251,6 +255,8 @@ class _StoreHomeState extends State<StoreHome> {
     super.initState();
     searchFocusNode.addListener(_handleSearchFocusChange);
     customerToken = widget.initialToken;
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _checkDesignerAdminAccess(force: true);
     push = GlowHitPushService(onTap: _handleNotificationLink, onForeground: _refreshNotificationCount);
     push.initialize(customerJwt: customerToken).then((_) => _refreshNotificationCount());
     load();
@@ -423,31 +429,49 @@ class _StoreHomeState extends State<StoreHome> {
 
   bool _isNestedAppBarPage(String pageKey) => !const ['home','search','categories','wishlist','cart','account'].contains(pageKey);
 
-  Future<bool> _checkDesignerAdminAccess() async {
+  Future<bool> _checkDesignerAdminAccess({bool force = false}) async {
+    final checkedAt = _designerAdminVerifiedAt;
+    if (!force && _designerAdminCheckComplete && checkedAt != null && DateTime.now().difference(checkedAt) < const Duration(minutes: 2)) {
+      return _designerAdminVerified;
+    }
     final token = customerToken;
-    if (token == null || token.isEmpty) return false;
-    try {
-      final response = await ArkCustomerApi(token).request('designer/config');
-      final allowed = response is Map && response['pages'] is Map;
-      return allowed;
-    } catch (_) {
+    if (token == null || token.isEmpty) {
+      _designerAdminCheckComplete = true;
+      _designerAdminVerified = false;
+      _designerAdminVerifiedAt = DateTime.now();
       return false;
     }
+    var allowed = false;
+    try {
+      // This endpoint is protected server-side by the WordPress manage_options
+      // capability; a customer JWT alone cannot grant Designer access.
+      final response = await ArkCustomerApi(token).request('designer/config');
+      allowed = response is Map && response['pages'] is Map;
+    } catch (_) {
+      allowed = false;
+    }
+    _designerAdminCheckComplete = true;
+    _designerAdminVerified = allowed;
+    _designerAdminVerifiedAt = DateTime.now();
+    if (mounted) setState(() {});
+    return allowed;
   }
 
   Future<void> _openAppBarMenu([String pageKey = 'home']) async {
-    final canManageDesigner = await _checkDesignerAdminAccess();
+    // Never wait for a network role check before presenting the drawer. The
+    // admin capability is warmed on app start and refreshed in the background.
+    final checkedAt = _designerAdminVerifiedAt;
+    final freshAdminCheck = _designerAdminCheckComplete && checkedAt != null && DateTime.now().difference(checkedAt) < const Duration(minutes: 2);
+    final canManageDesigner = freshAdminCheck && _designerAdminVerified;
+    if (!freshAdminCheck) _checkDesignerAdminAccess(force: true);
     if (!mounted) return;
     final raw = designerConfig['app_bar'] is Map ? Map<String,dynamic>.from(designerConfig['app_bar'] as Map) : <String,dynamic>{};
     final config = DesignerAppBarConfig(json: raw);
-    final configured = config.menuItems;
-    final menuItems = configured.isNotEmpty ? configured : <Map<String,dynamic>>[
-      {'id':'home','title':'Home','link_type':'page','link_value':'home','leading_icon':'home_outlined'},
-      {'id':'categories','title':'Categories','link_type':'page','link_value':'categories','leading_icon':'grid_view'},
-      {'id':'wishlist','title':'Wishlist','link_type':'page','link_value':'wishlist','leading_icon':'favorite_border'},
-      {'id':'cart','title':'Cart','link_type':'page','link_value':'cart','leading_icon':'shopping_cart_outlined'},
-      {'id':'account','title':'Account','link_type':'page','link_value':'account','leading_icon':'person_outline'},
-    ];
+    final menuItems = config.menuItems.map((item)=>Map<String,dynamic>.from(item)).toList();
+    final hasDesigner = menuItems.any((item)=>(item['link_value']??'').toString()=='ark_designer' || (item['link_value']??'').toString()=='designer');
+    if (canManageDesigner && !hasDesigner) {
+      menuItems.add({'id':'ark-designer','title':'ARK Designer','link_type':'deep_link','link_value':'ark_designer','leading_icon_family':'Material','leading_icon':'design_services','visible':true,'admin_only':true});
+    }
     final choice = await showModalBottomSheet<Map<String,dynamic>>(
       context: context,
       isScrollControlled: true,
@@ -458,24 +482,22 @@ class _StoreHomeState extends State<StoreHome> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(width:42,height:4,margin:const EdgeInsets.only(top:10,bottom:8),decoration:BoxDecoration(color:Colors.black26,borderRadius:BorderRadius.circular(5))),
           if (config.menuHeaderImageUrl.isNotEmpty)
-            ClipRRect(borderRadius:BorderRadius.circular(14),child:Padding(padding:const EdgeInsets.fromLTRB(14,4,14,10),child:Image.network(config.menuHeaderImageUrl,width:double.infinity,height:118,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const SizedBox.shrink()))),
+            ClipRRect(borderRadius:BorderRadius.circular(14),child:Padding(padding:const EdgeInsets.fromLTRB(14,4,14,10),child:Image.network(config.menuHeaderImageUrl,width:double.infinity,height:118,fit:BoxFit.cover,gaplessPlayback:true,filterQuality:FilterQuality.medium,errorBuilder:(_,__,___)=>const SizedBox.shrink()))),
           Flexible(child:ListView(shrinkWrap:true,padding:const EdgeInsets.fromLTRB(12,4,12,18),children:[
-            for(final item in menuItems.where((e)=>e['visible']!=false && (canManageDesigner || (e['link_value']??'').toString()!='designer')))
+            for(final item in menuItems.where((e){final target=(e['link_value']??'').toString();final isDesigner=target=='ark_designer'||target=='designer';return e['visible']!=false && (canManageDesigner || (e['admin_only']!=true && !isDesigner));}))
               ListTile(
                 leading: _menuLeadingIcon(item),
                 title: Text((item['title']??'Menu item').toString(),style:const TextStyle(fontWeight:FontWeight.w700)),
                 trailing: DesignerNavIcons.icon((item['trailing_icon_family']??'Material').toString(),(item['trailing_icon']??'chevron_right').toString(),color:const Color(0xFF51408F),size:20),
                 onTap:()=>Navigator.pop(ctx,item),
               ),
-            if(canManageDesigner)
-              ListTile(leading:const Icon(Icons.design_services_outlined,color:Color(0xFF51408F)),title:const Text('ARK Designer',style:TextStyle(fontWeight:FontWeight.w700)),trailing:const Icon(Icons.chevron_right),onTap:()=>Navigator.pop(ctx,{'id':'designer','link_type':'page','link_value':'designer','title':'ARK Designer'})),
           ])),
         ]),
       )),
     );
     if (!mounted || choice == null) return;
     final target = (choice['link_value'] ?? '').toString();
-    if (target == 'designer') { await _openDesigner(); return; }
+    if (target == 'designer' || target == 'ark_designer') { await _openDesigner(); return; }
     if (_isNestedAppBarPage(pageKey)) Navigator.of(context).pop();
     await _openAppBarCustomAction({
       'label':choice['title']??'Menu item',
@@ -1692,12 +1714,31 @@ class _StoreHomeState extends State<StoreHome> {
     final config = DesignerAppBarConfig(json: rawAppBar);
     if (!config.enabled || !config.visibleOn(pageKey)) return null;
     final topInset = MediaQuery.paddingOf(context).top;
+    final statusBackground = DesignerAppBarConfig.color(config.statusBarBackground);
+    final statusForegroundBrightness = config.statusBarIconBrightness == 'light' ? Brightness.light : Brightness.dark;
+    final systemStyle = SystemUiOverlayStyle(
+      statusBarColor: config.extendUnderStatusBar ? Colors.transparent : statusBackground,
+      statusBarIconBrightness: statusForegroundBrightness,
+      statusBarBrightness: config.statusBarIconBrightness == 'light' ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: Colors.black,
+      systemNavigationBarIconBrightness: Brightness.light,
+    );
     return PreferredSize(
       preferredSize: Size.fromHeight(config.renderHeight + topInset),
-      child: Column(
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: systemStyle,
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(height: topInset),
+          SizedBox(
+            height: topInset,
+            child: Stack(fit: StackFit.expand, children: [
+              if (config.extendUnderStatusBar && config.backgroundImageUrl.isNotEmpty)
+                Image.network(config.backgroundImageUrl, fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_, __, ___) => ColoredBox(color: DesignerAppBarConfig.color(config.backgroundColor))),
+              if (!config.extendUnderStatusBar || config.backgroundImageUrl.isEmpty)
+                ColoredBox(color: config.extendUnderStatusBar ? DesignerAppBarConfig.color(config.backgroundColor) : statusBackground),
+            ]),
+          ),
           SizedBox(
             height: config.renderHeight,
             child: DesignerAppBarView(
@@ -1746,6 +1787,7 @@ class _StoreHomeState extends State<StoreHome> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

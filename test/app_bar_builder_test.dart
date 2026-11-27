@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glowhit_shopping/designer_app_bar.dart';
+import 'package:glowhit_shopping/designer_navigation_bar.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -86,6 +87,45 @@ void main() {
     expect(json['menu_items'], hasLength(1));
   });
 
+  test('App Bar config preserves attachment IDs, status bar and address colours', () {
+    final config = DesignerAppBarConfig(json: {
+      'background_image_url': 'https://pluginstore.shop/wp-content/uploads/header.gif',
+      'background_image_id': 812,
+      'menu_header_image_url': 'https://pluginstore.shop/wp-content/uploads/menu.jpg',
+      'menu_header_image_id': 913,
+      'address_text_color': '#123456',
+      'extend_under_status_bar': true,
+      'status_bar_background': '#654321',
+      'status_bar_icon_brightness': 'light',
+      'menu_items': [
+        {'id':'admin','title':'ARK Designer','link_type':'deep_link','link_value':'ark_designer','admin_only':true},
+      ],
+    });
+    expect(config.backgroundImageId, 812);
+    expect(config.menuHeaderImageId, 913);
+    expect(config.addressTextColor, '#123456');
+    expect(config.extendUnderStatusBar, isTrue);
+    expect(config.statusBarBackground, '#654321');
+    expect(config.statusBarIconBrightness, 'light');
+    expect(config.menuItems.single['admin_only'], isTrue);
+  });
+
+  test('App Bar config supplies default menu items including protected ARK Designer', () {
+    final config = DesignerAppBarConfig(json: {'menu_items': []});
+    expect(config.menuItems.map((item) => item['title']), containsAll(['Home','Categories','Wishlist','Cart','Account','ARK Designer']));
+    final designer = config.menuItems.singleWhere((item) => item['title'] == 'ARK Designer');
+    expect(designer['admin_only'], isTrue);
+  });
+
+  test('Searchable native icon library includes 200 additional Material icons', () {
+    final extraMaterial = DesignerNavIcons.all
+        .where((icon) => icon.family == 'Material' && icon.name == 'account_box')
+        .toList();
+    expect(extraMaterial, hasLength(1));
+    expect(DesignerNavIcons.find('Material', 'local_bar'), isNotNull);
+    expect(DesignerNavIcons.all.length, greaterThanOrEqualTo(430));
+  });
+
   test('App Bar Builder limits custom action buttons to ten', () {
     final actions = List.generate(12, (i) => {
       'id':'a$i','label':'Action $i','icon_family':'Material','icon':'star',
@@ -105,6 +145,7 @@ void main() {
         {'key':'custom_campaign','title':'Campaign'},
       ],
       onUpload: () async => null,
+      onChooseMedia: () async => null,
       onSave: (value) async { saved = value; },
     )));
     await tester.pumpAndSettle();
@@ -176,6 +217,7 @@ void main() {
       initialConfig:DesignerAppBarConfig(),
       availablePages:const [{'key':'home','title':'Home'}],
       onUpload:() async=>null,
+      onChooseMedia:() async=>null,
       onSave:(_) async{},
     )));
     await tester.pumpAndSettle();

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'designer_app_bar_menu_editor.dart';
 import 'designer_navigation_bar.dart';
 
 const _appBarAccent = Color(0xFF5B3A9E);
@@ -20,9 +21,25 @@ class DesignerAppBarConfig {
   String get preset => (_json['preset'] ?? 'custom').toString();
   String get position => (_json['position'] ?? 'top').toString();
   String get backgroundImageUrl => (_json['background_image_url'] ?? '').toString();
+  String get backgroundColor => (_json['background_color'] ?? '#FFFFFF').toString();
+  String get foregroundColor => (_json['foreground_color'] ?? '#202124').toString();
   String get logoUrl => (_json['logo_url'] ?? '').toString();
   String get menuHeaderImageUrl => (_json['menu_header_image_url'] ?? '').toString();
-  List<Map<String,dynamic>> get menuItems => (_json['menu_items'] as List? ?? const []).whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).take(30).toList();
+  int get menuHeaderImageId => (_json['menu_header_image_id'] as num?)?.toInt() ?? int.tryParse((_json['menu_header_image_id'] ?? '0').toString()) ?? 0;
+  int get backgroundImageId => (_json['background_image_id'] as num?)?.toInt() ?? int.tryParse((_json['background_image_id'] ?? '0').toString()) ?? 0;
+  String get addressTextColor => (_json['address_text_color'] ?? '#202124').toString();
+  bool get extendUnderStatusBar => _json['extend_under_status_bar'] != false;
+  String get statusBarBackground => (_json['status_bar_background'] ?? _json['background_color'] ?? '#FFFFFF').toString();
+  String get statusBarIconBrightness => (_json['status_bar_icon_brightness'] ?? 'dark').toString() == 'light' ? 'light' : 'dark';
+  static const defaultMenuItems = <Map<String,dynamic>>[
+    {'id':'home','title':'Home','link_type':'page','link_value':'home','leading_icon_family':'Material','leading_icon':'home_outlined','leading_icon_style':'plain','trailing_icon_family':'Material','trailing_icon':'','visible':true,'admin_only':false},
+    {'id':'categories','title':'Categories','link_type':'page','link_value':'categories','leading_icon_family':'Material','leading_icon':'grid_view','leading_icon_style':'plain','trailing_icon_family':'Material','trailing_icon':'','visible':true,'admin_only':false},
+    {'id':'wishlist','title':'Wishlist','link_type':'page','link_value':'wishlist','leading_icon_family':'Material','leading_icon':'favorite_border','leading_icon_style':'plain','trailing_icon_family':'Material','trailing_icon':'','visible':true,'admin_only':false},
+    {'id':'cart','title':'Cart','link_type':'page','link_value':'cart','leading_icon_family':'Material','leading_icon':'shopping_cart_outlined','leading_icon_style':'plain','trailing_icon_family':'Material','trailing_icon':'','visible':true,'admin_only':false},
+    {'id':'account','title':'Account','link_type':'page','link_value':'account','leading_icon_family':'Material','leading_icon':'person_outline','leading_icon_style':'plain','trailing_icon_family':'Material','trailing_icon':'','visible':true,'admin_only':false},
+    {'id':'ark-designer','title':'ARK Designer','link_type':'deep_link','link_value':'ark_designer','leading_icon_family':'Material','leading_icon':'design_services','leading_icon_style':'plain','trailing_icon_family':'Material','trailing_icon':'chevron_right','visible':true,'admin_only':true},
+  ];
+  List<Map<String,dynamic>> get menuItems => (_json['menu_items'] as List? ?? defaultMenuItems).whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).take(30).toList();
   double get iconSize => ((_json['icon_size'] as num?)?.toDouble() ?? 22).clamp(16.0,36.0).toDouble();
   double get horizontalPadding => ((_json['horizontal_padding'] as num?)?.toDouble() ?? 10).clamp(0.0,24.0).toDouble();
   double get leftPadding => ((_json['left_padding'] as num?)?.toDouble() ?? horizontalPadding).clamp(0.0,24.0).toDouble();
@@ -35,7 +52,7 @@ class DesignerAppBarConfig {
   static const pageKeys = ['home','search','categories','wishlist','product','account','cart','orders','notifications'];
   static const defaults = <String,dynamic>{
     'version':1,'enabled':true,'preset':'custom','background_color':'#FFFFFF','foreground_color':'#202124',
-    'background_image_url':'','background_mime_type':'','logo_url':'','menu_header_image_url':'','menu_items':<dynamic>[],'icon_size':22.0,'horizontal_padding':10.0,'left_padding':10.0,'right_padding':10.0,'height':156.0,'spacing':8.0,'radius':12.0,'position':'top',
+    'background_image_url':'','background_image_id':0,'background_mime_type':'','logo_url':'','menu_header_image_url':'','menu_header_image_id':0,'menu_items':defaultMenuItems,'address_text_color':'#202124','extend_under_status_bar':true,'status_bar_background':'#FFFFFF','status_bar_icon_brightness':'dark','icon_size':22.0,'horizontal_padding':10.0,'left_padding':10.0,'right_padding':10.0,'height':156.0,'spacing':8.0,'radius':12.0,'position':'top',
     'show_menu':true,'show_logo':true,'show_cart':true,'show_voice_search':true,'show_search':true,'show_wishlist':true ,'show_refresh':false,'show_location':true,
     'search_placeholder':'Search products...',
     'search_placeholder_terms':<String>['watch','book','cloth'],
@@ -58,7 +75,8 @@ class DesignerAppBarConfig {
     }).toList() : <Map<String,dynamic>>[];
     out['actions']=normalizeActions(source['actions']);
     final rawMenu = source['menu_items'];
-    out['menu_items'] = rawMenu is List ? rawMenu.whereType<Map>().take(30).map((e)=><String,dynamic>{
+    final menuSource = rawMenu is List && rawMenu.isNotEmpty ? rawMenu : defaultMenuItems;
+    out['menu_items'] = menuSource.whereType<Map>().take(30).map((e)=><String,dynamic>{
       'id':(e['id']??DateTime.now().microsecondsSinceEpoch).toString(),
       'title':(e['title']??'Menu item').toString(),
       'link_type':(e['link_type']??'page').toString(),
@@ -69,7 +87,14 @@ class DesignerAppBarConfig {
       'trailing_icon_family':(e['trailing_icon_family']??'Material').toString(),
       'trailing_icon':(e['trailing_icon']??'chevron_right').toString(),
       'visible':e['visible']!=false,
-    }).toList() : <Map<String,dynamic>>[];
+      'admin_only':e['admin_only']==true,
+    }).toList();
+    out['menu_header_image_id'] = (source['menu_header_image_id'] as num?)?.toInt() ?? int.tryParse((source['menu_header_image_id'] ?? '0').toString()) ?? 0;
+    out['background_image_id'] = (source['background_image_id'] as num?)?.toInt() ?? int.tryParse((source['background_image_id'] ?? '0').toString()) ?? 0;
+    out['address_text_color'] = _validHex(source['address_text_color']) ? source['address_text_color'] : '#202124';
+    out['extend_under_status_bar'] = source['extend_under_status_bar'] != false;
+    out['status_bar_background'] = _validHex(source['status_bar_background']) ? source['status_bar_background'] : out['background_color'];
+    out['status_bar_icon_brightness'] = source['status_bar_icon_brightness'] == 'light' ? 'light' : 'dark';
     out['icon_size']=((out['icon_size'] as num?)?.toDouble()??22).clamp(16.0,36.0).toDouble();
     out['horizontal_padding']=((out['horizontal_padding'] as num?)?.toDouble()??10).clamp(0.0,24.0).toDouble();
     final terms = source['search_placeholder_terms'];
@@ -81,6 +106,7 @@ class DesignerAppBarConfig {
     return out;
   }
 
+  static bool _validHex(dynamic value) => value is String && RegExp(r'^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$').hasMatch(value);
   static Color color(String value,{Color fallback=Colors.white}) {
     final raw=value.replaceFirst('#',''); final parsed=int.tryParse(raw,radix:16);
     return parsed==null?fallback:Color(raw.length==6?0xFF000000|parsed:parsed);
@@ -103,10 +129,11 @@ class DesignerAppBarConfig {
 }
 
 class DesignerAppBarBuilderPage extends StatefulWidget {
-  const DesignerAppBarBuilderPage({super.key,required this.initialConfig,required this.availablePages,required this.onUpload,required this.onSave});
+  const DesignerAppBarBuilderPage({super.key,required this.initialConfig,required this.availablePages,required this.onUpload,required this.onChooseMedia,required this.onSave});
   final DesignerAppBarConfig initialConfig;
   final List<Map<String,String>> availablePages;
   final Future<Map<String,dynamic>?> Function() onUpload;
+  final Future<Map<String,dynamic>?> Function() onChooseMedia;
   final Future<void> Function(DesignerAppBarConfig) onSave;
   @override State<DesignerAppBarBuilderPage> createState()=>_DesignerAppBarBuilderPageState();
 }
@@ -134,19 +161,16 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
   @override void dispose(){colorController.dispose();placeholderController.dispose();searchTermsController.dispose();previewController.dispose();previewFocusNode.dispose();settingsScrollController.dispose();super.dispose();}
   void setValue(String key,dynamic value)=>setState(()=>data[key]=value);
   Future<void> apply() async { await widget.onSave(DesignerAppBarConfig(json:data)); if(mounted) Navigator.pop(context); }
-  Future<void> upload(String key) async {
-    if(uploading)return;
-    setState(()=>uploading=true);
-    try {
-      final media=await widget.onUpload(); if(media==null||!mounted)return;
-      final url=(media['source_url']??media['url']??'').toString(); if(url.isEmpty)return;
-      setState(() { data[key]=url; if(key=='background_image_url') data['background_mime_type']=(media['mime_type']??'').toString(); });
-    } finally { if(mounted)setState(()=>uploading=false); }
+  void _applyMedia(String key,Map<String,dynamic> media) {
+    final url=(media['source_url']??media['url']??'').toString();if(url.isEmpty)return;
+    final idValue=media['id']??media['attachment_id']??0;
+    final id=idValue is num?idValue.toInt():int.tryParse(idValue.toString())??0;
+    setState((){data[key]=url;if(key=='background_image_url'){data['background_image_id']=id;data['background_mime_type']=(media['mime_type']??'').toString();}if(key=='menu_header_image_url')data['menu_header_image_id']=id;});
   }
-  void removeMedia(String key) {
-    setState(() { data[key]=''; if(key=='background_image_url')data['background_mime_type']=''; });
-  }
-  Future<NavIconChoice?> pickIcon() => showDialog<NavIconChoice>(context:context,builder:(_)=>const _AppBarIconPicker());
+  Future<void> upload(String key) async {if(uploading)return;setState(()=>uploading=true);try{final media=await widget.onUpload();if(media!=null&&mounted)_applyMedia(key,media);}finally{if(mounted)setState(()=>uploading=false);}}
+  Future<void> chooseExistingMedia(String key) async {if(uploading)return;setState(()=>uploading=true);try{final media=await widget.onChooseMedia();if(media!=null&&mounted)_applyMedia(key,media);}finally{if(mounted)setState(()=>uploading=false);}}
+  void removeMedia(String key){setState((){data[key]='';if(key=='background_image_url'){data['background_image_id']=0;data['background_mime_type']='';}if(key=='menu_header_image_url')data['menu_header_image_id']=0;});}
+    Future<NavIconChoice?> pickIcon() => showDialog<NavIconChoice>(context:context,builder:(_)=>const _AppBarIconPicker());
   Future<void> chooseIcon(String key) async {
     final choice=await pickIcon();if(choice==null||!mounted)return;
     setState(() { data['${key}_family']=choice.family; data[key]=choice.name; });
@@ -157,72 +181,33 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     actions.add({'id':DateTime.now().microsecondsSinceEpoch.toString(),'label':'Action ${actions.length+1}','icon_family':'Material','icon':'star_outline','link_type':'page','link_value':'home','visible':true});
     setValue('actions',actions);
   }
-  void addMenuItem() {
-    final items=List<Map<String,dynamic>>.from(DesignerAppBarConfig(json:data).toJson()['menu_items'] as List);
-    items.add({'id':DateTime.now().microsecondsSinceEpoch.toString(),'title':'New menu item','link_type':'page','link_value':'home','leading_icon_family':'Material','leading_icon':'home_outlined','leading_icon_style':'plain','trailing_icon_family':'Material','trailing_icon':'chevron_right','visible':true});
-    setValue('menu_items',items);
+  Future<void> openMenuEditor() async {
+    final config=DesignerAppBarConfig(json:data);
+    final result=await Navigator.of(context).push<Map<String,dynamic>>(MaterialPageRoute(builder:(_)=>DesignerAppBarMenuEditorPage(initialItems:config.menuItems,initialImageUrl:config.menuHeaderImageUrl,initialImageId:config.menuHeaderImageId,onUpload:widget.onUpload,onChooseMedia:widget.onChooseMedia)));
+    if(result==null||!mounted)return;
+    setState((){data['menu_items']=result['menu_items'] is List?result['menu_items']:DesignerAppBarConfig.defaultMenuItems;data['menu_header_image_url']=(result['menu_header_image_url']??'').toString();data['menu_header_image_id']=(result['menu_header_image_id'] as num?)?.toInt()??0;});
   }
-  Future<void> chooseMenuIcon(int index,String field) async {
-    final choice=await pickIcon();if(choice==null||!mounted)return;
-    final items=List<Map<String,dynamic>>.from(DesignerAppBarConfig(json:data).toJson()['menu_items'] as List);
-    items[index][field+'_family']=choice.family;items[index][field]=choice.name;setValue('menu_items',items);
-  }
-  Widget menuEditor() {
-    final items=List<Map<String,dynamic>>.from(DesignerAppBarConfig(json:data).toJson()['menu_items'] as List);
-    return Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Row(children:[const Expanded(child:Text('Menu Edit',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold))),TextButton.icon(onPressed:items.length>=30?null:addMenuItem,icon:const Icon(Icons.add),label:const Text('Add item'))]),
-      ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.image_outlined),title:const Text('Menu Top Image · WordPress Gallery'),subtitle:Text((data['menu_header_image_url']??'').toString().isEmpty?'No menu image selected':'Image selected · tap to replace'),onTap:uploading?null:()=>upload('menu_header_image_url'),trailing:(data['menu_header_image_url']??'').toString().isEmpty?null:IconButton(tooltip:'Delete menu image',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>setValue('menu_header_image_url',''))),
-      if((data['menu_header_image_url']??'').toString().isNotEmpty) ClipRRect(borderRadius:BorderRadius.circular(10),child:Image.network(data['menu_header_image_url'].toString(),height:100,width:double.infinity,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const SizedBox(height:40,child:Text('Menu image preview unavailable')))),
-      for(var i=0;i<items.length;i++) Card(color:const Color(0xFFF8F7FC),child:Padding(padding:const EdgeInsets.all(9),child:Column(children:[
-        Row(children:[Expanded(child:TextFormField(initialValue:(items[i]['title']??'').toString(),decoration:const InputDecoration(labelText:'Title'),onChanged:(v){items[i]['title']=v;setValue('menu_items',items);})),IconButton(onPressed:(){final next=List<Map<String,dynamic>>.from(items)..removeAt(i);setValue('menu_items',next);},icon:const Icon(Icons.delete_outline,color:Colors.red))]),
-        DropdownButtonFormField<String>(value:(items[i]['link_type']??'page').toString(),decoration:const InputDecoration(labelText:'Link type'),items:const [DropdownMenuItem(value:'page',child:Text('App Page')),DropdownMenuItem(value:'url',child:Text('Website URL')),DropdownMenuItem(value:'deep_link',child:Text('Deep Link'))],onChanged:(v){items[i]['link_type']=v??'page';setValue('menu_items',items);}),
-        TextFormField(initialValue:(items[i]['link_value']??'home').toString(),decoration:const InputDecoration(labelText:'Link / Destination'),onChanged:(v){items[i]['link_value']=v;setValue('menu_items',items);}),
-        Row(children:[Expanded(child:ListTile(dense:true,contentPadding:EdgeInsets.zero,leading:DesignerNavIcons.icon((items[i]['leading_icon_family']??'Material').toString(),(items[i]['leading_icon']??'home_outlined').toString(),color:_appBarAccent),title:const Text('Leading Icon'),onTap:()=>chooseMenuIcon(i,'leading_icon'))),Expanded(child:ListTile(dense:true,contentPadding:EdgeInsets.zero,leading:DesignerNavIcons.icon((items[i]['trailing_icon_family']??'Material').toString(),(items[i]['trailing_icon']??'chevron_right').toString(),color:_appBarAccent),title:const Text('Trailing Icon'),onTap:()=>chooseMenuIcon(i,'trailing_icon')))]),
-        DropdownButtonFormField<String>(value:(items[i]['leading_icon_style']??'plain').toString(),decoration:const InputDecoration(labelText:'Leading Icon Style'),items:const [DropdownMenuItem(value:'plain',child:Text('Plain')),DropdownMenuItem(value:'circle',child:Text('Circle')),DropdownMenuItem(value:'tile',child:Text('Colored Tile'))],onChanged:(v){items[i]['leading_icon_style']=v??'plain';setValue('menu_items',items);}),
-        SwitchListTile(contentPadding:EdgeInsets.zero,title:const Text('Show menu item'),value:items[i]['visible']!=false,onChanged:(v){items[i]['visible']=v;setValue('menu_items',items);}),
-      ]))),
-      if(items.isEmpty) const Text('No custom menu items. Add items to replace the default menu list.'),
-    ])));
-  }
-  Future<void> editActionIcon(int index) async {
+  Widget menuEditor()=>Card(child:Padding(padding:const EdgeInsets.all(12),child:ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.menu_open,color:_appBarAccent),title:const Text('Menu Edit',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:Text('${DesignerAppBarConfig(json:data).menuItems.length} menu items · WordPress Media Library image'),trailing:const Icon(Icons.chevron_right),onTap:openMenuEditor)));
+    Future<void> editActionIcon(int index) async {
     final choice=await pickIcon();if(choice==null||!mounted)return;
     final actions=DesignerAppBarConfig(json:data).actions;actions[index]['icon_family']=choice.family;actions[index]['icon']=choice.name;setValue('actions',actions);
   }
-  Future<void> _pickBackgroundColor() async {
-    final current=DesignerAppBarConfig.color((data['background_color']??'#FFFFFF').toString());
-    var hsv=HSVColor.fromColor(current);
-    final picked=await showDialog<Color>(
-      context:context,
-      builder:(ctx)=>StatefulBuilder(builder:(ctx,setDialogState)=>AlertDialog(
-        title:const Text('Choose App Bar Background'),
-        content:SizedBox(width:320,child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Container(height:54,width:double.infinity,decoration:BoxDecoration(color:hsv.toColor(),borderRadius:BorderRadius.circular(12),border:Border.all(color:Colors.black12))),
-          const SizedBox(height:14),
-          const Text('Hue'),
-          Slider(value:hsv.hue.clamp(0,360).toDouble(),min:0,max:360,divisions:360,onChanged:(v)=>setDialogState(()=>hsv=hsv.withHue(v))),
-          const Text('Saturation'),
-          Slider(value:hsv.saturation,min:0,max:1,divisions:100,onChanged:(v)=>setDialogState(()=>hsv=hsv.withSaturation(v))),
-          const Text('Brightness'),
-          Slider(value:hsv.value,min:0,max:1,divisions:100,onChanged:(v)=>setDialogState(()=>hsv=hsv.withValue(v))),
-          Text('#'+hsv.toColor().value.toRadixString(16).substring(2).toUpperCase(),style:const TextStyle(fontWeight:FontWeight.w800)),
-        ])),
-        actions:[
-          TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel')),
-          FilledButton(onPressed:()=>Navigator.pop(ctx,hsv.toColor()),child:const Text('Use Colour')),
-        ],
-      )),
-    );
-    if(picked==null||!mounted)return;
-    final hex='#'+picked.value.toRadixString(16).substring(2).toUpperCase();
-    setState(()=>data['background_color']=hex);
-    colorController.text=hex;
+  Future<void> _pickColor(String key,String title) async {
+    final current=DesignerAppBarConfig.color((data[key]??'#FFFFFF').toString());var hsv=HSVColor.fromColor(current);
+    final picked=await showDialog<Color>(context:context,builder:(ctx)=>StatefulBuilder(builder:(ctx,setDialogState)=>AlertDialog(
+      title:Text(title),content:SizedBox(width:320,child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Container(height:54,width:double.infinity,decoration:BoxDecoration(color:hsv.toColor(),borderRadius:BorderRadius.circular(12),border:Border.all(color:Colors.black12))),
+        const SizedBox(height:14),const Text('Hue'),Slider(value:hsv.hue.clamp(0,360).toDouble(),min:0,max:360,divisions:360,onChanged:(v)=>setDialogState(()=>hsv=hsv.withHue(v))),
+        const Text('Saturation'),Slider(value:hsv.saturation,min:0,max:1,divisions:100,onChanged:(v)=>setDialogState(()=>hsv=hsv.withSaturation(v))),
+        const Text('Brightness'),Slider(value:hsv.value,min:0,max:1,divisions:100,onChanged:(v)=>setDialogState(()=>hsv=hsv.withValue(v))),
+        Text('#'+hsv.toColor().value.toRadixString(16).substring(2).toUpperCase(),style:const TextStyle(fontWeight:FontWeight.w800)),
+      ])),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel')),FilledButton(onPressed:()=>Navigator.pop(ctx,hsv.toColor()),child:const Text('Use Colour'))],
+    )));
+    if(picked==null||!mounted)return;final hex='#'+picked.value.toRadixString(16).substring(2).toUpperCase();setState(()=>data[key]=hex);if(key=='background_color')colorController.text=hex;
   }
-  Widget backgroundColorPicker() => Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-    const Text('Background colour'),
-    const SizedBox(height:7),
-    InkWell(onTap:_pickBackgroundColor,child:Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:11),decoration:BoxDecoration(border:Border.all(color:Colors.black26),borderRadius:BorderRadius.circular(10)),child:Row(children:[Container(width:28,height:28,decoration:BoxDecoration(color:DesignerAppBarConfig.color((data['background_color']??'#FFFFFF').toString()),borderRadius:BorderRadius.circular(6),border:Border.all(color:Colors.black26))),const SizedBox(width:10),Expanded(child:Text((data['background_color']??'#FFFFFF').toString(),style:const TextStyle(fontWeight:FontWeight.w700))),const Icon(Icons.palette_outlined)]))),
-  ]);
-  Widget switchTile(String key,String title,IconData icon)=>SwitchListTile(contentPadding:EdgeInsets.zero,secondary:Icon(icon,color:_appBarAccent),title:Text(title),value:data[key]!=false,onChanged:(v)=>setValue(key,v));
+  Widget _colorPickerTile(String key,String title)=>ListTile(contentPadding:EdgeInsets.zero,title:Text(title),subtitle:Text((data[key]??'#FFFFFF').toString()),leading:Container(width:28,height:28,decoration:BoxDecoration(color:DesignerAppBarConfig.color((data[key]??'#FFFFFF').toString()),shape:BoxShape.circle,border:Border.all(color:Colors.black26))),trailing:const Icon(Icons.palette_outlined),onTap:()=>_pickColor(key,'Choose $title'));
+  Widget backgroundColorPicker()=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Background colour'),const SizedBox(height:7),InkWell(onTap:()=>_pickColor('background_color','Choose App Bar Background'),child:Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:11),decoration:BoxDecoration(border:Border.all(color:Colors.black26),borderRadius:BorderRadius.circular(10)),child:Row(children:[Container(width:28,height:28,decoration:BoxDecoration(color:DesignerAppBarConfig.color((data['background_color']??'#FFFFFF').toString()),borderRadius:BorderRadius.circular(6),border:Border.all(color:Colors.black26))),const SizedBox(width:10),Expanded(child:Text((data['background_color']??'#FFFFFF').toString(),style:const TextStyle(fontWeight:FontWeight.w700))),const Icon(Icons.palette_outlined)])))]);
+    Widget switchTile(String key,String title,IconData icon)=>SwitchListTile(contentPadding:EdgeInsets.zero,secondary:Icon(icon,color:_appBarAccent),title:Text(title),value:data[key]!=false,onChanged:(v)=>setValue(key,v));
   Widget slider(String title,String key,double min,double max){
     final value=((data[key] as num?)?.toDouble()??min).clamp(min,max).toDouble();
     return Column(children:[Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Text(title),Text(value.toStringAsFixed(0))]),Slider(value:value,min:min,max:max,divisions:(max-min).round(),onChanged:(v)=>setValue(key,v))]);
@@ -240,13 +225,14 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
     final config=DesignerAppBarConfig(json:data);
     return ClipRRect(borderRadius:BorderRadius.circular(14),child:Column(children:[
       Container(width:double.infinity,padding:const EdgeInsets.all(6),color:Colors.black12,child:const Text('LIVE PREVIEW · GLOWHIT',style:TextStyle(fontSize:10,fontWeight:FontWeight.bold))),
+      SizedBox(height:22,width:double.infinity,child:Stack(fit:StackFit.expand,children:[if(config.extendUnderStatusBar&&config.backgroundImageUrl.isNotEmpty)Image.network(config.backgroundImageUrl,fit:BoxFit.cover,gaplessPlayback:true,errorBuilder:(_,__,___)=>ColoredBox(color:DesignerAppBarConfig.color(config.backgroundColor))),ColoredBox(color:config.extendUnderStatusBar?(config.backgroundImageUrl.isEmpty?DesignerAppBarConfig.color(config.backgroundColor):Colors.transparent):DesignerAppBarConfig.color(config.statusBarBackground)),Align(alignment:Alignment.centerLeft,child:Padding(padding:const EdgeInsets.symmetric(horizontal:10),child:Text('9:41  •  ▮▮▮  ▰',style:TextStyle(color:DesignerAppBarConfig.color(config.foregroundColor,fallback:Colors.black),fontSize:10))))])),
       SizedBox(height:config.renderHeight,child:DesignerAppBarView(config:config,pageKey:'home',cartCount:2,searchController:previewController,searchFocusNode:previewFocusNode,onSearchSubmitted:(_){},onMenu:(){},onCart:(){},onSearch:(){},onVoiceSearch:(){},onWishlist:(){},onRefresh:(){},onLocation:(){},onCustomAction:(_){ })),
     ]));
   }
 
   @override Widget build(BuildContext context){
     final config=DesignerAppBarConfig(json:data);
-    final previewHeight=(config.renderHeight+50).clamp(150.0,270.0).toDouble();
+    final previewHeight=(config.renderHeight+66).clamp(166.0,300.0).toDouble();
     return Scaffold(
       resizeToAvoidBottomInset:true,
       appBar:AppBar(title:const Text('App Bar Builder'),actions:[TextButton(onPressed:apply,child:const Text('Apply'))]),
@@ -266,6 +252,10 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
         switchTile('show_cart','Cart',Icons.shopping_cart_outlined),switchTile('show_voice_search','Voice Search',Icons.mic_none),
         switchTile('show_search','Search',Icons.search),switchTile('show_wishlist','Wishlist',Icons.favorite_border),
         switchTile('show_refresh','Refresh',Icons.refresh),switchTile('show_location','Address / Location',Icons.location_on_outlined),
+        switchTile('extend_under_status_bar','Extend background into Status Bar',Icons.vertical_align_top),
+        _colorPickerTile('address_text_color','Delivery Address Text Colour'),
+        _colorPickerTile('status_bar_background','Status Bar Colour'),
+        DropdownButtonFormField<String>(value:config.statusBarIconBrightness,decoration:const InputDecoration(labelText:'Status Bar Icon Brightness'),items:const [DropdownMenuItem(value:'dark',child:Text('Dark icons')),DropdownMenuItem(value:'light',child:Text('Light icons'))],onChanged:(v)=>setValue('status_bar_icon_brightness',v??'dark')),
       ]))),
       menuEditor(),
       Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
@@ -275,8 +265,8 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
       ]))),
       Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('Logo & Background',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold)),
-        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.image_outlined),title:const Text('Upload Logo'),subtitle:Text(config.logoUrl.isEmpty?'No logo selected':'Logo uploaded · tap to replace'),onTap:uploading?null:()=>upload('logo_url'),trailing:config.logoUrl.isEmpty?null:IconButton(tooltip:'Delete logo',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>removeMedia('logo_url'))),
-        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.wallpaper_outlined),title:const Text('Upload Background Image / GIF'),subtitle:Text(config.backgroundImageUrl.isEmpty?'No background selected':'Background media uploaded · tap to replace'),onTap:uploading?null:()=>upload('background_image_url'),trailing:config.backgroundImageUrl.isEmpty?null:IconButton(tooltip:'Delete background',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>removeMedia('background_image_url'))),
+        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.image_outlined),title:const Text('WordPress Media Library · Logo'),subtitle:Text(config.logoUrl.isEmpty?'No logo selected':'Logo selected · tap to replace'),onTap:uploading?null:()=>chooseExistingMedia('logo_url'),trailing:Row(mainAxisSize:MainAxisSize.min,children:[IconButton(tooltip:'Upload from phone',onPressed:uploading?null:()=>upload('logo_url'),icon:const Icon(Icons.add_photo_alternate_outlined)),if(config.logoUrl.isNotEmpty)IconButton(tooltip:'Delete logo',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>removeMedia('logo_url'))])),
+        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.wallpaper_outlined),title:const Text('WordPress Media Library · Background Image / GIF'),subtitle:Text(config.backgroundImageUrl.isEmpty?'No background selected':'Background media selected · tap to replace'),onTap:uploading?null:()=>chooseExistingMedia('background_image_url'),trailing:Row(mainAxisSize:MainAxisSize.min,children:[IconButton(tooltip:'Upload from phone',onPressed:uploading?null:()=>upload('background_image_url'),icon:const Icon(Icons.add_photo_alternate_outlined)),if(config.backgroundImageUrl.isNotEmpty)IconButton(tooltip:'Delete background',icon:const Icon(Icons.delete_outline,color:Colors.red),onPressed:()=>removeMedia('background_image_url'))])),
         if(uploading) const LinearProgressIndicator(),
         backgroundColorPicker(),
         TextField(controller:placeholderController,decoration:const InputDecoration(labelText:'Search placeholder'),onChanged:(v)=>setValue('search_placeholder',v)),
@@ -366,6 +356,8 @@ class DesignerAppBarView extends StatelessWidget {
       child:TextField(
         controller:searchController,
         focusNode:searchFocusNode,
+        textAlign:TextAlign.center,
+        textAlignVertical:TextAlignVertical.center,
         textInputAction:TextInputAction.search,
         onTap:onSearch,
         onSubmitted:onSearchSubmitted,
@@ -449,7 +441,7 @@ class DesignerAppBarView extends StatelessWidget {
                 child:Row(children:[
                   DesignerNavIcons.icon((data['location_icon_family']??'Material').toString(),(data['location_icon']??'location_on_outlined').toString(),color:fg,size:config.iconSize),
                   const SizedBox(width:6),
-                  Expanded(child:Text((data['address_label']??'Deliver to your address').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:TextStyle(color:DesignerAppBarConfig.color((data['address_text_color']??'#202124').toString(),fallback:Colors.black),fontSize:14,fontWeight:FontWeight.w800,height:1.15))),
+                  Expanded(child:Text((data['address_label']??'Deliver to your address').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:TextStyle(color:DesignerAppBarConfig.color(config.addressTextColor,fallback:Colors.black),fontSize:14,fontWeight:FontWeight.w800,height:1.15))),
                   Icon(Icons.chevron_right,color:fg,size:17),
                 ]),
               ),
@@ -464,7 +456,7 @@ class DesignerAppBarView extends StatelessWidget {
         width:double.infinity,
         height:config.renderHeight,
         child:Stack(fit:StackFit.expand,children:[
-          if(imageProvider!=null) Image(image:imageProvider,fit:BoxFit.cover,errorBuilder:(_,__,___)=>ColoredBox(color:bg)),
+          if(imageProvider!=null) Image(image:imageProvider,fit:BoxFit.cover,gaplessPlayback:true,errorBuilder:(_,__,___)=>ColoredBox(color:bg)),
           body,
         ]),
       ),
