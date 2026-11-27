@@ -50,8 +50,8 @@ jobs:
 
           # Keep the existing Android application identity so users can update
           # the installed GlowHit app instead of receiving a second app.
-          app_id = 'applicationId = "com.ark.glowhit"' if kotlin_dsl else 'applicationId "com.ark.glowhit"'
-          namespace = 'namespace = "com.ark.glowhit"' if kotlin_dsl else 'namespace "com.ark.glowhit"'
+          app_id = 'applicationId = "com.ark.glowhit"'
+          namespace = 'namespace = "com.ark.glowhit"'
           for key, replacement in (("applicationId", app_id), ("namespace", namespace)):
               pattern = rf'(?m)^\s*{key}\s*(?:=\s*)?"[^"]+"'
               if re.search(pattern, text):
