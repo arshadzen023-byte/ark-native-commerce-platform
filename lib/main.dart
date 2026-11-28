@@ -235,30 +235,30 @@ class _GlowHitSplashGateState extends State<GlowHitSplashGate> {
         if (_showSplash)
           Positioned.fill(
             child: IgnorePointer(
-              child: ColoredBox(
-                color: DesignerAppBarConfig.color(
-                  (_config['background_color'] ?? '#FFFFFF').toString(),
-                ),
-                child: Image.network(
-                  (_config['image_url'] ?? '').toString(),
-                  fit: fit,
-                  width: double.infinity,
-                  height: double.infinity,
-                  gaplessPlayback: true,
-                  frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                    if (frame != null || wasSynchronouslyLoaded) {
-                      _startSplashTimerAfterFirstFrame();
-                      return Transform.scale(scale: scale, child: child);
-                    }
-                    // Keep the actual app rendered underneath while the
-                    // remote splash image is arriving; never show a loader.
-                    return const SizedBox.expand();
-                  },
-                  errorBuilder: (_, __, ___) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) => _dismissSplash());
-                    return const SizedBox.expand();
-                  },
-                ),
+              child: Image.network(
+                (_config['image_url'] ?? '').toString(),
+                fit: fit,
+                width: double.infinity,
+                height: double.infinity,
+                gaplessPlayback: true,
+                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                  if (frame != null || wasSynchronouslyLoaded) {
+                    _startSplashTimerAfterFirstFrame();
+                    return ColoredBox(
+                      color: DesignerAppBarConfig.color(
+                        (_config['background_color'] ?? '#FFFFFF').toString(),
+                      ),
+                      child: Transform.scale(scale: scale, child: child),
+                    );
+                  }
+                  // A transparent overlay leaves Home visible while the
+                  // remote image downloads; no blank/black loading page.
+                  return const SizedBox.expand();
+                },
+                errorBuilder: (_, __, ___) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) => _dismissSplash());
+                  return const SizedBox.expand();
+                },
               ),
             ),
           ),
