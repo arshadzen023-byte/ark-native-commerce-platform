@@ -2404,6 +2404,7 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
   int _attachmentId = 0;
   String _fit = 'contain';
   double _imageScale = 1;
+  bool _enabled = true;
   bool _loading = true;
   bool _saving = false;
 
@@ -2427,6 +2428,7 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
         final data = Map<String, dynamic>.from(jsonDecode(raw) as Map);
         _imageUrl = (data['image_url'] ?? '').toString();
         _attachmentId = (data['attachment_id'] as num?)?.toInt() ?? 0;
+        _enabled = data['enabled'] == null ? _imageUrl.isNotEmpty : data['enabled'] == true;
         _durationController.text = ((data['duration_seconds'] as num?)?.toInt() ?? 3).toString();
         _imageScale = ((data['image_scale'] as num?)?.toDouble() ?? 1).clamp(.25, 2.0).toDouble();
         _fit = (data['fit'] ?? 'contain').toString();
@@ -2447,7 +2449,7 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, jsonEncode({
-        'enabled': _imageUrl.isNotEmpty,
+        'enabled': _enabled && _imageUrl.isNotEmpty,
         'image_url': _imageUrl,
         'attachment_id': _attachmentId,
         'duration_seconds': seconds,
@@ -2534,6 +2536,14 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
               ),
             ),
             const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Enable launch splash screen',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('Show this published screen before the Home page opens.'),
+              value: _enabled,
+              onChanged: (value) => setState(() => _enabled = value),
+            ),
             OutlinedButton.icon(
               onPressed: _chooseImage,
               icon: const Icon(Icons.photo_library_outlined),
