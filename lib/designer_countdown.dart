@@ -43,11 +43,11 @@ class _DesignerCountdownCardState extends State<DesignerCountdownCard> {
   Widget build(BuildContext context) {
     final remaining = widget.target.difference(DateTime.now());
     final total = remaining.isNegative ? 0 : remaining.inSeconds;
-    final scale = (widget.titleFontSize / 18).clamp(.65, 1.0).toDouble();
-    final numberSize = (13 * scale).clamp(9.0, 13.0).toDouble();
-    final labelSize = (6 * scale).clamp(5.0, 6.0).toDouble();
-    final minWidth = (29 * scale).clamp(24.0, 29.0).toDouble();
-    final gap = (3 * scale).clamp(2.0, 3.0).toDouble();
+    final scale = (widget.titleFontSize / 18).clamp(.65, 1.2).toDouble();
+    final numberSize = (13 * scale).clamp(9.0, 15.0).toDouble();
+    final labelSize = (6 * scale).clamp(5.0, 7.0).toDouble();
+    final minWidth = (29 * scale).clamp(24.0, 34.0).toDouble();
+    final gap = (3 * scale).clamp(2.0, 4.0).toDouble();
     final values = <(String, String)>[
       ((total ~/ 86400).toString().padLeft(2, '0'), 'DAYS'),
       (((total % 86400) ~/ 3600).toString().padLeft(2, '0'), 'HRS'),
