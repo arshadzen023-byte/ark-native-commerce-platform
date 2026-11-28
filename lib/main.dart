@@ -281,19 +281,26 @@ class SplashLaunchScreen extends StatefulWidget {
 
 class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
   bool _showSplash = true;
-  bool _frameReleased = false;
+  bool _frameReleaseScheduled = false;
+  bool _nativeFrameAllowed = false;
   Timer? _timer;
 
   Color get _background => DesignerAppBarConfig.color(
     (widget.config['background_color'] ?? '#FFFFFF').toString(),
   );
 
+  void _allowNativeFrame() {
+    if (_nativeFrameAllowed) return;
+    _nativeFrameAllowed = true;
+    WidgetsBinding.instance.allowFirstFrame();
+  }
+
   void _releaseNativeFrame({required bool startDuration}) {
-    if (_frameReleased || !mounted) return;
-    _frameReleased = true;
+    if (_frameReleaseScheduled || !mounted) return;
+    _frameReleaseScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _allowNativeFrame();
       if (!mounted) return;
-      WidgetsBinding.instance.allowFirstFrame();
       if (startDuration) {
         final seconds = ((widget.config['duration_seconds'] as num?)?.toInt() ?? 3)
             .clamp(1, 15).toInt();
@@ -309,10 +316,7 @@ class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    if (!_frameReleased) {
-      _frameReleased = true;
-      WidgetsBinding.instance.allowFirstFrame();
-    }
+    _allowNativeFrame();
     super.dispose();
   }
 
