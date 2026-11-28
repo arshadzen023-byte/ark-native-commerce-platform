@@ -31,6 +31,36 @@ jobs:
           cache: true
       - name: Generate Android project
         run: flutter create --project-name glowhit --org com.ark --platforms android .
+      - name: Configure clean native launch window
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path("android/app/src/main/res")
+          launch = root / "drawable" / "launch_background.xml"
+          launch.parent.mkdir(parents=True, exist_ok=True)
+          launch.write_text("""<?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item android:drawable="@android:color/white" />
+          </layer-list>
+          """, encoding="utf-8")
+
+          for folder in ("values", "values-night"):
+              styles = root / folder / "styles.xml"
+              if not styles.exists():
+                  continue
+              text = styles.read_text(encoding="utf-8")
+              text = re.sub(
+                  r'<item name="android:windowBackground">.*?</item>',
+                  '<item name="android:windowBackground">@drawable/launch_background</item>',
+                  text,
+                  flags=re.S,
+              )
+              styles.write_text(text, encoding="utf-8")
+          print("Configured a non-black Android launch window; Flutter content paints immediately above it.")
+          PY
       - name: Preserve GlowHit Android identity and Firebase
         shell: bash
         run: |
