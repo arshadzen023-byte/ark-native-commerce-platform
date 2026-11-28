@@ -100,7 +100,14 @@ jobs:
           # first frame, since Android's pre-activity screen cannot fetch remote media.
           v31 = res / "values-v31" / "styles.xml"
           if not v31.exists():
-              raise SystemExit("Android 12+ values-v31/styles.xml was not generated")
+              # Flutter's generated Android template does not create a v31
+              # qualifier on every Flutter/Gradle version. Derive it from the
+              # standard launch theme and add API-31-only splash attributes.
+              base_styles = res / "values" / "styles.xml"
+              if not base_styles.exists():
+                  raise SystemExit("Base Android styles.xml was not generated")
+              v31.parent.mkdir(parents=True, exist_ok=True)
+              v31.write_text(base_styles.read_text(encoding="utf-8"), encoding="utf-8")
           text = v31.read_text(encoding="utf-8")
           launch_match = re.search(r'<style name="LaunchTheme"[^>]*>(.*?)</style>', text, flags=re.S)
           if not launch_match:
