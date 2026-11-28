@@ -47,8 +47,9 @@ void main() {
     expect(aliases['height'], aliases['height_px']);
     expect(aliases['width'], 0.82);
     expect(aliases['width_pct'], 82.0);
-    expect(aliases['main_axis_spacing'], aliases['item_gap'] == 15 ? 9 : 9);
+    expect(aliases['main_axis_spacing'], 9);
     expect(aliases['cross_axis_spacing'], 15);
+    expect(aliases['item_gap'], 15);
     expect(aliases['border_radius'], aliases['corner_radius']);
     expect(aliases['cross_axis_count'], aliases['columns']);
   });
