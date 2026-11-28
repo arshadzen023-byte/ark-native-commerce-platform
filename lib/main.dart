@@ -300,6 +300,13 @@ class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
     _config = Map<String, dynamic>.from(widget.config);
     _imageBytes = widget.imageBytes;
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    if (_imageBytes == null || _imageBytes!.isEmpty) {
+      // Do not keep customers on a slow image download. A late response may
+      // refresh the cache for the next launch, but must not reopen this screen.
+      _timer = Timer(const Duration(seconds: 5), () {
+        if (mounted) setState(() => _showSplash = false);
+      });
+    }
     _refreshPublishedSplash();
   }
 
@@ -310,6 +317,7 @@ class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
   void _startDuration() {
     if (_durationStarted || !mounted) return;
     _durationStarted = true;
+    _timer?.cancel();
     final seconds = ((_config['duration_seconds'] as num?)?.toInt() ?? 3)
         .clamp(1, 15).toInt();
     _timer = Timer(Duration(seconds: seconds), () {
@@ -320,7 +328,7 @@ class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
   Future<void> _refreshPublishedSplash() async {
     try {
       final latest = await _loadSplashStartupData();
-      if (!mounted) return;
+      if (!mounted || !_showSplash) return;
       if (latest.config['enabled'] == true &&
           latest.imageBytes != null && latest.imageBytes!.isNotEmpty) {
         setState(() {
@@ -334,6 +342,7 @@ class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
           if (mounted) setState(() => _showSplash = false);
         });
       } else if (latest.config['enabled'] == false) {
+        _timer?.cancel();
         setState(() => _showSplash = false);
       }
     } catch (_) {
