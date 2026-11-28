@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'customer_account_page.dart';
 import 'designer_banner_carousel.dart';
 import 'designer_layout_contract.dart';
+import 'designer_countdown.dart';
 import 'designer_navigation_bar.dart';
 import 'designer_floating_action.dart';
 import 'designer_app_bar.dart';
@@ -1697,6 +1698,14 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     }
 
     final title = (properties['show_title'] == false) ? '' : component.title;
+    final countdownEnabled = properties['countdown_enabled'] == true;
+    final countdownExpiry = DateTime.tryParse((properties['countdown_time'] ?? '').toString());
+    final titleFontSize = compact ? 12.0 : (properties['title_font_size'] as num?)?.toDouble() ?? 18.0;
+    final titleAlignment = switch ((properties['title_text_align'] ?? 'left').toString()) {
+      'center' => TextAlign.center,
+      'right' => TextAlign.right,
+      _ => TextAlign.left,
+    };
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: onEdit == null || (isBanner && isSlider) ? null : (event) {
@@ -1748,62 +1757,61 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                   if (title.isNotEmpty)
                     Padding(
                       padding: EdgeInsets.only(
-                        bottom: ((properties['title_bottom_spacing'] as num?)
-                                ?.toDouble() ??
-                            8),
+                        bottom: ((properties['title_bottom_spacing'] as num?)?.toDouble() ?? 4)
+                            .clamp(0, 6).toDouble(),
                       ),
-                      child: GestureDetector(
-                        onTap: isBanner && isSlider ? onEdit : null,
-                        child: Text(
-                          title,
-                          maxLines: ((properties['title_max_lines'] as num?)
-                                  ?.toInt() ??
-                              2)
-                              .clamp(1, 4)
-                              .toInt(),
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: (properties['title_text_align'] ?? 'left') ==
-                                  'center'
-                              ? TextAlign.center
-                              : (properties['title_text_align'] ?? 'left') ==
-                                      'right'
-                                  ? TextAlign.right
-                                  : TextAlign.left,
-                          style: _designerFontStyle(
-                            (properties['font_family'] ?? 'Roboto').toString(),
-                            TextStyle(
-                            color: titleColor,
-                            backgroundColor: _color((properties['title_background_color'] ?? '#00000000').toString()),
-                            fontSize: compact
-                                ? 12
-                                : ((properties['title_font_size'] as num?)
-                                        ?.toDouble() ??
-                                    18),
-                            fontWeight:
-                                (properties['title_font_weight'] ?? 'bold') ==
-                                        'normal'
-                                    ? FontWeight.normal
-                                    : (properties['title_font_weight'] ??
-                                                'bold') ==
-                                            'medium'
-                                        ? FontWeight.w500
-                                        : FontWeight.bold,
-                            fontFamily:
-                                (properties['font_family'] ?? 'Roboto')
-                                    .toString(),
-                            fontStyle: properties['italic'] == true
-                                ? FontStyle.italic
-                                : FontStyle.normal,
-                            letterSpacing:
-                                (properties['letter_spacing'] as num?)
-                                        ?.toDouble() ??
-                                    0,
-                            wordSpacing:
-                                (properties['word_spacing'] as num?)
-                                        ?.toDouble() ??
-                                    0,
-                          )),
-                        ),
+                      child: Column(
+                        crossAxisAlignment: titleAlignment == TextAlign.center
+                            ? CrossAxisAlignment.center
+                            : titleAlignment == TextAlign.right
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                        children: [
+                          GestureDetector(
+                            onTap: isBanner && isSlider ? onEdit : null,
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: Text(
+                                title,
+                                maxLines: ((properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4).toInt(),
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: titleAlignment,
+                                style: _designerFontStyle(
+                                  (properties['font_family'] ?? 'Roboto').toString(),
+                                  TextStyle(
+                                    color: titleColor,
+                                    backgroundColor: _color((properties['title_background_color'] ?? '#00000000').toString()),
+                                    fontSize: titleFontSize,
+                                    fontWeight: (properties['title_font_weight'] ?? 'bold') == 'normal'
+                                        ? FontWeight.normal
+                                        : (properties['title_font_weight'] ?? 'bold') == 'medium'
+                                            ? FontWeight.w500
+                                            : FontWeight.bold,
+                                    fontFamily: (properties['font_family'] ?? 'Roboto').toString(),
+                                    fontStyle: properties['italic'] == true ? FontStyle.italic : FontStyle.normal,
+                                    letterSpacing: (properties['letter_spacing'] as num?)?.toDouble() ?? 0,
+                                    wordSpacing: (properties['word_spacing'] as num?)?.toDouble() ?? 0,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (countdownEnabled && countdownExpiry != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Align(
+                                alignment: titleAlignment == TextAlign.center
+                                    ? Alignment.center
+                                    : titleAlignment == TextAlign.right
+                                        ? Alignment.centerRight
+                                        : Alignment.centerLeft,
+                                child: DesignerCountdownCard(
+                                  target: countdownExpiry,
+                                  titleFontSize: titleFontSize,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   content,
