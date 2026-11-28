@@ -167,6 +167,7 @@ Future<_SplashStartupData> _loadSplashStartupData() async {
   Map<String, dynamic> cachedConfig = const {};
   Uint8List? cachedBytes;
   String cachedUrl = '';
+  String cachedVersion = '';
   try {
     final prefs = await SharedPreferences.getInstance();
     final rawConfig = prefs.getString('glowhit_published_splash_config');
@@ -175,6 +176,7 @@ Future<_SplashStartupData> _loadSplashStartupData() async {
       if (decoded is Map) {
         cachedConfig = Map<String, dynamic>.from(decoded);
         cachedUrl = (cachedConfig['image_url'] ?? '').toString().trim();
+        cachedVersion = (cachedConfig['version'] ?? '').toString();
       }
     }
     final cachedPath = prefs.getString('glowhit_published_splash_image_path');
@@ -216,7 +218,9 @@ Future<_SplashStartupData> _loadSplashStartupData() async {
             await prefs.setString('glowhit_published_splash_config', jsonEncode(config));
             return _SplashStartupData(config: config, imageBytes: null);
           }
-          if (imageUrl == cachedUrl && cachedBytes != null && cachedBytes.isNotEmpty) {
+          if (imageUrl == cachedUrl &&
+              (config['version'] ?? '').toString() == cachedVersion &&
+              cachedBytes != null && cachedBytes.isNotEmpty) {
             await prefs.setString('glowhit_published_splash_config', jsonEncode(config));
             return _SplashStartupData(config: config, imageBytes: cachedBytes);
           }
