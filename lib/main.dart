@@ -471,6 +471,7 @@ class _StoreHomeState extends State<StoreHome> {
       customerToken = widget.initialToken;
       if (customerToken != null && customerToken!.isNotEmpty) {
         push.register(customerJwt: customerToken);
+        _checkDesignerAdminAccess(force: true);
         _refreshCart();
         _refreshNotificationCount();
       }
