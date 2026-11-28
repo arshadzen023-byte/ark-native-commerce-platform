@@ -61,6 +61,72 @@ jobs:
               styles.write_text(text, encoding="utf-8")
           print("Configured a non-black Android launch window; Flutter content paints immediately above it.")
           PY
+      - name: Configure Android native launch splash on legacy and Android 12+ devices
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          res = Path("android/app/src/main/res")
+          legacy = res / "drawable" / "launch_background.xml"
+          legacy.parent.mkdir(parents=True, exist_ok=True)
+          legacy.write_text("""<?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item android:drawable="#51408F" />
+          </layer-list>
+          """, encoding="utf-8")
+
+          # Android 11 and earlier use the launch window background.
+          for folder in ("values", "values-night"):
+              styles = res / folder / "styles.xml"
+              if not styles.exists():
+                  continue
+              text = styles.read_text(encoding="utf-8")
+              item = '<item name="android:windowBackground">@drawable/launch_background</item>'
+              pattern = r'<item name="android:windowBackground">.*?</item>'
+              if re.search(pattern, text, flags=re.S):
+                  text = re.sub(pattern, item, text, count=1, flags=re.S)
+              else:
+                  match = re.search(r'<style name="LaunchTheme"[^>]*>', text)
+                  if not match:
+                      raise SystemExit(f"LaunchTheme missing in {styles}")
+                  text = text[:match.end()] + "\n        " + item + text[match.end():]
+              styles.write_text(text, encoding="utf-8")
+
+          # Android 12+ owns a system splash window before Flutter starts.
+          # Use the app launcher icon and a branded background; the published
+          # Designer splash takes over edge-to-edge immediately after Flutter's
+          # first frame, since Android's pre-activity screen cannot fetch remote media.
+          v31 = res / "values-v31" / "styles.xml"
+          if not v31.exists():
+              raise SystemExit("Android 12+ values-v31/styles.xml was not generated")
+          text = v31.read_text(encoding="utf-8")
+          launch_match = re.search(r'<style name="LaunchTheme"[^>]*>(.*?)</style>', text, flags=re.S)
+          if not launch_match:
+              raise SystemExit("Android 12+ LaunchTheme not found")
+          block = launch_match.group(1)
+          items = {
+              "android:windowSplashScreenBackground": "#51408F",
+              "android:windowSplashScreenAnimatedIcon": "@mipmap/ic_launcher",
+          }
+          for name, value in items.items():
+              item = f'<item name="{name}">{value}</item>'
+              pattern = rf'<item name="{re.escape(name)}">.*?</item>'
+              if re.search(pattern, block, flags=re.S):
+                  block = re.sub(pattern, item, block, count=1, flags=re.S)
+              else:
+                  block += "\n        " + item
+          text = text[:launch_match.start(1)] + block + text[launch_match.end(1):]
+          v31.write_text(text, encoding="utf-8")
+
+          for path in (res / "values" / "styles.xml", res / "values-night" / "styles.xml", v31):
+              if path.exists():
+                  data = path.read_text(encoding="utf-8")
+                  if "LaunchTheme" not in data:
+                      raise SystemExit(f"LaunchTheme validation failed: {path}")
+          print("Configured branded Android launch splash for legacy and Android 12+.")
+          PY
       - name: Preserve GlowHit Android identity and Firebase
         shell: bash
         run: |
