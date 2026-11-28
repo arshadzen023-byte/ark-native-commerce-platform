@@ -1330,6 +1330,101 @@ class _StoreHomeState extends State<StoreHome> {
         wordSpacing: (config['word_spacing'] as num?)?.toDouble() ?? 0,
       ));
     }
+    Widget buildSectionHeading() {
+      final layout = (config['title_countdown_layout'] ?? 'left').toString();
+      final showCountdown = countdownEnabled && countdownExpiry != null;
+      final size = (config['countdown_size'] as num?)?.toDouble() ?? 18;
+      final countdown = showCountdown
+          ? DesignerCountdownCard(
+              target: countdownExpiry!,
+              size: size,
+              backgroundColor: DesignerAppBarConfig.color(
+                (config['countdown_background_color'] ?? '#51408F').toString(),
+              ),
+              textColor: DesignerAppBarConfig.color(
+                (config['countdown_text_color'] ?? '#FFFFFF').toString(),
+              ),
+              labelColor: DesignerAppBarConfig.color(
+                (config['countdown_label_color'] ?? '#EDE7F8').toString(),
+              ),
+            )
+          : const SizedBox.shrink();
+      final titleWidget = showTitle
+          ? Flexible(
+              fit: FlexFit.loose,
+              child: Text(
+                title,
+                maxLines: (config['title_max_lines'] as num?)?.toInt() ?? 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: titleAlignment,
+                style: sectionTitleStyle(),
+              ),
+            )
+          : const SizedBox.shrink();
+
+      if (layout == 'stack') {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4)
+                .clamp(0, 60).toDouble(),
+          ),
+          child: Column(
+            crossAxisAlignment: titleAlignment == TextAlign.center
+                ? CrossAxisAlignment.center
+                : titleAlignment == TextAlign.right
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showTitle)
+                SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    title,
+                    maxLines: (config['title_max_lines'] as num?)?.toInt() ?? 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: titleAlignment,
+                    style: sectionTitleStyle(),
+                  ),
+                ),
+              if (showCountdown) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: switch ((config['countdown_alignment'] ?? 'left').toString()) {
+                    'center' => Alignment.center,
+                    'right' => Alignment.centerRight,
+                    _ => Alignment.centerLeft,
+                  },
+                  child: countdown,
+                ),
+              ],
+            ],
+          ),
+        );
+      }
+
+      final rowAlignment = switch (layout) {
+        'center' => MainAxisAlignment.center,
+        'right' => MainAxisAlignment.end,
+        _ => MainAxisAlignment.start,
+      };
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4)
+              .clamp(0, 60).toDouble(),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.max,
+          mainAxisAlignment: rowAlignment,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (showTitle) titleWidget,
+            if (showTitle && showCountdown) const SizedBox(width: 8),
+            if (showCountdown) countdown,
+          ],
+        ),
+      );
+    }
     final padding = layoutSpec.padding.top;
     final paddingLeft = layoutSpec.padding.left;
     final paddingRight = layoutSpec.padding.right;
@@ -1390,46 +1485,7 @@ class _StoreHomeState extends State<StoreHome> {
               (config['padding_bottom'] as num?)?.toDouble() ?? 12,
             ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            if (showTitle || (countdownEnabled && countdownExpiry != null)) Padding(
-  padding: EdgeInsets.only(
-    left: 0,
-    bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4).clamp(0, 60).toDouble(),
-  ),
-  child: Column(
-    crossAxisAlignment: titleAlignment == TextAlign.center
-        ? CrossAxisAlignment.center
-        : titleAlignment == TextAlign.right
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
-    children: [
-      if (showTitle) SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle())),
-      if (countdownEnabled && countdownExpiry != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Align(
-            alignment: switch ((config['countdown_alignment'] ?? config['title_text_align'] ?? 'left').toString()) {
-              'center' => Alignment.center,
-              'right' => Alignment.centerRight,
-              _ => Alignment.centerLeft,
-            },
-            child: DesignerCountdownCard(
-              target: countdownExpiry,
-              size: (config['countdown_size'] as num?)?.toDouble() ?? 18,
-              backgroundColor: DesignerAppBarConfig.color(
-                (config['countdown_background_color'] ?? '#51408F').toString(),
-              ),
-              textColor: DesignerAppBarConfig.color(
-                (config['countdown_text_color'] ?? '#FFFFFF').toString(),
-              ),
-              labelColor: DesignerAppBarConfig.color(
-                (config['countdown_label_color'] ?? '#EDE7F8').toString(),
-              ),
-            ),
-          ),
-        ),
-    ],
-  ),
-),
+            if (showTitle || (countdownEnabled && countdownExpiry != null)) buildSectionHeading(),
             bannerGrid
                 ? SizedBox(
                     height: bannerGridHeight,
@@ -1681,37 +1737,7 @@ class _StoreHomeState extends State<StoreHome> {
           (config['padding_bottom'] as num?)?.toDouble() ?? 12,
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (showTitle || (countdownEnabled && countdownExpiry != null)) Padding(
-  padding: EdgeInsets.only(
-    left: 0,
-    bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4).clamp(0, 6).toDouble(),
-  ),
-  child: Column(
-    crossAxisAlignment: titleAlignment == TextAlign.center
-        ? CrossAxisAlignment.center
-        : titleAlignment == TextAlign.right
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
-    children: [
-      if (showTitle) SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle())),
-      if (countdownEnabled && countdownExpiry != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Align(
-            alignment: titleAlignment == TextAlign.center
-                ? Alignment.center
-                : titleAlignment == TextAlign.right
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
-            child: DesignerCountdownCard(
-              target: countdownExpiry,
-              titleFontSize: (config['title_font_size'] as num?)?.toDouble() ?? 18,
-            ),
-          ),
-        ),
-    ],
-  ),
-),
+          if (showTitle || (countdownEnabled && countdownExpiry != null)) buildSectionHeading(),
           if (layout.contains('list_tile'))
             Column(children: rows.map((category) => ListTile(
               contentPadding: EdgeInsets.zero,
@@ -1804,7 +1830,7 @@ class _StoreHomeState extends State<StoreHome> {
           if (showTitle || (countdownEnabled && countdownExpiry != null)) Padding(
   padding: EdgeInsets.only(
     left: 4,
-    bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4).clamp(0, 6).toDouble(),
+    bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4).clamp(0, 60).toDouble(),
   ),
   child: Column(
     crossAxisAlignment: titleAlignment == TextAlign.center
