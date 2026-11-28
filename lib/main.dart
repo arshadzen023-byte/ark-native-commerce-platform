@@ -1454,7 +1454,7 @@ class _StoreHomeState extends State<StoreHome> {
       final size = (config['countdown_size'] as num?)?.toDouble() ?? 18;
       final countdown = showCountdown
           ? DesignerCountdownCard(
-              target: countdownExpiry!,
+              target: countdownExpiry,
               size: size,
               backgroundColor: DesignerAppBarConfig.color(
                 (config['countdown_background_color'] ?? '#51408F').toString(),
