@@ -37,4 +37,28 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.binding.setSurfaceSize(null);
   });
+  testWidgets('countdown supports custom size, colours and right alignment', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 360,
+          child: DesignerCountdownCard(
+            target: DateTime.now().add(const Duration(hours: 2)),
+            size: 26,
+            backgroundColor: Colors.teal,
+            textColor: Colors.yellow,
+            labelColor: Colors.white,
+            alignment: Alignment.centerRight,
+          ),
+        ),
+      ),
+    ));
+
+    expect(find.byWidgetPredicate(
+      (widget) => widget is Align && widget.alignment == Alignment.centerRight,
+    ), findsOneWidget);
+    expect(tester.widget<Text>(find.text('DAYS')).style?.color, Colors.white);
+    expect(tester.takeException(), isNull);
+  });
+
 }
