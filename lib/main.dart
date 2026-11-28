@@ -1882,11 +1882,6 @@ class _StoreHomeState extends State<StoreHome> {
               ) ?? const SizedBox.shrink(),
             ),
           ),
-          if (designerConfigLoading && sections.isEmpty)
-            const SliverToBoxAdapter(child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
-            )),
           if (sectionWidgets.isNotEmpty)
             SliverList(delegate: SliverChildBuilderDelegate(
               (context, index) => sectionWidgets[index],
@@ -1908,7 +1903,7 @@ class _StoreHomeState extends State<StoreHome> {
       for (final item in [('For You','date',false),('Deals','date',true),('Top Rated','rating',false),('Featured','popularity',false)])
         Padding(padding: const EdgeInsets.only(right: 8), child: OutlinedButton(onPressed: () => load(order: item.$2, sale: item.$3), child: Text(item.$1))),
     ])),
-    if (loading) const Expanded(child: Center(child: CircularProgressIndicator()))
+    if (loading) const Expanded(child: SizedBox.shrink())
     else if (error != null) Expanded(child: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.cloud_off, size: 42, color: Colors.deepOrange), const SizedBox(height: 12), Text(error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.deepOrange)), const SizedBox(height: 12), FilledButton.icon(onPressed: load, icon: const Icon(Icons.refresh), label: const Text('Retry'))]))))
     else if (products.isEmpty) const Expanded(child: Center(child: Text('No products found. Try another search.')))
     else Expanded(child: GridView.builder(padding: const EdgeInsets.fromLTRB(12, 0, 12, 18), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .66, crossAxisSpacing: 10, mainAxisSpacing: 10), itemCount: products.length, itemBuilder: (_, i) => productCard(products[i]))),
