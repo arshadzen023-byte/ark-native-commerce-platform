@@ -109,7 +109,6 @@ class _DesignerCountdownCardState extends State<DesignerCountdownCard> {
                             fontSize: numberSize,
                             fontWeight: FontWeight.w800,
                             height: 1.05,
-                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                         const SizedBox(height: 3),
