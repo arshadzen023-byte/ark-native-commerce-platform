@@ -464,45 +464,6 @@ class _DesignerCountdownBadgeState extends State<_DesignerCountdownBadge> {
   }
 }
 
-class _DesignerCountdownBadgeState extends State<_DesignerCountdownBadge> {
-  Timer? _ticker;
-
-  @override
-  void initState() {
-    super.initState();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _ticker?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final remaining = widget.target.difference(DateTime.now());
-    final seconds = remaining.isNegative ? 0 : remaining.inSeconds;
-    final days = seconds ~/ 86400;
-    final hours = (seconds % 86400) ~/ 3600;
-    final minutes = (seconds % 3600) ~/ 60;
-    final secs = seconds % 60;
-    final label = days > 0
-        ? '${days}d ${hours.toString().padLeft(2, '0')}h'
-        : '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFF51408F).withValues(alpha: .10),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF51408F))),
-    );
-  }
-}
-
 class StoreHome extends StatefulWidget {
   const StoreHome({super.key, this.initialToken});
   final String? initialToken;
