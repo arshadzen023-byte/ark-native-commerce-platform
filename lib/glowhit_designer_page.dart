@@ -797,7 +797,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             'background_position', 'background_size', 'background_repeat',
             'font_family', 'title_font_size', 'title_font_weight', 'italic',
             'letter_spacing', 'word_spacing', 'text_style',
-            'countdown_size', 'countdown_alignment', 'countdown_background_color',
+            'countdown_size', 'countdown_alignment', 'title_countdown_layout', 'countdown_background_color',
             'countdown_text_color', 'countdown_label_color',
           ];
           // Compatibility aliases (for example item_gap) may be normalized by
@@ -964,6 +964,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         'countdown_time': '',
         'countdown_size': 18.0,
         'countdown_alignment': 'left',
+        'title_countdown_layout': 'left',
         'countdown_background_color': '#51408F',
         'countdown_text_color': '#FFFFFF',
         'countdown_label_color': '#EDE7F8',
@@ -1765,64 +1766,112 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                   if (title.isNotEmpty || (countdownEnabled && countdownExpiry != null))
                     Padding(
                       padding: EdgeInsets.only(
-                        bottom: ((properties['title_bottom_spacing'] as num?)?.toDouble() ?? 4)
-                            .clamp(0, 60).toDouble(),
+                        bottom: ((properties['title_bottom_spacing'] as num?)?.toDouble() ?? 4).clamp(0, 60).toDouble(),
                       ),
-                      child: Column(
-                        crossAxisAlignment: titleAlignment == TextAlign.center
-                            ? CrossAxisAlignment.center
-                            : titleAlignment == TextAlign.right
-                                ? CrossAxisAlignment.end
-                                : CrossAxisAlignment.start,
-                        children: [
-                          if (title.isNotEmpty)
-                            GestureDetector(
-                            onTap: isBanner && isSlider ? onEdit : null,
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: Text(
-                                title,
-                                maxLines: ((properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4).toInt(),
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: titleAlignment,
-                                style: _designerFontStyle(
-                                  (properties['font_family'] ?? 'Roboto').toString(),
-                                  TextStyle(
-                                    color: titleColor,
-                                    backgroundColor: _color((properties['title_background_color'] ?? '#00000000').toString()),
-                                    fontSize: titleFontSize,
-                                    fontWeight: (properties['title_font_weight'] ?? 'bold') == 'normal'
-                                        ? FontWeight.normal
-                                        : (properties['title_font_weight'] ?? 'bold') == 'medium'
-                                            ? FontWeight.w500
-                                            : FontWeight.bold,
-                                    fontFamily: (properties['font_family'] ?? 'Roboto').toString(),
-                                    fontStyle: properties['italic'] == true ? FontStyle.italic : FontStyle.normal,
-                                    letterSpacing: (properties['letter_spacing'] as num?)?.toDouble() ?? 0,
-                                    wordSpacing: (properties['word_spacing'] as num?)?.toDouble() ?? 0,
+                      child: (properties['title_countdown_layout'] ?? 'left').toString() == 'stack'
+                          ? Column(
+                              crossAxisAlignment: titleAlignment == TextAlign.center
+                                  ? CrossAxisAlignment.center
+                                  : titleAlignment == TextAlign.right
+                                      ? CrossAxisAlignment.end
+                                      : CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (title.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: isBanner && isSlider ? onEdit : null,
+                                    child: SizedBox(
+                                      width: double.infinity,
+                                      child: Text(
+                                        title,
+                                        maxLines: ((properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4).toInt(),
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: titleAlignment,
+                                        style: _designerFontStyle(
+                                          (properties['font_family'] ?? 'Roboto').toString(),
+                                          TextStyle(
+                                            color: titleColor,
+                                            backgroundColor: _color((properties['title_background_color'] ?? '#00000000').toString()),
+                                            fontSize: titleFontSize,
+                                            fontWeight: (properties['title_font_weight'] ?? 'bold') == 'normal'
+                                                ? FontWeight.normal
+                                                : (properties['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
+                                            fontFamily: (properties['font_family'] ?? 'Roboto').toString(),
+                                            fontStyle: properties['italic'] == true ? FontStyle.italic : FontStyle.normal,
+                                            letterSpacing: (properties['letter_spacing'] as num?)?.toDouble() ?? 0,
+                                            wordSpacing: (properties['word_spacing'] as num?)?.toDouble() ?? 0,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
+                                if (countdownEnabled && countdownExpiry != null) ...[
+                                  const SizedBox(height: 4),
+                                  Align(
+                                    alignment: switch ((properties['countdown_alignment'] ?? 'left').toString()) {
+                                      'center' => Alignment.center,
+                                      'right' => Alignment.centerRight,
+                                      _ => Alignment.centerLeft,
+                                    },
+                                    child: DesignerCountdownCard(
+                                      target: countdownExpiry,
+                                      size: (properties['countdown_size'] as num?)?.toDouble() ?? 18,
+                                      backgroundColor: _color((properties['countdown_background_color'] ?? '#51408F').toString()),
+                                      textColor: _color((properties['countdown_text_color'] ?? '#FFFFFF').toString()),
+                                      labelColor: _color((properties['countdown_label_color'] ?? '#EDE7F8').toString()),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            )
+                          : Row(
+                              mainAxisAlignment: switch ((properties['title_countdown_layout'] ?? 'left').toString()) {
+                                'center' => MainAxisAlignment.center,
+                                'right' => MainAxisAlignment.end,
+                                _ => MainAxisAlignment.start,
+                              },
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                if (title.isNotEmpty)
+                                  Flexible(
+                                    fit: FlexFit.loose,
+                                    child: GestureDetector(
+                                      onTap: isBanner && isSlider ? onEdit : null,
+                                      child: Text(
+                                        title,
+                                        maxLines: ((properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4).toInt(),
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: titleAlignment,
+                                        style: _designerFontStyle(
+                                          (properties['font_family'] ?? 'Roboto').toString(),
+                                          TextStyle(
+                                            color: titleColor,
+                                            backgroundColor: _color((properties['title_background_color'] ?? '#00000000').toString()),
+                                            fontSize: titleFontSize,
+                                            fontWeight: (properties['title_font_weight'] ?? 'bold') == 'normal'
+                                                ? FontWeight.normal
+                                                : (properties['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
+                                            fontFamily: (properties['font_family'] ?? 'Roboto').toString(),
+                                            fontStyle: properties['italic'] == true ? FontStyle.italic : FontStyle.normal,
+                                            letterSpacing: (properties['letter_spacing'] as num?)?.toDouble() ?? 0,
+                                            wordSpacing: (properties['word_spacing'] as num?)?.toDouble() ?? 0,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                if (title.isNotEmpty && countdownEnabled && countdownExpiry != null)
+                                  const SizedBox(width: 8),
+                                if (countdownEnabled && countdownExpiry != null)
+                                  DesignerCountdownCard(
+                                    target: countdownExpiry,
+                                    size: (properties['countdown_size'] as num?)?.toDouble() ?? 18,
+                                    backgroundColor: _color((properties['countdown_background_color'] ?? '#51408F').toString()),
+                                    textColor: _color((properties['countdown_text_color'] ?? '#FFFFFF').toString()),
+                                    labelColor: _color((properties['countdown_label_color'] ?? '#EDE7F8').toString()),
+                                  ),
+                              ],
                             ),
-                          ),
-                          if (countdownEnabled && countdownExpiry != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: DesignerCountdownCard(
-                                target: countdownExpiry,
-                                size: (properties['countdown_size'] as num?)?.toDouble() ?? 18,
-                                backgroundColor: _color((properties['countdown_background_color'] ?? '#51408F').toString()),
-                                textColor: _color((properties['countdown_text_color'] ?? '#FFFFFF').toString()),
-                                labelColor: _color((properties['countdown_label_color'] ?? '#EDE7F8').toString()),
-                                alignment: switch ((properties['countdown_alignment'] ?? properties['title_text_align'] ?? 'left').toString()) {
-                                  'center' => Alignment.center,
-                                  'right' => Alignment.centerRight,
-                                  _ => Alignment.centerLeft,
-                                },
-                              ),
-                            ),
-                        ],
-                      ),
                     ),
                   content,
                 ],
@@ -2946,14 +2995,25 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
             onChanged: (value) => _change('countdown_time', value),
           ),
           _slider('Countdown Size', 'countdown_size', min: 10, max: 40),
-          const Text('Countdown Position', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text('Title + Countdown Layout', style: TextStyle(fontWeight: FontWeight.w700)),
           SegmentedButton<String>(
             segments: const [
               ButtonSegment(value: 'left', label: Text('Left'), icon: Icon(Icons.format_align_left)),
               ButtonSegment(value: 'center', label: Text('Centre'), icon: Icon(Icons.format_align_center)),
               ButtonSegment(value: 'right', label: Text('Right'), icon: Icon(Icons.format_align_right)),
+              ButtonSegment(value: 'stack', label: Text('Stack'), icon: Icon(Icons.view_agenda_outlined)),
             ],
-            selected: {['left', 'center', 'right'].contains((item.properties['countdown_alignment'] ?? item.properties['title_text_align'] ?? 'left').toString()) ? (item.properties['countdown_alignment'] ?? item.properties['title_text_align'] ?? 'left').toString() : 'left'},
+            selected: {(item.properties['title_countdown_layout'] ?? 'left').toString()},
+            onSelectionChanged: (selection) => _change('title_countdown_layout', selection.first),
+          ),
+          const Text('Countdown Position (Stack mode)', style: TextStyle(fontWeight: FontWeight.w700)),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'left', label: Text('Left')),
+              ButtonSegment(value: 'center', label: Text('Centre')),
+              ButtonSegment(value: 'right', label: Text('Right')),
+            ],
+            selected: {['left', 'center', 'right'].contains((item.properties['countdown_alignment'] ?? 'left').toString()) ? (item.properties['countdown_alignment'] ?? 'left').toString() : 'left'},
             onSelectionChanged: (selection) => _change('countdown_alignment', selection.first),
           ),
           _colorChoice('Countdown Box Colour', 'countdown_background_color', const ['#51408F', '#202033', '#16734A', '#B23B32', '#1B6CA8', '#FFFFFF']),
