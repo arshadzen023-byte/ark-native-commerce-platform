@@ -2,7 +2,7 @@ name: GlowHit Android CI and Release
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'fix/**']
   workflow_dispatch:
 permissions:
   contents: read
