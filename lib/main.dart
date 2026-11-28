@@ -263,6 +263,10 @@ Future<_SplashStartupData> _loadSplashStartupData({bool fetchRemote = true}) asy
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Hide system bars before the first Flutter frame to avoid a black status
+  // strip flashing between Android's neutral launch window and the uploaded
+  // full-screen splash image.
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   // Read only the local cache before runApp. Never hold the first Flutter
   // frame while waiting for WordPress or a remote image download.
   final splash = await _loadSplashStartupData(fetchRemote: false);
@@ -336,8 +340,8 @@ class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
           _imageBytes = latest.imageBytes;
         });
       } else if (_imageBytes == null || _imageBytes!.isEmpty) {
-        // A disabled/missing splash should not strand the customer on a
-        // loading screen. Show the native brand fallback briefly, then Home.
+        // No uploaded image is selected: show no substitute logo and proceed
+        // directly to the actual app after the short startup hand-off.
         _timer ??= Timer(const Duration(milliseconds: 650), () {
           if (mounted) setState(() => _showSplash = false);
         });
@@ -375,18 +379,10 @@ class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
       child: ColoredBox(
         color: _background,
         child: bytes == null || bytes.isEmpty
-            ? const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.shopping_bag_rounded, size: 54, color: purple),
-                    SizedBox(height: 12),
-                    Text('GlowHit', style: TextStyle(
-                      color: purple, fontSize: 25, fontWeight: FontWeight.w800,
-                    )),
-                  ],
-                ),
-              )
+            // Never substitute a built-in GlowHit logo. Only the image
+            // selected and published in Designer → App Settings is allowed
+            // to appear as the branded splash.
+            ? const SizedBox.expand()
             : Image.memory(
                 bytes,
                 cacheWidth: (MediaQuery.sizeOf(context).width *
@@ -1180,7 +1176,17 @@ class _StoreHomeState extends State<StoreHome> {
   }
 
   Future<void> _precacheDesignerImages(Map<String, dynamic> config) async {
+    // Prioritize App Bar assets so the header background is decoded before
+    // the next visible Home frame. Then warm the first visible page assets.
     final urls = <String>{};
+    final rawAppBar = config['app_bar'];
+    if (rawAppBar is Map) {
+      final appBar = Map<String, dynamic>.from(rawAppBar);
+      for (final key in const ['background_image_url', 'logo_url', 'menu_header_image_url']) {
+        final url = (appBar[key] ?? '').toString().trim();
+        if (url.startsWith('https://') || url.startsWith('http://')) urls.add(url);
+      }
+    }
     final rawPages = config['pages'];
     if (rawPages is Map) {
       for (final rawPage in rawPages.values.whereType<Map>()) {
@@ -1207,16 +1213,18 @@ class _StoreHomeState extends State<StoreHome> {
       }
     }
     final cacheWidth = (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio)
-        .round().clamp(320, 1600);
-    for (final url in urls.take(12)) {
+        .round().clamp(320, 1600).toInt();
+    await Future.wait(urls.take(12).map((url) async {
       if (!mounted) return;
       try {
-        await precacheImage(ResizeImage(NetworkImage(url), width: cacheWidth), context)
-            .timeout(const Duration(seconds: 5));
+        await precacheImage(
+          ResizeImage(NetworkImage(url), width: cacheWidth),
+          context,
+        ).timeout(const Duration(seconds: 4));
       } catch (_) {
-        // An unavailable image must not block the Home screen.
+        // An unavailable image must never block the Home screen.
       }
-    }
+    }));
   }
 
   Future<Map<String, dynamic>> _loadDesignerSlider(String key) async {
@@ -1381,11 +1389,11 @@ class _StoreHomeState extends State<StoreHome> {
               paddingRight,
               (config['padding_bottom'] as num?)?.toDouble() ?? 12,
             ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             if (showTitle || (countdownEnabled && countdownExpiry != null)) Padding(
   padding: EdgeInsets.only(
     left: 0,
-    bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4).clamp(0, 6).toDouble(),
+    bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4).clamp(0, 60).toDouble(),
   ),
   child: Column(
     crossAxisAlignment: titleAlignment == TextAlign.center
@@ -1399,14 +1407,23 @@ class _StoreHomeState extends State<StoreHome> {
         Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Align(
-            alignment: titleAlignment == TextAlign.center
-                ? Alignment.center
-                : titleAlignment == TextAlign.right
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
+            alignment: switch ((config['countdown_alignment'] ?? config['title_text_align'] ?? 'left').toString()) {
+              'center' => Alignment.center,
+              'right' => Alignment.centerRight,
+              _ => Alignment.centerLeft,
+            },
             child: DesignerCountdownCard(
               target: countdownExpiry,
-              titleFontSize: (config['title_font_size'] as num?)?.toDouble() ?? 18,
+              size: (config['countdown_size'] as num?)?.toDouble() ?? 18,
+              backgroundColor: DesignerAppBarConfig.color(
+                (config['countdown_background_color'] ?? '#51408F').toString(),
+              ),
+              textColor: DesignerAppBarConfig.color(
+                (config['countdown_text_color'] ?? '#FFFFFF').toString(),
+              ),
+              labelColor: DesignerAppBarConfig.color(
+                (config['countdown_label_color'] ?? '#EDE7F8').toString(),
+              ),
             ),
           ),
         ),
