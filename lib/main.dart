@@ -1327,7 +1327,7 @@ class _StoreHomeState extends State<StoreHome> {
               (config['padding_bottom'] as num?)?.toDouble() ?? 12,
             ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (showTitle) Padding(
+            if (showTitle || (countdownEnabled && countdownExpiry != null)) Padding(
   padding: EdgeInsets.only(
     left: 0,
     bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4).clamp(0, 6).toDouble(),
@@ -1339,7 +1339,7 @@ class _StoreHomeState extends State<StoreHome> {
             ? CrossAxisAlignment.end
             : CrossAxisAlignment.start,
     children: [
-      SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle())),
+      if (showTitle) SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle())),
       if (countdownEnabled && countdownExpiry != null)
         Padding(
           padding: const EdgeInsets.only(top: 4),
@@ -1609,7 +1609,7 @@ class _StoreHomeState extends State<StoreHome> {
           (config['padding_bottom'] as num?)?.toDouble() ?? 12,
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (showTitle) Padding(
+          if (showTitle || (countdownEnabled && countdownExpiry != null)) Padding(
   padding: EdgeInsets.only(
     left: 0,
     bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4).clamp(0, 6).toDouble(),
@@ -1621,7 +1621,7 @@ class _StoreHomeState extends State<StoreHome> {
             ? CrossAxisAlignment.end
             : CrossAxisAlignment.start,
     children: [
-      SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle())),
+      if (showTitle) SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle())),
       if (countdownEnabled && countdownExpiry != null)
         Padding(
           padding: const EdgeInsets.only(top: 4),
@@ -1729,7 +1729,7 @@ class _StoreHomeState extends State<StoreHome> {
           (config['padding_bottom'] as num?)?.toDouble() ?? 12,
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (showTitle) Padding(
+          if (showTitle || (countdownEnabled && countdownExpiry != null)) Padding(
   padding: EdgeInsets.only(
     left: 4,
     bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4).clamp(0, 6).toDouble(),
@@ -1741,7 +1741,7 @@ class _StoreHomeState extends State<StoreHome> {
             ? CrossAxisAlignment.end
             : CrossAxisAlignment.start,
     children: [
-      SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle())),
+      if (showTitle) SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle())),
       if (countdownEnabled && countdownExpiry != null)
         Padding(
           padding: const EdgeInsets.only(top: 4),
