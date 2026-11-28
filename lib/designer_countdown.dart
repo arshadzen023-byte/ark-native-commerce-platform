@@ -1,17 +1,29 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
-/// Shared live countdown used by both the native Designer preview and Home.
-/// The layout sizes itself to the available width and follows the title scale.
+/// Shared countdown used by the Designer preview and published Home renderer.
+/// All visual properties are explicit so the editor preview matches the app.
 class DesignerCountdownCard extends StatefulWidget {
   const DesignerCountdownCard({
     super.key,
     required this.target,
     this.titleFontSize = 18,
+    this.size,
+    this.backgroundColor = const Color(0xFF51408F),
+    this.textColor = Colors.white,
+    this.labelColor = const Color(0xFFEDE7F8),
+    this.alignment = Alignment.centerLeft,
   });
 
   final DateTime target;
+
+  /// Kept for compatibility with older callers and tests.
   final double titleFontSize;
+  final double? size;
+  final Color backgroundColor;
+  final Color textColor;
+  final Color labelColor;
+  final AlignmentGeometry alignment;
 
   @override
   State<DesignerCountdownCard> createState() => _DesignerCountdownCardState();
@@ -44,7 +56,8 @@ class _DesignerCountdownCardState extends State<DesignerCountdownCard> {
   Widget build(BuildContext context) {
     final remaining = widget.target.difference(DateTime.now());
     final total = remaining.isNegative ? 0 : remaining.inSeconds;
-    final scale = (widget.titleFontSize / 18).clamp(.75, 1.15).toDouble();
+    final baseSize = (widget.size ?? widget.titleFontSize).clamp(10, 40).toDouble();
+    final scale = (baseSize / 18).clamp(.58, 2.0).toDouble();
     final values = <(String, String)>[
       ((total ~/ 86400).toString().padLeft(2, '0'), 'DAYS'),
       (((total % 86400) ~/ 3600).toString().padLeft(2, '0'), 'HRS'),
@@ -64,18 +77,19 @@ class _DesignerCountdownCardState extends State<DesignerCountdownCard> {
         final horizontalPadding = compact ? 5.0 : 8.0;
         final verticalPadding = compact ? 5.0 : 7.0;
 
-        return Center(
+        return Align(
+          alignment: widget.alignment,
           child: Container(
             padding: EdgeInsets.symmetric(
               horizontal: horizontalPadding,
               vertical: verticalPadding,
             ),
             decoration: BoxDecoration(
-              color: const Color(0xFF51408F),
+              color: widget.backgroundColor,
               borderRadius: BorderRadius.circular(11),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF51408F).withValues(alpha: .16),
+                  color: widget.backgroundColor.withValues(alpha: .16),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -95,7 +109,7 @@ class _DesignerCountdownCardState extends State<DesignerCountdownCard> {
                       vertical: compact ? 4 : 5,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .15),
+                      color: widget.textColor.withValues(alpha: .12),
                       borderRadius: BorderRadius.circular(7),
                     ),
                     child: Column(
@@ -105,7 +119,7 @@ class _DesignerCountdownCardState extends State<DesignerCountdownCard> {
                           values[i].$1,
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white,
+                            color: widget.textColor,
                             fontSize: numberSize,
                             fontWeight: FontWeight.w800,
                             height: 1.05,
@@ -116,7 +130,7 @@ class _DesignerCountdownCardState extends State<DesignerCountdownCard> {
                           values[i].$2,
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: .82),
+                            color: widget.labelColor,
                             fontSize: labelSize,
                             fontWeight: FontWeight.w700,
                             letterSpacing: .45,
