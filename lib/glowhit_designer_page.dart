@@ -797,6 +797,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             'background_position', 'background_size', 'background_repeat',
             'font_family', 'title_font_size', 'title_font_weight', 'italic',
             'letter_spacing', 'word_spacing', 'text_style',
+            'countdown_size', 'countdown_alignment', 'countdown_background_color',
+            'countdown_text_color', 'countdown_label_color',
           ];
           // Compatibility aliases (for example item_gap) may be normalized by
           // WordPress from their canonical field. Verify canonical design
@@ -2411,7 +2413,7 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
   int _attachmentId = 0;
   String _fit = 'contain';
   double _imageScale = 1;
-  bool _enabled = true;
+  bool _enabled = false;
   bool _loading = true;
   bool _saving = false;
 
@@ -2435,7 +2437,7 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
         final data = Map<String, dynamic>.from(jsonDecode(raw) as Map);
         _imageUrl = (data['image_url'] ?? '').toString();
         _attachmentId = (data['attachment_id'] as num?)?.toInt() ?? 0;
-        _enabled = data['enabled'] == null ? _imageUrl.isNotEmpty : data['enabled'] == true;
+        _enabled = data['enabled'] == true && _imageUrl.isNotEmpty;
         _durationController.text = ((data['duration_seconds'] as num?)?.toInt() ?? 3).toString();
         _imageScale = ((data['image_scale'] as num?)?.toDouble() ?? 1).clamp(.25, 2.0).toDouble();
         _fit = (data['fit'] ?? 'contain').toString();
@@ -2547,9 +2549,11 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
               contentPadding: EdgeInsets.zero,
               title: const Text('Enable launch splash screen',
                 style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: const Text('Show this published screen before the Home page opens.'),
-              value: _enabled,
-              onChanged: (value) => setState(() => _enabled = value),
+              subtitle: Text(_imageUrl.isEmpty
+                  ? 'Choose an uploaded image first. No built-in GlowHit logo will be shown.'
+                  : 'Show only this uploaded image before the Home page opens.'),
+              value: _enabled && _imageUrl.isNotEmpty,
+              onChanged: _imageUrl.isEmpty ? null : (value) => setState(() => _enabled = value),
             ),
             OutlinedButton.icon(
               onPressed: _chooseImage,
