@@ -300,11 +300,8 @@ class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
     super.initState();
     _config = Map<String, dynamic>.from(widget.config);
     _imageBytes = widget.imageBytes;
-    if (_imageBytes == null || _imageBytes!.isEmpty) {
-      _refreshPublishedSplash();
-    } else {
-      _refreshPublishedSplash();
-    }
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    _refreshPublishedSplash();
   }
 
   Color get _background => DesignerAppBarConfig.color(
@@ -386,6 +383,9 @@ class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
               )
             : Image.memory(
                 bytes,
+                cacheWidth: (MediaQuery.sizeOf(context).width *
+                        MediaQuery.devicePixelRatioOf(context))
+                    .round().clamp(320, 2048),
                 fit: fit,
                 width: double.infinity,
                 height: double.infinity,
