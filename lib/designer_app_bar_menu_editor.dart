@@ -113,6 +113,7 @@ class _DesignerAppBarMenuEditorPageState extends State<DesignerAppBarMenuEditorP
                         imageUrl,
                         width: double.infinity,
                         height: 180,
+                        cacheWidth: (MediaQuery.sizeOf(context).width * MediaQuery.devicePixelRatioOf(context)).round().clamp(320, 1600).toInt(),
                         fit: BoxFit.contain,
                         gaplessPlayback: true,
                         errorBuilder: (_, __, ___) => const SizedBox(
