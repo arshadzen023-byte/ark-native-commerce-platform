@@ -1754,7 +1754,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (title.isNotEmpty)
+                  if (title.isNotEmpty || (countdownEnabled && countdownExpiry != null))
                     Padding(
                       padding: EdgeInsets.only(
                         bottom: ((properties['title_bottom_spacing'] as num?)?.toDouble() ?? 4)
@@ -1767,7 +1767,8 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                                 ? CrossAxisAlignment.end
                                 : CrossAxisAlignment.start,
                         children: [
-                          GestureDetector(
+                          if (title.isNotEmpty)
+                            GestureDetector(
                             onTap: isBanner && isSlider ? onEdit : null,
                             child: SizedBox(
                               width: double.infinity,
