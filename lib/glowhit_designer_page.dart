@@ -960,6 +960,12 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         'show_title': true,
         'countdown_enabled': false,
         'countdown_time': '',
+        'countdown_size': 18.0,
+        'countdown_alignment': 'left',
+        'countdown_background_color': '#51408F',
+        'countdown_text_color': '#FFFFFF',
+        'countdown_label_color': '#EDE7F8',
+        'title_bottom_spacing': 4.0,
         'title_font_size': 18.0,
         'title_font_weight': 'bold',
         'title_text_align': 'left',
@@ -1758,7 +1764,7 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                     Padding(
                       padding: EdgeInsets.only(
                         bottom: ((properties['title_bottom_spacing'] as num?)?.toDouble() ?? 4)
-                            .clamp(0, 6).toDouble(),
+                            .clamp(0, 60).toDouble(),
                       ),
                       child: Column(
                         crossAxisAlignment: titleAlignment == TextAlign.center
@@ -1800,16 +1806,17 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                           if (countdownEnabled && countdownExpiry != null)
                             Padding(
                               padding: const EdgeInsets.only(top: 4),
-                              child: Align(
-                                alignment: titleAlignment == TextAlign.center
-                                    ? Alignment.center
-                                    : titleAlignment == TextAlign.right
-                                        ? Alignment.centerRight
-                                        : Alignment.centerLeft,
-                                child: DesignerCountdownCard(
-                                  target: countdownExpiry,
-                                  titleFontSize: titleFontSize,
-                                ),
+                              child: DesignerCountdownCard(
+                                target: countdownExpiry,
+                                size: (properties['countdown_size'] as num?)?.toDouble() ?? 18,
+                                backgroundColor: _color((properties['countdown_background_color'] ?? '#51408F').toString()),
+                                textColor: _color((properties['countdown_text_color'] ?? '#FFFFFF').toString()),
+                                labelColor: _color((properties['countdown_label_color'] ?? '#EDE7F8').toString()),
+                                alignment: switch ((properties['countdown_alignment'] ?? properties['title_text_align'] ?? 'left').toString()) {
+                                  'center' => Alignment.center,
+                                  'right' => Alignment.centerRight,
+                                  _ => Alignment.centerLeft,
+                                },
                               ),
                             ),
                         ],
@@ -2927,12 +2934,27 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           onSelectionChanged: (selection) => _change('title_text_align', selection.first),
         ),
         const SizedBox(height: 10),
+        _slider('Title to Content Gap', 'title_bottom_spacing', min: 0, max: 60),
         _switch('Countdown Time', 'countdown_enabled'),
         if (item.properties['countdown_enabled'] == true) ...[
           _CountdownDateTimeSettings(
             initialValue: (item.properties['countdown_time'] ?? '').toString(),
             onChanged: (value) => _change('countdown_time', value),
           ),
+          _slider('Countdown Size', 'countdown_size', min: 10, max: 40),
+          const Text('Countdown Position', style: TextStyle(fontWeight: FontWeight.w700)),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'left', label: Text('Left'), icon: Icon(Icons.format_align_left)),
+              ButtonSegment(value: 'center', label: Text('Centre'), icon: Icon(Icons.format_align_center)),
+              ButtonSegment(value: 'right', label: Text('Right'), icon: Icon(Icons.format_align_right)),
+            ],
+            selected: {['left', 'center', 'right'].contains((item.properties['countdown_alignment'] ?? item.properties['title_text_align'] ?? 'left').toString()) ? (item.properties['countdown_alignment'] ?? item.properties['title_text_align'] ?? 'left').toString() : 'left'},
+            onSelectionChanged: (selection) => _change('countdown_alignment', selection.first),
+          ),
+          _colorChoice('Countdown Box Colour', 'countdown_background_color', const ['#51408F', '#202033', '#16734A', '#B23B32', '#1B6CA8', '#FFFFFF']),
+          _colorChoice('Countdown Number Colour', 'countdown_text_color', const ['#FFFFFF', '#202033', '#51408F', '#16734A', '#B23B32', '#1B6CA8']),
+          _colorChoice('Countdown Label Colour', 'countdown_label_color', const ['#EDE7F8', '#FFFFFF', '#202033', '#51408F', '#FFF0E6', '#E8F6F0']),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Hide component when countdown ends'),
