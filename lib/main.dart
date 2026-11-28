@@ -338,7 +338,6 @@ class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
       }
     } catch (_) {
       if (!mounted) return;
-      _remoteResolved = true;
       if (_imageBytes == null || _imageBytes!.isEmpty) {
         _timer ??= Timer(const Duration(milliseconds: 900), () {
           if (mounted) setState(() => _showSplash = false);
