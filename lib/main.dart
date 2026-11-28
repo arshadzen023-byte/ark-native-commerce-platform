@@ -874,6 +874,9 @@ class _StoreHomeState extends State<StoreHome> {
                           child: Image.network(
                             config.menuHeaderImageUrl,
                             width: double.infinity,
+                            cacheWidth: (MediaQuery.sizeOf(ctx).width *
+                                    MediaQuery.devicePixelRatioOf(ctx))
+                                .round().clamp(320, 1600).toInt(),
                             fit: BoxFit.contain,
                             alignment: Alignment.center,
                             gaplessPlayback: true,
