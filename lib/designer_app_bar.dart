@@ -338,7 +338,7 @@ class DesignerAppBarView extends StatelessWidget {
     Widget iconButton(String key,VoidCallback action,{bool badge=false}) {
       final family=(data['${key}_icon_family']??'Material').toString();
       final name=(data['${key}_icon']??'').toString();
-      final icon=DesignerNavIcons.icon(family,name,color:fg,size:config.iconSize);
+      final icon=DesignerNavIcons.icon(family,name,color:iconColor,size:config.iconSize);
       return IconButton(
         visualDensity:VisualDensity.compact,
         constraints:const BoxConstraints(minWidth:40,minHeight:40),
@@ -354,7 +354,7 @@ class DesignerAppBarView extends StatelessWidget {
       padding:EdgeInsets.zero,
       tooltip:(action['label']??'Action').toString(),
       onPressed:()=>onCustomAction(action),
-      icon:DesignerNavIcons.icon((action['icon_family']??'Material').toString(),(action['icon']??'star_outline').toString(),color:fg,size:config.iconSize),
+      icon:DesignerNavIcons.icon((action['icon_family']??'Material').toString(),(action['icon']??'star_outline').toString(),color:iconColor,size:config.iconSize),
     );
     Widget searchField() => Container(
       height:46,
@@ -414,7 +414,7 @@ class DesignerAppBarView extends StatelessWidget {
         padding:EdgeInsets.zero,
         tooltip:'Menu',
         onPressed:onMenu,
-        icon:DesignerNavIcons.icon((data['menu_icon_family']??'Material').toString(),(data['menu_icon']??'menu').toString(),color:fg,size:config.iconSize),
+        icon:DesignerNavIcons.icon((data['menu_icon_family']??'Material').toString(),(data['menu_icon']??'menu').toString(),color:iconColor,size:config.iconSize),
       ),
       if(config.show('show_logo')) ...[
         if(config.logoUrl.isNotEmpty) ClipRRect(borderRadius:BorderRadius.circular(6),child:Image.network(config.logoUrl,width:36,height:36,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const SizedBox.shrink())),
