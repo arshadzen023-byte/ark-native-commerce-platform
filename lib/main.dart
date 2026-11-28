@@ -179,17 +179,53 @@ class _GlowHitSplashGateState extends State<GlowHitSplashGate> {
   Future<void> _loadSplashConfig() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString('glowhit_designer_splash_config');
-      if (raw == null || raw.isEmpty) return;
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) return;
-      final config = Map<String, dynamic>.from(decoded);
-      final url = (config['image_url'] ?? '').toString().trim();
-      if (url.isEmpty || !mounted) return;
-      setState(() {
-        _config = config;
-        _showSplash = true;
-      });
+      // Use cached published settings immediately, then refresh the public
+      // WordPress config so every installed phone receives Designer publishes.
+      final cached = prefs.getString('glowhit_published_splash_config') ??
+          prefs.getString('glowhit_designer_splash_config');
+      if (cached != null && cached.isNotEmpty) {
+        final decoded = jsonDecode(cached);
+        if (decoded is Map) {
+          final local = Map<String, dynamic>.from(decoded);
+          final localUrl = (local['image_url'] ?? '').toString().trim();
+          if (local['enabled'] != false && localUrl.isNotEmpty && mounted) {
+            setState(() { _config = local; _showSplash = true; });
+          }
+        }
+      }
+      try {
+        final response = await http.get(
+          Uri.parse('$storeUrl/wp-json/ark-designer/v1/config'),
+          headers: const {'Accept': 'application/json'},
+        ).timeout(const Duration(seconds: 7));
+        if (response.statusCode == 200) {
+          final payload = jsonDecode(response.body);
+          if (payload is Map && payload['splash'] is Map) {
+            final root = Map<String, dynamic>.from(payload);
+            final remote = Map<String, dynamic>.from(payload['splash'] as Map);
+            final config = <String, dynamic>{
+              'enabled': remote['enabled'] != false,
+              'image_url': (remote['image_url'] ?? '').toString(),
+              'attachment_id': remote['attachment_id'] ?? 0,
+              'duration_seconds': (((remote['duration_ms'] as num?)?.toInt() ?? 3000) / 1000).round().clamp(1, 15),
+              'fit': remote['fit'] ?? 'contain',
+              'image_scale': remote['image_scale'] ?? 1,
+              'background_color': remote['background'] ?? '#FFFFFF',
+              'version': root['version'] ?? root['updated_at'] ?? '',
+            };
+            await prefs.setString('glowhit_published_splash_config', jsonEncode(config));
+            if (!mounted) return;
+            setState(() {
+              _timer?.cancel();
+              _timerStarted = false;
+              _config = config;
+              _showSplash = config['enabled'] == true && config['image_url'].toString().trim().isNotEmpty;
+            });
+          }
+        }
+      } catch (_) {
+        // Previously published cache remains usable offline.
+      }
     } catch (_) {
       // The store remains usable if splash settings are missing or invalid.
     }
@@ -388,9 +424,44 @@ class _GlowHitPinnedSearchAddressHeaderDelegate extends SliverPersistentHeaderDe
 class _DesignerCountdownBadge extends StatefulWidget {
   const _DesignerCountdownBadge({required this.target});
   final DateTime target;
+  @override State<_DesignerCountdownBadge> createState() => _DesignerCountdownBadgeState();
+}
 
-  @override
-  State<_DesignerCountdownBadge> createState() => _DesignerCountdownBadgeState();
+class _DesignerCountdownBadgeState extends State<_DesignerCountdownBadge> {
+  Timer? _ticker;
+  @override void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) { if (mounted) setState(() {}); });
+  }
+  @override void dispose() { _ticker?.cancel(); super.dispose(); }
+  @override Widget build(BuildContext context) {
+    final difference = widget.target.difference(DateTime.now());
+    final total = difference.isNegative ? 0 : difference.inSeconds;
+    final values = <(String, String)>[
+      ('${total ~/ 86400}', 'DAYS'),
+      (((total % 86400) ~/ 3600).toString().padLeft(2, '0'), 'HOURS'),
+      (((total % 3600) ~/ 60).toString().padLeft(2, '0'), 'MINUTES'),
+      ((total % 60).toString().padLeft(2, '0'), 'SECONDS'),
+    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(color: const Color(0xFF51408F), borderRadius: BorderRadius.circular(14),
+        boxShadow: const [BoxShadow(color: Color(0x2251408F), blurRadius: 8, offset: Offset(0, 3))]),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        for (var i = 0; i < values.length; i++) ...[
+          if (i > 0) const SizedBox(width: 5),
+          Container(constraints: const BoxConstraints(minWidth: 42),
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(.14), borderRadius: BorderRadius.circular(9)),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(values[i].$1, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800, height: 1.05)),
+              const SizedBox(height: 3),
+              Text(values[i].$2, style: const TextStyle(color: Colors.white70, fontSize: 7, fontWeight: FontWeight.w700, letterSpacing: .35)),
+            ])),
+        ],
+      ]),
+    );
+  }
 }
 
 class _DesignerCountdownBadgeState extends State<_DesignerCountdownBadge> {
