@@ -1945,37 +1945,7 @@ class _StoreHomeState extends State<StoreHome> {
           (config['padding_bottom'] as num?)?.toDouble() ?? 12,
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (showTitle || (countdownEnabled && countdownExpiry != null)) Padding(
-  padding: EdgeInsets.only(
-    left: 4,
-    bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4).clamp(0, 60).toDouble(),
-  ),
-  child: Column(
-    crossAxisAlignment: titleAlignment == TextAlign.center
-        ? CrossAxisAlignment.center
-        : titleAlignment == TextAlign.right
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
-    children: [
-      if (showTitle) SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle())),
-      if (countdownEnabled && countdownExpiry != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Align(
-            alignment: titleAlignment == TextAlign.center
-                ? Alignment.center
-                : titleAlignment == TextAlign.right
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
-            child: DesignerCountdownCard(
-              target: countdownExpiry,
-              titleFontSize: (config['title_font_size'] as num?)?.toDouble() ?? 18,
-            ),
-          ),
-        ),
-    ],
-  ),
-),
+          if (showTitle || (countdownEnabled && countdownExpiry != null)) buildSectionHeading(),
           if (layout.contains('carousel') || layout.contains('slider') || layout.contains('scroll'))
             SizedBox(
               height: cardHeight,
