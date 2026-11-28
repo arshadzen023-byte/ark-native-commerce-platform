@@ -290,7 +290,6 @@ class SplashLaunchScreen extends StatefulWidget {
 class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
   bool _showSplash = true;
   bool _durationStarted = false;
-  bool _remoteResolved = false;
   Timer? _timer;
   Uint8List? _imageBytes;
   late Map<String, dynamic> _config;
@@ -322,7 +321,6 @@ class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
     try {
       final latest = await _loadSplashStartupData();
       if (!mounted) return;
-      _remoteResolved = true;
       if (latest.config['enabled'] == true &&
           latest.imageBytes != null && latest.imageBytes!.isNotEmpty) {
         setState(() {
@@ -385,7 +383,7 @@ class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
                 bytes,
                 cacheWidth: (MediaQuery.sizeOf(context).width *
                         MediaQuery.devicePixelRatioOf(context))
-                    .round().clamp(320, 2048),
+                    .round().clamp(320, 2048).toInt(),
                 fit: fit,
                 width: double.infinity,
                 height: double.infinity,
