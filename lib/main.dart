@@ -165,44 +165,53 @@ class GlowHitSplashGate extends StatefulWidget {
 }
 
 class _GlowHitSplashGateState extends State<GlowHitSplashGate> {
-  bool _ready = false;
-  bool _showSplash = false;
   Map<String, dynamic> _config = const {};
+  bool _showSplash = false;
+  bool _timerStarted = false;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _loadSplash();
+    _loadSplashConfig();
   }
 
-  Future<void> _loadSplash() async {
+  Future<void> _loadSplashConfig() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString('glowhit_designer_splash_config');
-      if (raw != null && raw.isNotEmpty) {
-        _config = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-      }
-      final url = (_config['image_url'] ?? '').toString().trim();
-      if (url.isEmpty) {
-        if (mounted) setState(() => _ready = true);
-        return;
-      }
-      try {
-        await precacheImage(NetworkImage(url), context).timeout(const Duration(seconds: 6));
-      } catch (_) {
-        if (mounted) setState(() => _ready = true);
-        return;
-      }
-      if (!mounted) return;
-      setState(() => _showSplash = true);
-      final seconds = ((_config['duration_seconds'] as num?)?.toInt() ?? 3).clamp(1, 15).toInt();
-      _timer = Timer(Duration(seconds: seconds), () {
-        if (mounted) setState(() => _ready = true);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      final config = Map<String, dynamic>.from(decoded);
+      final url = (config['image_url'] ?? '').toString().trim();
+      if (url.isEmpty || !mounted) return;
+      setState(() {
+        _config = config;
+        _showSplash = true;
       });
     } catch (_) {
-      if (mounted) setState(() => _ready = true);
+      // The store remains usable if splash settings are missing or invalid.
     }
+  }
+
+  void _startSplashTimerAfterFirstFrame() {
+    if (_timerStarted || !mounted) return;
+    _timerStarted = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final seconds = ((_config['duration_seconds'] as num?)?.toInt() ?? 3)
+          .clamp(1, 15).toInt();
+      _timer = Timer(Duration(seconds: seconds), () {
+        if (mounted) setState(() => _showSplash = false);
+      });
+    });
+  }
+
+  void _dismissSplash() {
+    if (!mounted) return;
+    _timer?.cancel();
+    setState(() => _showSplash = false);
   }
 
   @override
@@ -213,33 +222,47 @@ class _GlowHitSplashGateState extends State<GlowHitSplashGate> {
 
   @override
   Widget build(BuildContext context) {
-    if (_ready) return widget.child;
-    if (!_showSplash) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
     final fitName = (_config['fit'] ?? 'contain').toString();
-    final fit = fitName == 'cover' ? BoxFit.cover : fitName == 'fill' ? BoxFit.fill : BoxFit.contain;
-    final scale = ((_config['image_scale'] as num?)?.toDouble() ?? 1).clamp(.25, 2.0).toDouble();
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SizedBox.expand(
-        child: ClipRect(
-          child: Transform.scale(
-            scale: scale,
-            child: Image.network(
-              (_config['image_url'] ?? '').toString(),
-              fit: fit,
-              width: double.infinity,
-              height: double.infinity,
-              gaplessPlayback: true,
-              errorBuilder: (_, __, ___) => widget.child,
+    final fit = fitName == 'cover'
+        ? BoxFit.cover
+        : fitName == 'fill' ? BoxFit.fill : BoxFit.contain;
+    final scale = ((_config['image_scale'] as num?)?.toDouble() ?? 1)
+        .clamp(.25, 2.0).toDouble();
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        widget.child,
+        if (_showSplash)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ColoredBox(
+                color: DesignerAppBarConfig.color(
+                  (_config['background_color'] ?? '#FFFFFF').toString(),
+                ),
+                child: Image.network(
+                  (_config['image_url'] ?? '').toString(),
+                  fit: fit,
+                  width: double.infinity,
+                  height: double.infinity,
+                  gaplessPlayback: true,
+                  frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                    if (frame != null || wasSynchronouslyLoaded) {
+                      _startSplashTimerAfterFirstFrame();
+                      return Transform.scale(scale: scale, child: child);
+                    }
+                    // Keep the actual app rendered underneath while the
+                    // remote splash image is arriving; never show a loader.
+                    return const SizedBox.expand();
+                  },
+                  errorBuilder: (_, __, ___) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) => _dismissSplash());
+                    return const SizedBox.expand();
+                  },
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+      ],
     );
   }
 }
@@ -250,23 +273,26 @@ class SessionGate extends StatefulWidget {
 }
 
 class _SessionGateState extends State<SessionGate> {
-  bool checking = true;
   String? token;
-  @override void initState() { super.initState(); _check(); }
-  Future<void> _check() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('glowhit_customer_session');
-    if (saved != null && saved.isNotEmpty) {
-      try { await ArkCustomerApi(saved).request('customer/me'); token = saved; }
-      catch (_) { await prefs.remove('glowhit_customer_session'); token = null; }
+  @override void initState() {
+    super.initState();
+    _restoreLocalSession();
+  }
+
+  Future<void> _restoreLocalSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('glowhit_customer_session');
+      if (mounted && saved != null && saved.isNotEmpty) {
+        setState(() => token = saved);
+      }
+    } catch (_) {
+      // A missing preferences store must not prevent the Home page from opening.
     }
-    if (mounted) setState(() => checking = false);
   }
-  @override Widget build(BuildContext context) {
-    if (checking) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (token == null) return LoginLandingPage(onLogin: (value) => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => StoreHome(initialToken: value))));
-    return StoreHome(initialToken: token);
-  }
+
+  @override
+  Widget build(BuildContext context) => StoreHome(initialToken: token);
 }
 
 class LoginLandingPage extends StatelessWidget {
@@ -315,13 +341,13 @@ class _GlowHitPinnedSearchAddressHeaderDelegate extends SliverPersistentHeaderDe
     required this.minHeight,
     required this.maxHeight,
     required this.backgroundColor,
-    required this.child,
+    required this.childBuilder,
   });
 
   final double minHeight;
   final double maxHeight;
   final Color backgroundColor;
-  final Widget child;
+  final Widget Function(double collapseProgress) childBuilder;
 
   @override
   double get minExtent => minHeight;
@@ -331,23 +357,20 @@ class _GlowHitPinnedSearchAddressHeaderDelegate extends SliverPersistentHeaderDe
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    // Align bottom so the final Search/Address rows stay in place as the
-    // upper Menu/Logo/Actions row is clipped smoothly during scrolling.
+    final range = maxExtent - minExtent;
+    final progress = range <= 0
+        ? 1.0
+        : (shrinkOffset / range).clamp(0.0, 1.0).toDouble();
+    final currentHeight = maxExtent - (range * progress);
     return ColoredBox(
       color: backgroundColor,
-      child: LayoutBuilder(
-        builder: (context, constraints) => ClipRect(
-          child: OverflowBox(
-            alignment: Alignment.bottomCenter,
-            minWidth: constraints.maxWidth,
-            maxWidth: constraints.maxWidth,
-            minHeight: maxExtent,
-            maxHeight: maxExtent,
-            child: SizedBox(
-              height: maxExtent,
-              width: constraints.maxWidth,
-              child: child,
-            ),
+      child: ClipRect(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: SizedBox(
+            height: currentHeight,
+            width: double.infinity,
+            child: childBuilder(progress),
           ),
         ),
       ),
@@ -359,7 +382,7 @@ class _GlowHitPinnedSearchAddressHeaderDelegate extends SliverPersistentHeaderDe
       minHeight != oldDelegate.minHeight ||
       maxHeight != oldDelegate.maxHeight ||
       backgroundColor != oldDelegate.backgroundColor ||
-      child != oldDelegate.child;
+      childBuilder != oldDelegate.childBuilder;
 }
 
 class _DesignerCountdownBadge extends StatefulWidget {
@@ -441,6 +464,19 @@ class _StoreHomeState extends State<StoreHome> {
   String? customerToken;
   late final GlowHitPushService push;
   int notificationCount = 0;
+  @override
+  void didUpdateWidget(covariant StoreHome oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialToken != widget.initialToken) {
+      customerToken = widget.initialToken;
+      if (customerToken != null && customerToken!.isNotEmpty) {
+        push.register(customerJwt: customerToken);
+        _refreshCart();
+        _refreshNotificationCount();
+      }
+    }
+  }
+
   @override void initState() {
     super.initState();
     searchFocusNode.addListener(_handleSearchFocusChange);
@@ -1825,10 +1861,8 @@ class _StoreHomeState extends State<StoreHome> {
     // The App Bar collapses its top action/logo row during Home scrolling,
     // while Search and Delivery Address remain visible as pinned rows.
     final statusInset = MediaQuery.paddingOf(context).top;
-    final pinnedRowsHeight = statusInset
-        + (config.show('show_search') ? 50.0 : 0.0)
-        + (config.show('show_location') ? 32.0 : 0.0);
-    final fullHeaderHeight = (statusInset + config.renderHeight.toDouble())
+    final pinnedRowsHeight = statusInset + config.compactRenderHeight;
+    final fullHeaderHeight = (statusInset + config.renderHeight)
         .clamp(pinnedRowsHeight, 280.0).toDouble();
     return RefreshIndicator(
       onRefresh: _loadDesignerConfig,
@@ -1842,7 +1876,10 @@ class _StoreHomeState extends State<StoreHome> {
               minHeight: pinnedRowsHeight,
               maxHeight: fullHeaderHeight,
               backgroundColor: DesignerAppBarConfig.color(config.backgroundColor),
-              child: _buildConfiguredAppBar('home') ?? const SizedBox.shrink(),
+              childBuilder: (progress) => _buildConfiguredAppBar(
+                'home',
+                collapseProgress: progress,
+              ) ?? const SizedBox.shrink(),
             ),
           ),
           if (designerConfigLoading && sections.isEmpty)
@@ -2013,7 +2050,7 @@ class _StoreHomeState extends State<StoreHome> {
     ));
   }
 
-  PreferredSizeWidget? _buildConfiguredAppBar(String pageKey) {
+  PreferredSizeWidget? _buildConfiguredAppBar(String pageKey, {double collapseProgress = 0}) {
     final rawAppBar = designerConfig['app_bar'] is Map
         ? Map<String, dynamic>.from(designerConfig['app_bar'] as Map)
         : <String, dynamic>{};
@@ -2030,8 +2067,11 @@ class _StoreHomeState extends State<StoreHome> {
       systemNavigationBarColor: Colors.black,
       systemNavigationBarIconBrightness: Brightness.light,
     );
+    final progress = collapseProgress.clamp(0.0, 1.0).toDouble();
+    final renderedHeight = config.renderHeight -
+        ((config.renderHeight - config.compactRenderHeight) * progress);
     return PreferredSize(
-      preferredSize: Size.fromHeight(config.renderHeight + topInset),
+      preferredSize: Size.fromHeight(renderedHeight + topInset),
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: systemStyle,
         child: Column(
@@ -2047,9 +2087,10 @@ class _StoreHomeState extends State<StoreHome> {
             ]),
           ),
           SizedBox(
-            height: config.renderHeight,
+            height: renderedHeight,
             child: DesignerAppBarView(
         config: config,
+        collapseProgress: progress,
         pageKey: pageKey,
         cartCount: cartCount,
         searchController: searchController,
@@ -2140,7 +2181,13 @@ class _StoreHomeState extends State<StoreHome> {
     else if (tab == 3) page = _cartPage();
     else page = account();
     final currentPageKey = tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home') : tab == 1 ? 'categories' : tab == 2 ? 'wishlist' : tab == 3 ? 'cart' : 'account';
-    final PreferredSizeWidget activeAppBar = _buildConfiguredAppBar(currentPageKey) ?? AppBar(title: Text(titles[tab]), actions: [
+    final configuredAppBar = _buildConfiguredAppBar(currentPageKey);
+    final hasHomeDesignerSections = designerConfig['pages'] is Map &&
+        (designerConfig['pages'] as Map)['home'] is Map &&
+        ((designerConfig['pages'] as Map)['home'] as Map)['sections'] is List;
+    final useHomeSliverHeader = tab == 0 && hasHomeDesignerSections &&
+        configuredAppBar != null;
+    final PreferredSizeWidget activeAppBar = configuredAppBar ?? AppBar(title: Text(titles[tab]), actions: [
       if (tab == 0) IconButton(tooltip: 'ARK Designer', onPressed: _openDesigner, icon: const Icon(Icons.design_services_rounded)),
       if (tab == 0) IconButton(tooltip: 'Sync published layout', onPressed: _loadDesignerConfig, icon: const Icon(Icons.sync_rounded)),
       if (tab == 0) IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
@@ -2164,7 +2211,7 @@ class _StoreHomeState extends State<StoreHome> {
         if (tab != 0) setState(() => tab = 0);
       },
       child: Scaffold(
-      appBar: activeAppBar,
+      appBar: useHomeSliverHeader ? null : activeAppBar,
       body: SafeArea(top: false, child: page),
       floatingActionButton: _buildDesignerFloatingAction(
         tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home')
