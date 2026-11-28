@@ -12,8 +12,11 @@ class DesignerAppBarConfig {
   Map<String, dynamic> toJson() => Map<String, dynamic>.from(_json);
   bool get enabled => _json['enabled'] != false;
   double get height => ((_json['height'] as num?)?.toDouble() ?? 72).clamp(88.0,220.0).toDouble();
+  double get compactRenderHeight =>
+      10.0 + (show('show_search') ? 50.0 : 0.0) +
+      (show('show_location') ? 44.0 : 0.0);
   double get renderHeight {
-    final minimum = 50.0 + (show('show_search') ? 50.0 : 0.0) + (show('show_location') ? 32.0 : 0.0);
+    final minimum = 40.0 + compactRenderHeight;
     return height < minimum ? minimum : height;
   }
   double get spacing => ((_json['spacing'] as num?)?.toDouble() ?? 8).clamp(0.0,32.0).toDouble();
@@ -51,7 +54,7 @@ class DesignerAppBarConfig {
 
   static const pageKeys = ['home','search','categories','wishlist','product','account','cart','orders','notifications'];
   static const defaults = <String,dynamic>{
-    'version':1,'enabled':true,'preset':'custom','background_color':'#FFFFFF','foreground_color':'#202124',
+    'version':1,'enabled':true,'preset':'custom','background_color':'#FFFFFF','foreground_color':'#202124','icon_color':'#202124',
     'background_image_url':'','background_image_id':0,'background_mime_type':'','logo_url':'','menu_header_image_url':'','menu_header_image_id':0,'menu_items':defaultMenuItems,'address_text_color':'#202124','extend_under_status_bar':true,'status_bar_background':'#FFFFFF','status_bar_icon_brightness':'dark','icon_size':22.0,'horizontal_padding':10.0,'left_padding':10.0,'right_padding':10.0,'height':156.0,'spacing':8.0,'radius':12.0,'position':'top',
     'show_menu':true,'show_logo':true,'show_cart':true,'show_voice_search':true,'show_search':true,'show_wishlist':true ,'show_refresh':false,'show_location':true,
     'search_placeholder':'Search products...',
@@ -92,6 +95,7 @@ class DesignerAppBarConfig {
     out['menu_header_image_id'] = (source['menu_header_image_id'] as num?)?.toInt() ?? int.tryParse((source['menu_header_image_id'] ?? '0').toString()) ?? 0;
     out['background_image_id'] = (source['background_image_id'] as num?)?.toInt() ?? int.tryParse((source['background_image_id'] ?? '0').toString()) ?? 0;
     out['address_text_color'] = _validHex(source['address_text_color']) ? source['address_text_color'] : '#202124';
+    out['icon_color'] = _validHex(source['icon_color']) ? source['icon_color'] : out['foreground_color'];
     out['extend_under_status_bar'] = source['extend_under_status_bar'] != false;
     out['status_bar_background'] = _validHex(source['status_bar_background']) ? source['status_bar_background'] : out['background_color'];
     out['status_bar_icon_brightness'] = source['status_bar_icon_brightness'] == 'light' ? 'light' : 'dark';
@@ -253,6 +257,7 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
         switchTile('show_search','Search',Icons.search),switchTile('show_wishlist','Wishlist',Icons.favorite_border),
         switchTile('show_refresh','Refresh',Icons.refresh),switchTile('show_location','Address / Location',Icons.location_on_outlined),
         switchTile('extend_under_status_bar','Extend background into Status Bar',Icons.vertical_align_top),
+        _colorPickerTile('icon_color','App Bar Icons Colour'),
         _colorPickerTile('address_text_color','Delivery Address Text Colour'),
         _colorPickerTile('status_bar_background','Status Bar Colour'),
         DropdownButtonFormField<String>(value:config.statusBarIconBrightness,decoration:const InputDecoration(labelText:'Status Bar Icon Brightness'),items:const [DropdownMenuItem(value:'dark',child:Text('Dark icons')),DropdownMenuItem(value:'light',child:Text('Light icons'))],onChanged:(v)=>setValue('status_bar_icon_brightness',v??'dark')),
@@ -317,14 +322,18 @@ class _DesignerAppBarBuilderPageState extends State<DesignerAppBarBuilderPage> {
 }
 
 class DesignerAppBarView extends StatelessWidget {
-  const DesignerAppBarView({super.key,required this.config,required this.pageKey,required this.cartCount,required this.searchController,required this.searchFocusNode,required this.onSearchSubmitted,required this.onMenu,required this.onCart,required this.onSearch,required this.onVoiceSearch,required this.onWishlist,required this.onRefresh,required this.onLocation,required this.onCustomAction});
+  const DesignerAppBarView({super.key,required this.config,required this.pageKey,required this.cartCount,required this.searchController,required this.searchFocusNode,required this.onSearchSubmitted,required this.onMenu,required this.onCart,required this.onSearch,required this.onVoiceSearch,required this.onWishlist,required this.onRefresh,required this.onLocation,required this.onCustomAction,this.collapseProgress=0});
   final DesignerAppBarConfig config;final String pageKey;final int cartCount;final TextEditingController searchController;final FocusNode searchFocusNode;final ValueChanged<String> onSearchSubmitted;
   final VoidCallback onMenu,onCart,onSearch,onVoiceSearch,onWishlist,onRefresh,onLocation;
   final ValueChanged<Map<String,dynamic>> onCustomAction;
+  final double collapseProgress;
   @override Widget build(BuildContext context){
     if(!config.enabled||!config.visibleOn(pageKey))return const SizedBox.shrink();
     final data=config.toJson();
     final fg=DesignerAppBarConfig.color((data['foreground_color']??'#202124').toString(),fallback:Colors.black);
+    final iconColor=DesignerAppBarConfig.color((data['icon_color']??data['foreground_color']??'#202124').toString(),fallback:fg);
+    final progress=collapseProgress.clamp(0.0,1.0).toDouble();
+    final currentHeight=config.renderHeight-((config.renderHeight-config.compactRenderHeight)*progress);
     final bg=DesignerAppBarConfig.color((data['background_color']??'#FFFFFF').toString());
     Widget iconButton(String key,VoidCallback action,{bool badge=false}) {
       final family=(data['${key}_icon_family']??'Material').toString();
@@ -366,7 +375,7 @@ class DesignerAppBarView extends StatelessWidget {
           isDense:true,
           hint: _RotatingSearchHint(terms: config.searchTerms.isEmpty ? [(data['search_placeholder']??'Search products...').toString()] : config.searchTerms, style: const TextStyle(color:Colors.black54,fontSize:14)),
           hintStyle:const TextStyle(color:Colors.black54,fontSize:14),
-          prefixIcon:DesignerNavIcons.icon((data['search_icon_family']??'Material').toString(),(data['search_icon']??'search').toString(),color:Colors.black54,size:config.iconSize),
+          prefixIcon:DesignerNavIcons.icon((data['search_icon_family']??'Material').toString(),(data['search_icon']??'search').toString(),color:iconColor,size:config.iconSize),
           prefixIconConstraints:const BoxConstraints(minWidth:44,minHeight:46),
           suffixIcon:Row(
             mainAxisSize:MainAxisSize.min,
@@ -377,7 +386,7 @@ class DesignerAppBarView extends StatelessWidget {
                 padding:EdgeInsets.zero,
                 tooltip:'Voice Search',
                 onPressed:onVoiceSearch,
-                icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:_appBarAccent,size:config.iconSize),
+                icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:iconColor,size:config.iconSize),
               ),
               IconButton(
                 visualDensity:VisualDensity.compact,
@@ -388,7 +397,7 @@ class DesignerAppBarView extends StatelessWidget {
                   searchController.clear();
                   searchFocusNode.unfocus();
                 },
-                icon:const Icon(Icons.close,color:Colors.black54),
+                icon:Icon(Icons.close,color:iconColor),
               ),
             ],
           ),
@@ -429,7 +438,15 @@ class DesignerAppBarView extends StatelessWidget {
       child:Column(
         mainAxisSize:MainAxisSize.min,
         children:[
-          SizedBox(height:40,child:topRow),
+          SizedBox(
+            height:40.0*(1.0-progress),
+            child:ClipRect(
+              child:Opacity(
+                opacity:1.0-progress,
+                child:IgnorePointer(ignoring:progress>=0.98,child:topRow),
+              ),
+            ),
+          ),
           if(config.show('show_search')) Padding(padding:const EdgeInsets.only(top:4),child:searchField()),
           if(config.show('show_location')) Padding(
             padding:const EdgeInsets.only(top:4),
@@ -439,10 +456,10 @@ class DesignerAppBarView extends StatelessWidget {
               child:Padding(
                 padding:const EdgeInsets.symmetric(horizontal:3,vertical:4),
                 child:Row(children:[
-                  DesignerNavIcons.icon((data['location_icon_family']??'Material').toString(),(data['location_icon']??'location_on_outlined').toString(),color:fg,size:config.iconSize),
+                  DesignerNavIcons.icon((data['location_icon_family']??'Material').toString(),(data['location_icon']??'location_on_outlined').toString(),color:iconColor,size:config.iconSize),
                   const SizedBox(width:6),
                   Expanded(child:Text((data['address_label']??'Deliver to your address').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:TextStyle(color:DesignerAppBarConfig.color(config.addressTextColor,fallback:Colors.black),fontSize:14,fontWeight:FontWeight.w800,height:1.15))),
-                  Icon(Icons.chevron_right,color:fg,size:17),
+                  Icon(Icons.chevron_right,color:iconColor,size:17),
                 ]),
               ),
             ),
@@ -454,7 +471,7 @@ class DesignerAppBarView extends StatelessWidget {
       borderRadius:BorderRadius.circular(config.position=='floating'?config.radius:0),
       child: SizedBox(
         width:double.infinity,
-        height:config.renderHeight,
+        height:currentHeight,
         child:Stack(fit:StackFit.expand,children:[
           if(imageProvider!=null) Image(image:imageProvider,fit:BoxFit.cover,gaplessPlayback:true,errorBuilder:(_,__,___)=>ColoredBox(color:bg)),
           body,
