@@ -389,6 +389,14 @@ jobs:
             fi
           done
           exit 1
+      - name: Report per-ABI APK sizes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for apk in build/app/outputs/flutter-apk/*-release.apk; do
+            test -f "$apk"
+            du -h "$apk"
+          done
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
