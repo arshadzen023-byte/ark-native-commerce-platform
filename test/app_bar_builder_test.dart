@@ -271,9 +271,6 @@ void main() {
     expect(DateTime.tryParse(properties['countdown_time'] as String), DateTime(2027, 1, 15, 18, 30));
     expect(properties['countdown_auto_hide'], isTrue);
   });
-}
-
-
   test('compact app bar keeps only search and address rows after collapse', () {
     final config = DesignerAppBarConfig(json: const {
       'show_search': true,
@@ -293,3 +290,4 @@ void main() {
     });
     expect(config.toJson()['icon_color'], '#FF3366');
   });
+}
