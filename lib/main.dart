@@ -163,7 +163,7 @@ class _SplashStartupData {
   final Uint8List? imageBytes;
 }
 
-Future<_SplashStartupData> _loadSplashStartupData() async {
+Future<_SplashStartupData> _loadSplashStartupData({bool fetchRemote = true}) async {
   Map<String, dynamic> cachedConfig = const {};
   Uint8List? cachedBytes;
   String cachedUrl = '';
@@ -183,6 +183,13 @@ Future<_SplashStartupData> _loadSplashStartupData() async {
     if (cachedPath != null && cachedPath.isNotEmpty) {
       final file = File(cachedPath);
       if (await file.exists()) cachedBytes = await file.readAsBytes();
+    }
+
+    if (!fetchRemote) {
+      return _SplashStartupData(
+        config: cachedConfig,
+        imageBytes: cachedConfig['enabled'] == true ? cachedBytes : null,
+      );
     }
 
     final configResponse = await http.get(
@@ -256,8 +263,9 @@ Future<_SplashStartupData> _loadSplashStartupData() async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final splash = await _loadSplashStartupData();
-  if (splash.imageBytes != null) WidgetsBinding.instance.deferFirstFrame();
+  // Read only the local cache before runApp. Never hold the first Flutter
+  // frame while waiting for WordPress or a remote image download.
+  final splash = await _loadSplashStartupData(fetchRemote: false);
   runApp(GlowHitApp(
     initialSplashConfig: splash.config,
     initialSplashBytes: splash.imageBytes,
@@ -272,7 +280,7 @@ class SplashLaunchScreen extends StatefulWidget {
     required this.child,
   });
   final Map<String, dynamic> config;
-  final Uint8List imageBytes;
+  final Uint8List? imageBytes;
   final Widget child;
 
   @override
@@ -281,74 +289,117 @@ class SplashLaunchScreen extends StatefulWidget {
 
 class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
   bool _showSplash = true;
-  bool _frameReleaseScheduled = false;
-  bool _nativeFrameAllowed = false;
+  bool _durationStarted = false;
+  bool _remoteResolved = false;
   Timer? _timer;
+  Uint8List? _imageBytes;
+  late Map<String, dynamic> _config;
 
-  Color get _background => DesignerAppBarConfig.color(
-    (widget.config['background_color'] ?? '#FFFFFF').toString(),
-  );
-
-  void _allowNativeFrame() {
-    if (_nativeFrameAllowed) return;
-    _nativeFrameAllowed = true;
-    WidgetsBinding.instance.allowFirstFrame();
+  @override
+  void initState() {
+    super.initState();
+    _config = Map<String, dynamic>.from(widget.config);
+    _imageBytes = widget.imageBytes;
+    if (_imageBytes == null || _imageBytes!.isEmpty) {
+      _refreshPublishedSplash();
+    } else {
+      _refreshPublishedSplash();
+    }
   }
 
-  void _releaseNativeFrame({required bool startDuration}) {
-    if (_frameReleaseScheduled || !mounted) return;
-    _frameReleaseScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _allowNativeFrame();
+  Color get _background => DesignerAppBarConfig.color(
+    (_config['background_color'] ?? '#FFFFFF').toString(),
+  );
+
+  void _startDuration() {
+    if (_durationStarted || !mounted) return;
+    _durationStarted = true;
+    final seconds = ((_config['duration_seconds'] as num?)?.toInt() ?? 3)
+        .clamp(1, 15).toInt();
+    _timer = Timer(Duration(seconds: seconds), () {
+      if (mounted) setState(() => _showSplash = false);
+    });
+  }
+
+  Future<void> _refreshPublishedSplash() async {
+    try {
+      final latest = await _loadSplashStartupData();
       if (!mounted) return;
-      if (startDuration) {
-        final seconds = ((widget.config['duration_seconds'] as num?)?.toInt() ?? 3)
-            .clamp(1, 15).toInt();
-        _timer = Timer(Duration(seconds: seconds), () {
+      _remoteResolved = true;
+      if (latest.config['enabled'] == true &&
+          latest.imageBytes != null && latest.imageBytes!.isNotEmpty) {
+        setState(() {
+          _config = Map<String, dynamic>.from(latest.config);
+          _imageBytes = latest.imageBytes;
+        });
+      } else if (_imageBytes == null || _imageBytes!.isEmpty) {
+        // A disabled/missing splash should not strand the customer on a
+        // loading screen. Show the native brand fallback briefly, then Home.
+        _timer ??= Timer(const Duration(milliseconds: 650), () {
           if (mounted) setState(() => _showSplash = false);
         });
-      } else {
+      } else if (latest.config['enabled'] == false) {
         setState(() => _showSplash = false);
       }
-    });
+    } catch (_) {
+      if (!mounted) return;
+      _remoteResolved = true;
+      if (_imageBytes == null || _imageBytes!.isEmpty) {
+        _timer ??= Timer(const Duration(milliseconds: 900), () {
+          if (mounted) setState(() => _showSplash = false);
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    _allowNativeFrame();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     if (!_showSplash) return widget.child;
-    final fitName = (widget.config['fit'] ?? 'contain').toString();
+    final fitName = (_config['fit'] ?? 'contain').toString();
     final fit = fitName == 'cover'
         ? BoxFit.cover
         : fitName == 'fill' ? BoxFit.fill : BoxFit.contain;
-    final scale = ((widget.config['image_scale'] as num?)?.toDouble() ?? 1)
+    final scale = ((_config['image_scale'] as num?)?.toDouble() ?? 1)
         .clamp(.25, 2.0).toDouble();
+    final bytes = _imageBytes;
     return SizedBox.expand(
       child: ColoredBox(
         color: _background,
-        child: Image.memory(
-          widget.imageBytes,
-          fit: fit,
-          width: double.infinity,
-          height: double.infinity,
-          gaplessPlayback: true,
-          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-            if (frame != null || wasSynchronouslyLoaded) {
-              _releaseNativeFrame(startDuration: true);
-            }
-            return Transform.scale(scale: scale, child: child);
-          },
-          errorBuilder: (_, __, ___) {
-            _releaseNativeFrame(startDuration: false);
-            return ColoredBox(color: _background);
-          },
-        ),
+        child: bytes == null || bytes.isEmpty
+            ? const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.shopping_bag_rounded, size: 54, color: purple),
+                    SizedBox(height: 12),
+                    Text('GlowHit', style: TextStyle(
+                      color: purple, fontSize: 25, fontWeight: FontWeight.w800,
+                    )),
+                  ],
+                ),
+              )
+            : Image.memory(
+                bytes,
+                fit: fit,
+                width: double.infinity,
+                height: double.infinity,
+                gaplessPlayback: true,
+                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                  if (frame != null || wasSynchronouslyLoaded) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) _startDuration();
+                    });
+                  }
+                  return Transform.scale(scale: scale, child: child);
+                },
+                errorBuilder: (_, __, ___) => ColoredBox(color: _background),
+              ),
       ),
     );
   }
@@ -424,13 +475,11 @@ class GlowHitApp extends StatelessWidget {
     title: 'GlowHit Shopping',
     debugShowCheckedModeBanner: false,
     theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: purple), scaffoldBackgroundColor: const Color(0xFFF7F6FA)),
-    home: initialSplashBytes == null
-        ? const SessionGate()
-        : SplashLaunchScreen(
-            config: initialSplashConfig,
-            imageBytes: initialSplashBytes!,
-            child: const SessionGate(),
-          ),
+    home: SplashLaunchScreen(
+      config: initialSplashConfig,
+      imageBytes: initialSplashBytes,
+      child: const SessionGate(),
+    ),
   );
 }
 
