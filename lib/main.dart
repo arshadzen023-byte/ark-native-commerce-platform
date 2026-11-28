@@ -803,28 +803,143 @@ class _StoreHomeState extends State<StoreHome> {
     if (canManageDesigner && !hasDesigner) {
       menuItems.add({'id':'ark-designer','title':'ARK Designer','link_type':'deep_link','link_value':'ark_designer','leading_icon_family':'Material','leading_icon':'design_services','visible':true,'admin_only':true});
     }
+    final visibleMenuItems = menuItems.where((item) {
+      final target = (item['link_value'] ?? '').toString();
+      final isDesigner = target == 'ark_designer' || target == 'designer';
+      return item['visible'] != false &&
+          (canManageDesigner || (item['admin_only'] != true && !isDesigner));
+    }).toList();
     final choice = await showModalBottomSheet<Map<String,dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => SafeArea(child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * .82),
-        decoration: const BoxDecoration(color: Color(0xFFFFFBFF), borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width:42,height:4,margin:const EdgeInsets.only(top:10,bottom:8),decoration:BoxDecoration(color:Colors.black26,borderRadius:BorderRadius.circular(5))),
-          if (config.menuHeaderImageUrl.isNotEmpty)
-            ClipRRect(borderRadius:BorderRadius.circular(14),child:Padding(padding:const EdgeInsets.fromLTRB(14,4,14,10),child:Image.network(config.menuHeaderImageUrl,width:double.infinity,height:118,fit:BoxFit.cover,gaplessPlayback:true,filterQuality:FilterQuality.medium,errorBuilder:(_,__,___)=>const SizedBox.shrink()))),
-          Flexible(child:ListView(shrinkWrap:true,padding:const EdgeInsets.fromLTRB(12,4,12,18),children:[
-            for(final item in menuItems.where((e){final target=(e['link_value']??'').toString();final isDesigner=target=='ark_designer'||target=='designer';return e['visible']!=false && (canManageDesigner || (e['admin_only']!=true && !isDesigner));}))
-              ListTile(
-                leading: _menuLeadingIcon(item),
-                title: Text((item['title']??'Menu item').toString(),style:const TextStyle(fontWeight:FontWeight.w700)),
-                trailing: DesignerNavIcons.icon((item['trailing_icon_family']??'Material').toString(),(item['trailing_icon']??'chevron_right').toString(),color:const Color(0xFF51408F),size:20),
-                onTap:()=>Navigator.pop(ctx,item),
-              ),
-          ])),
-        ]),
-      )),
+      builder: (ctx) {
+        final screenHeight = MediaQuery.sizeOf(ctx).height;
+        return SafeArea(
+          child: Container(
+            constraints: BoxConstraints(maxHeight: screenHeight * .9),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFFBFF),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  margin: const EdgeInsets.only(top: 11, bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 16, 8),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Explore GlowHit', style: TextStyle(
+                              fontSize: 19, fontWeight: FontWeight.w800,
+                              color: Color(0xFF252131),
+                            )),
+                            SizedBox(height: 2),
+                            Text('Shop and manage your account', style: TextStyle(
+                              fontSize: 12, color: Color(0xFF777181),
+                            )),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close menu',
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                if (config.menuHeaderImageUrl.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: ColoredBox(
+                        color: const Color(0xFFF5F2FA),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: (screenHeight * .19).clamp(110.0, 190.0),
+                          child: Image.network(
+                            config.menuHeaderImageUrl,
+                            width: double.infinity,
+                            fit: BoxFit.contain,
+                            alignment: Alignment.center,
+                            gaplessPlayback: true,
+                            filterQuality: FilterQuality.medium,
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(Icons.image_not_supported_outlined, color: Colors.black38),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(14, 2, 14, 20),
+                    itemCount: visibleMenuItems.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 7),
+                    itemBuilder: (context, index) {
+                      final item = visibleMenuItems[index];
+                      return Material(
+                        color: const Color(0xFFF7F5FA),
+                        borderRadius: BorderRadius.circular(15),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(15),
+                          onTap: () => Navigator.pop(ctx, item),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFECE5F7),
+                                    borderRadius: BorderRadius.circular(13),
+                                  ),
+                                  child: _menuLeadingIcon(item),
+                                ),
+                                const SizedBox(width: 13),
+                                Expanded(
+                                  child: Text(
+                                    (item['title'] ?? 'Menu item').toString(),
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF292536),
+                                    ),
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_forward_ios_rounded,
+                                  size: 16, color: Color(0xFF6A529B)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
     if (!mounted || choice == null) return;
     final target = (choice['link_value'] ?? '').toString();
