@@ -1,7 +1,7 @@
 name: glowhit_shopping
 description: GlowHit native WooCommerce shopping app
 publish_to: none
-version: 1.0.31+111
+version: 1.0.32+112
 environment:
   sdk: ">=3.3.0 <4.0.0"
 dependencies:
@@ -10,6 +10,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^1.2.2
   shared_preferences: ^2.3.2
+  path_provider: ^2.1.5
   url_launcher: ^6.3.1
   lottie: ^3.1.3
   image_picker: ^1.1.2

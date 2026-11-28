@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -20,6 +22,7 @@ import 'glowhit_designer_page.dart';
 import 'designer_layout_contract.dart';
 import 'designer_navigation_bar.dart';
 import 'designer_app_bar.dart';
+import 'designer_countdown.dart';
 import 'search_page.dart';
 import 'delivery_address_page.dart';
 
@@ -154,100 +157,206 @@ class StoreApi {
   }
 }
 
-void main() => runApp(const GlowHitApp());
+class _SplashStartupData {
+  const _SplashStartupData({required this.config, required this.imageBytes});
+  final Map<String, dynamic> config;
+  final Uint8List? imageBytes;
+}
 
-class GlowHitSplashGate extends StatefulWidget {
-  const GlowHitSplashGate({super.key, required this.child});
+Future<_SplashStartupData> _loadSplashStartupData({bool fetchRemote = true}) async {
+  Map<String, dynamic> cachedConfig = const {};
+  Uint8List? cachedBytes;
+  String cachedUrl = '';
+  String cachedVersion = '';
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final rawConfig = prefs.getString('glowhit_published_splash_config');
+    if (rawConfig != null && rawConfig.isNotEmpty) {
+      final decoded = jsonDecode(rawConfig);
+      if (decoded is Map) {
+        cachedConfig = Map<String, dynamic>.from(decoded);
+        cachedUrl = (cachedConfig['image_url'] ?? '').toString().trim();
+        cachedVersion = (cachedConfig['version'] ?? '').toString();
+      }
+    }
+    final cachedPath = prefs.getString('glowhit_published_splash_image_path');
+    if (cachedPath != null && cachedPath.isNotEmpty) {
+      final file = File(cachedPath);
+      if (await file.exists()) cachedBytes = await file.readAsBytes();
+    }
+
+    if (!fetchRemote) {
+      return _SplashStartupData(
+        config: cachedConfig,
+        imageBytes: cachedConfig['enabled'] == true ? cachedBytes : null,
+      );
+    }
+
+    final configResponse = await http.get(
+      Uri.parse('$storeUrl/wp-json/ark-designer/v1/config?glowhit_refresh=${DateTime.now().millisecondsSinceEpoch}'),
+      headers: const {'Accept': 'application/json', 'Cache-Control': 'no-cache'},
+    ).timeout(const Duration(seconds: 5));
+
+    if (configResponse.statusCode == 200) {
+      final payload = jsonDecode(configResponse.body);
+      if (payload is Map) {
+        final root = Map<String, dynamic>.from(payload);
+        dynamic rawSplash = root['splash'];
+        if (rawSplash is! Map && root['published_config'] is Map) {
+          rawSplash = (root['published_config'] as Map)['splash'];
+        }
+        if (rawSplash is! Map && root['config'] is Map) {
+          rawSplash = (root['config'] as Map)['splash'];
+        }
+        if (rawSplash is Map) {
+          final remote = Map<String, dynamic>.from(rawSplash);
+          final config = <String, dynamic>{
+            'enabled': remote['enabled'] != false,
+            'image_url': (remote['image_url'] ?? '').toString().trim(),
+            'attachment_id': remote['attachment_id'] ?? 0,
+            'duration_seconds': (((remote['duration_ms'] as num?)?.toInt() ?? 3000) / 1000).round().clamp(1, 15),
+            'fit': remote['fit'] ?? 'contain',
+            'image_scale': remote['image_scale'] ?? 1,
+            'background_color': remote['background'] ?? '#FFFFFF',
+            'version': root['version'] ?? root['updated_at'] ?? '',
+          };
+          final imageUrl = (config['image_url'] ?? '').toString().trim();
+          if (config['enabled'] != true || imageUrl.isEmpty) {
+            await prefs.setString('glowhit_published_splash_config', jsonEncode(config));
+            return _SplashStartupData(config: config, imageBytes: null);
+          }
+          if (imageUrl == cachedUrl &&
+              (config['version'] ?? '').toString() == cachedVersion &&
+              cachedBytes != null && cachedBytes.isNotEmpty) {
+            await prefs.setString('glowhit_published_splash_config', jsonEncode(config));
+            return _SplashStartupData(config: config, imageBytes: cachedBytes);
+          }
+          try {
+            final imageResponse = await http.get(Uri.parse(imageUrl))
+                .timeout(const Duration(seconds: 9));
+            if (imageResponse.statusCode == 200 && imageResponse.bodyBytes.isNotEmpty) {
+              final directory = await getApplicationSupportDirectory();
+              await directory.create(recursive: true);
+              final file = File('${directory.path}/glowhit-published-splash.bin');
+              await file.writeAsBytes(imageResponse.bodyBytes, flush: true);
+              await prefs.setString('glowhit_published_splash_image_path', file.path);
+              await prefs.setString('glowhit_published_splash_config', jsonEncode(config));
+              return _SplashStartupData(config: config, imageBytes: imageResponse.bodyBytes);
+            }
+          } catch (_) {
+            // Keep the last successfully downloaded image for offline/failed updates.
+          }
+          if (cachedBytes != null && cachedBytes.isNotEmpty) {
+            return _SplashStartupData(config: cachedConfig, imageBytes: cachedBytes);
+          }
+        }
+      }
+    }
+  } catch (_) {
+    // An unavailable network/cache must never prevent the store from opening.
+  }
+  if (cachedConfig['enabled'] == true && cachedBytes != null && cachedBytes.isNotEmpty) {
+    return _SplashStartupData(config: cachedConfig, imageBytes: cachedBytes);
+  }
+  return const _SplashStartupData(config: {}, imageBytes: null);
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Hide system bars before the first Flutter frame to avoid a black status
+  // strip flashing between Android's neutral launch window and the uploaded
+  // full-screen splash image.
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  // Read only the local cache before runApp. Never hold the first Flutter
+  // frame while waiting for WordPress or a remote image download.
+  final splash = await _loadSplashStartupData(fetchRemote: false);
+  runApp(GlowHitApp(
+    initialSplashConfig: splash.config,
+    initialSplashBytes: splash.imageBytes,
+  ));
+}
+
+class SplashLaunchScreen extends StatefulWidget {
+  const SplashLaunchScreen({
+    super.key,
+    required this.config,
+    required this.imageBytes,
+    required this.child,
+  });
+  final Map<String, dynamic> config;
+  final Uint8List? imageBytes;
   final Widget child;
 
   @override
-  State<GlowHitSplashGate> createState() => _GlowHitSplashGateState();
+  State<SplashLaunchScreen> createState() => _SplashLaunchScreenState();
 }
 
-class _GlowHitSplashGateState extends State<GlowHitSplashGate> {
-  Map<String, dynamic> _config = const {};
-  bool _showSplash = false;
-  bool _timerStarted = false;
+class _SplashLaunchScreenState extends State<SplashLaunchScreen> {
+  bool _showSplash = true;
+  bool _durationStarted = false;
   Timer? _timer;
+  Uint8List? _imageBytes;
+  late Map<String, dynamic> _config;
 
   @override
   void initState() {
     super.initState();
-    _loadSplashConfig();
-  }
-
-  Future<void> _loadSplashConfig() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      // Use cached published settings immediately, then refresh the public
-      // WordPress config so every installed phone receives Designer publishes.
-      final cached = prefs.getString('glowhit_published_splash_config') ??
-          prefs.getString('glowhit_designer_splash_config');
-      if (cached != null && cached.isNotEmpty) {
-        final decoded = jsonDecode(cached);
-        if (decoded is Map) {
-          final local = Map<String, dynamic>.from(decoded);
-          final localUrl = (local['image_url'] ?? '').toString().trim();
-          if (local['enabled'] != false && localUrl.isNotEmpty && mounted) {
-            setState(() { _config = local; _showSplash = true; });
-          }
-        }
-      }
-      try {
-        final response = await http.get(
-          Uri.parse('$storeUrl/wp-json/ark-designer/v1/config'),
-          headers: const {'Accept': 'application/json'},
-        ).timeout(const Duration(seconds: 7));
-        if (response.statusCode == 200) {
-          final payload = jsonDecode(response.body);
-          if (payload is Map && payload['splash'] is Map) {
-            final root = Map<String, dynamic>.from(payload);
-            final remote = Map<String, dynamic>.from(payload['splash'] as Map);
-            final config = <String, dynamic>{
-              'enabled': remote['enabled'] != false,
-              'image_url': (remote['image_url'] ?? '').toString(),
-              'attachment_id': remote['attachment_id'] ?? 0,
-              'duration_seconds': (((remote['duration_ms'] as num?)?.toInt() ?? 3000) / 1000).round().clamp(1, 15),
-              'fit': remote['fit'] ?? 'contain',
-              'image_scale': remote['image_scale'] ?? 1,
-              'background_color': remote['background'] ?? '#FFFFFF',
-              'version': root['version'] ?? root['updated_at'] ?? '',
-            };
-            await prefs.setString('glowhit_published_splash_config', jsonEncode(config));
-            if (!mounted) return;
-            setState(() {
-              _timer?.cancel();
-              _timerStarted = false;
-              _config = config;
-              _showSplash = config['enabled'] == true && config['image_url'].toString().trim().isNotEmpty;
-            });
-          }
-        }
-      } catch (_) {
-        // Previously published cache remains usable offline.
-      }
-    } catch (_) {
-      // The store remains usable if splash settings are missing or invalid.
-    }
-  }
-
-  void _startSplashTimerAfterFirstFrame() {
-    if (_timerStarted || !mounted) return;
-    _timerStarted = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final seconds = ((_config['duration_seconds'] as num?)?.toInt() ?? 3)
-          .clamp(1, 15).toInt();
-      _timer = Timer(Duration(seconds: seconds), () {
+    _config = Map<String, dynamic>.from(widget.config);
+    _imageBytes = widget.imageBytes;
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    if (_imageBytes == null || _imageBytes!.isEmpty) {
+      // Do not keep customers on a slow image download. A late response may
+      // refresh the cache for the next launch, but must not reopen this screen.
+      _timer = Timer(const Duration(seconds: 5), () {
         if (mounted) setState(() => _showSplash = false);
       });
+    }
+    _refreshPublishedSplash();
+  }
+
+  Color get _background => DesignerAppBarConfig.color(
+    (_config['background_color'] ?? '#FFFFFF').toString(),
+  );
+
+  void _startDuration() {
+    if (_durationStarted || !mounted) return;
+    _durationStarted = true;
+    _timer?.cancel();
+    final seconds = ((_config['duration_seconds'] as num?)?.toInt() ?? 3)
+        .clamp(1, 15).toInt();
+    _timer = Timer(Duration(seconds: seconds), () {
+      if (mounted) setState(() => _showSplash = false);
     });
   }
 
-  void _dismissSplash() {
-    if (!mounted) return;
-    _timer?.cancel();
-    setState(() => _showSplash = false);
+  Future<void> _refreshPublishedSplash() async {
+    try {
+      final latest = await _loadSplashStartupData();
+      if (!mounted || !_showSplash) return;
+      if (latest.config['enabled'] == true &&
+          latest.imageBytes != null && latest.imageBytes!.isNotEmpty) {
+        setState(() {
+          _config = Map<String, dynamic>.from(latest.config);
+          _imageBytes = latest.imageBytes;
+        });
+      } else if (_imageBytes == null || _imageBytes!.isEmpty) {
+        // No uploaded image is selected: show no substitute logo and proceed
+        // directly to the actual app after the short startup hand-off.
+        _timer ??= Timer(const Duration(milliseconds: 650), () {
+          if (mounted) setState(() => _showSplash = false);
+        });
+      } else if (latest.config['enabled'] == false) {
+        _timer?.cancel();
+        setState(() => _showSplash = false);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      if (_imageBytes == null || _imageBytes!.isEmpty) {
+        _timer ??= Timer(const Duration(milliseconds: 900), () {
+          if (mounted) setState(() => _showSplash = false);
+        });
+      }
+    }
   }
 
   @override
@@ -258,47 +367,42 @@ class _GlowHitSplashGateState extends State<GlowHitSplashGate> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_showSplash) return widget.child;
     final fitName = (_config['fit'] ?? 'contain').toString();
     final fit = fitName == 'cover'
         ? BoxFit.cover
         : fitName == 'fill' ? BoxFit.fill : BoxFit.contain;
     final scale = ((_config['image_scale'] as num?)?.toDouble() ?? 1)
         .clamp(.25, 2.0).toDouble();
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        widget.child,
-        if (_showSplash)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Image.network(
-                (_config['image_url'] ?? '').toString(),
+    final bytes = _imageBytes;
+    return SizedBox.expand(
+      child: ColoredBox(
+        color: _background,
+        child: bytes == null || bytes.isEmpty
+            // Never substitute a built-in GlowHit logo. Only the image
+            // selected and published in Designer → App Settings is allowed
+            // to appear as the branded splash.
+            ? const SizedBox.expand()
+            : Image.memory(
+                bytes,
+                cacheWidth: (MediaQuery.sizeOf(context).width *
+                        MediaQuery.devicePixelRatioOf(context))
+                    .round().clamp(320, 2048).toInt(),
                 fit: fit,
                 width: double.infinity,
                 height: double.infinity,
                 gaplessPlayback: true,
                 frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
                   if (frame != null || wasSynchronouslyLoaded) {
-                    _startSplashTimerAfterFirstFrame();
-                    return ColoredBox(
-                      color: DesignerAppBarConfig.color(
-                        (_config['background_color'] ?? '#FFFFFF').toString(),
-                      ),
-                      child: Transform.scale(scale: scale, child: child),
-                    );
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) _startDuration();
+                    });
                   }
-                  // A transparent overlay leaves Home visible while the
-                  // remote image downloads; no blank/black loading page.
-                  return const SizedBox.expand();
+                  return Transform.scale(scale: scale, child: child);
                 },
-                errorBuilder: (_, __, ___) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) => _dismissSplash());
-                  return const SizedBox.expand();
-                },
+                errorBuilder: (_, __, ___) => ColoredBox(color: _background),
               ),
-            ),
-          ),
-      ],
+      ),
     );
   }
 }
@@ -360,13 +464,24 @@ class LoginLandingPage extends StatelessWidget {
 
 
 class GlowHitApp extends StatelessWidget {
-  const GlowHitApp({super.key});
+  const GlowHitApp({
+    super.key,
+    required this.initialSplashConfig,
+    required this.initialSplashBytes,
+  });
+  final Map<String, dynamic> initialSplashConfig;
+  final Uint8List? initialSplashBytes;
+
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'GlowHit Shopping',
     debugShowCheckedModeBanner: false,
     theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: purple), scaffoldBackgroundColor: const Color(0xFFF7F6FA)),
-    home: const GlowHitSplashGate(child: SessionGate()),
+    home: SplashLaunchScreen(
+      config: initialSplashConfig,
+      imageBytes: initialSplashBytes,
+      child: const SessionGate(),
+    ),
   );
 }
 
@@ -419,49 +534,6 @@ class _GlowHitPinnedSearchAddressHeaderDelegate extends SliverPersistentHeaderDe
       maxHeight != oldDelegate.maxHeight ||
       backgroundColor != oldDelegate.backgroundColor ||
       childBuilder != oldDelegate.childBuilder;
-}
-
-class _DesignerCountdownBadge extends StatefulWidget {
-  const _DesignerCountdownBadge({required this.target});
-  final DateTime target;
-  @override State<_DesignerCountdownBadge> createState() => _DesignerCountdownBadgeState();
-}
-
-class _DesignerCountdownBadgeState extends State<_DesignerCountdownBadge> {
-  Timer? _ticker;
-  @override void initState() {
-    super.initState();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) { if (mounted) setState(() {}); });
-  }
-  @override void dispose() { _ticker?.cancel(); super.dispose(); }
-  @override Widget build(BuildContext context) {
-    final difference = widget.target.difference(DateTime.now());
-    final total = difference.isNegative ? 0 : difference.inSeconds;
-    final values = <(String, String)>[
-      ('${total ~/ 86400}', 'DAYS'),
-      (((total % 86400) ~/ 3600).toString().padLeft(2, '0'), 'HOURS'),
-      (((total % 3600) ~/ 60).toString().padLeft(2, '0'), 'MINUTES'),
-      ((total % 60).toString().padLeft(2, '0'), 'SECONDS'),
-    ];
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(color: const Color(0xFF51408F), borderRadius: BorderRadius.circular(14),
-        boxShadow: const [BoxShadow(color: Color(0x2251408F), blurRadius: 8, offset: Offset(0, 3))]),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        for (var i = 0; i < values.length; i++) ...[
-          if (i > 0) const SizedBox(width: 5),
-          Container(constraints: const BoxConstraints(minWidth: 42),
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(.14), borderRadius: BorderRadius.circular(9)),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text(values[i].$1, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800, height: 1.05)),
-              const SizedBox(height: 3),
-              Text(values[i].$2, style: const TextStyle(color: Colors.white70, fontSize: 7, fontWeight: FontWeight.w700, letterSpacing: .35)),
-            ])),
-        ],
-      ]),
-    );
-  }
 }
 
 class StoreHome extends StatefulWidget {
@@ -731,28 +803,146 @@ class _StoreHomeState extends State<StoreHome> {
     if (canManageDesigner && !hasDesigner) {
       menuItems.add({'id':'ark-designer','title':'ARK Designer','link_type':'deep_link','link_value':'ark_designer','leading_icon_family':'Material','leading_icon':'design_services','visible':true,'admin_only':true});
     }
+    final visibleMenuItems = menuItems.where((item) {
+      final target = (item['link_value'] ?? '').toString();
+      final isDesigner = target == 'ark_designer' || target == 'designer';
+      return item['visible'] != false &&
+          (canManageDesigner || (item['admin_only'] != true && !isDesigner));
+    }).toList();
     final choice = await showModalBottomSheet<Map<String,dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => SafeArea(child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * .82),
-        decoration: const BoxDecoration(color: Color(0xFFFFFBFF), borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width:42,height:4,margin:const EdgeInsets.only(top:10,bottom:8),decoration:BoxDecoration(color:Colors.black26,borderRadius:BorderRadius.circular(5))),
-          if (config.menuHeaderImageUrl.isNotEmpty)
-            ClipRRect(borderRadius:BorderRadius.circular(14),child:Padding(padding:const EdgeInsets.fromLTRB(14,4,14,10),child:Image.network(config.menuHeaderImageUrl,width:double.infinity,height:118,fit:BoxFit.cover,gaplessPlayback:true,filterQuality:FilterQuality.medium,errorBuilder:(_,__,___)=>const SizedBox.shrink()))),
-          Flexible(child:ListView(shrinkWrap:true,padding:const EdgeInsets.fromLTRB(12,4,12,18),children:[
-            for(final item in menuItems.where((e){final target=(e['link_value']??'').toString();final isDesigner=target=='ark_designer'||target=='designer';return e['visible']!=false && (canManageDesigner || (e['admin_only']!=true && !isDesigner));}))
-              ListTile(
-                leading: _menuLeadingIcon(item),
-                title: Text((item['title']??'Menu item').toString(),style:const TextStyle(fontWeight:FontWeight.w700)),
-                trailing: DesignerNavIcons.icon((item['trailing_icon_family']??'Material').toString(),(item['trailing_icon']??'chevron_right').toString(),color:const Color(0xFF51408F),size:20),
-                onTap:()=>Navigator.pop(ctx,item),
-              ),
-          ])),
-        ]),
-      )),
+      builder: (ctx) {
+        final screenHeight = MediaQuery.sizeOf(ctx).height;
+        return SafeArea(
+          child: Container(
+            constraints: BoxConstraints(maxHeight: screenHeight * .9),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFFBFF),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  margin: const EdgeInsets.only(top: 11, bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 16, 8),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Explore GlowHit', style: TextStyle(
+                              fontSize: 19, fontWeight: FontWeight.w800,
+                              color: Color(0xFF252131),
+                            )),
+                            SizedBox(height: 2),
+                            Text('Shop and manage your account', style: TextStyle(
+                              fontSize: 12, color: Color(0xFF777181),
+                            )),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close menu',
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                if (config.menuHeaderImageUrl.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: ColoredBox(
+                        color: const Color(0xFFF5F2FA),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: (screenHeight * .19).clamp(110.0, 190.0),
+                          child: Image.network(
+                            config.menuHeaderImageUrl,
+                            width: double.infinity,
+                            cacheWidth: (MediaQuery.sizeOf(ctx).width *
+                                    MediaQuery.devicePixelRatioOf(ctx))
+                                .round().clamp(320, 1600).toInt(),
+                            fit: BoxFit.contain,
+                            alignment: Alignment.center,
+                            gaplessPlayback: true,
+                            filterQuality: FilterQuality.medium,
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(Icons.image_not_supported_outlined, color: Colors.black38),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(14, 2, 14, 20),
+                    itemCount: visibleMenuItems.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 7),
+                    itemBuilder: (context, index) {
+                      final item = visibleMenuItems[index];
+                      return Material(
+                        color: const Color(0xFFF7F5FA),
+                        borderRadius: BorderRadius.circular(15),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(15),
+                          onTap: () => Navigator.pop(ctx, item),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFECE5F7),
+                                    borderRadius: BorderRadius.circular(13),
+                                  ),
+                                  child: _menuLeadingIcon(item),
+                                ),
+                                const SizedBox(width: 13),
+                                Expanded(
+                                  child: Text(
+                                    (item['title'] ?? 'Menu item').toString(),
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF292536),
+                                    ),
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_forward_ios_rounded,
+                                  size: 16, color: Color(0xFF6A529B)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
     if (!mounted || choice == null) return;
     final target = (choice['link_value'] ?? '').toString();
@@ -1104,7 +1294,17 @@ class _StoreHomeState extends State<StoreHome> {
   }
 
   Future<void> _precacheDesignerImages(Map<String, dynamic> config) async {
+    // Prioritize App Bar assets so the header background is decoded before
+    // the next visible Home frame. Then warm the first visible page assets.
     final urls = <String>{};
+    final rawAppBar = config['app_bar'];
+    if (rawAppBar is Map) {
+      final appBar = Map<String, dynamic>.from(rawAppBar);
+      for (final key in const ['background_image_url', 'logo_url', 'menu_header_image_url']) {
+        final url = (appBar[key] ?? '').toString().trim();
+        if (url.startsWith('https://') || url.startsWith('http://')) urls.add(url);
+      }
+    }
     final rawPages = config['pages'];
     if (rawPages is Map) {
       for (final rawPage in rawPages.values.whereType<Map>()) {
@@ -1131,16 +1331,18 @@ class _StoreHomeState extends State<StoreHome> {
       }
     }
     final cacheWidth = (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio)
-        .round().clamp(320, 1600);
-    for (final url in urls.take(12)) {
+        .round().clamp(320, 1600).toInt();
+    await Future.wait(urls.take(12).map((url) async {
       if (!mounted) return;
       try {
-        await precacheImage(ResizeImage(NetworkImage(url), width: cacheWidth), context)
-            .timeout(const Duration(seconds: 5));
+        await precacheImage(
+          ResizeImage(NetworkImage(url), width: cacheWidth),
+          context,
+        ).timeout(const Duration(seconds: 4));
       } catch (_) {
-        // An unavailable image must not block the Home screen.
+        // An unavailable image must never block the Home screen.
       }
-    }
+    }));
   }
 
   Future<Map<String, dynamic>> _loadDesignerSlider(String key) async {
@@ -1246,6 +1448,101 @@ class _StoreHomeState extends State<StoreHome> {
         wordSpacing: (config['word_spacing'] as num?)?.toDouble() ?? 0,
       ));
     }
+    Widget buildSectionHeading() {
+      final layout = (config['title_countdown_layout'] ?? 'left').toString();
+      final showCountdown = countdownEnabled && countdownExpiry != null;
+      final size = (config['countdown_size'] as num?)?.toDouble() ?? 18;
+      final countdown = showCountdown
+          ? DesignerCountdownCard(
+              target: countdownExpiry,
+              size: size,
+              backgroundColor: DesignerAppBarConfig.color(
+                (config['countdown_background_color'] ?? '#51408F').toString(),
+              ),
+              textColor: DesignerAppBarConfig.color(
+                (config['countdown_text_color'] ?? '#FFFFFF').toString(),
+              ),
+              labelColor: DesignerAppBarConfig.color(
+                (config['countdown_label_color'] ?? '#EDE7F8').toString(),
+              ),
+            )
+          : const SizedBox.shrink();
+      final titleWidget = showTitle
+          ? Flexible(
+              fit: FlexFit.loose,
+              child: Text(
+                title,
+                maxLines: (config['title_max_lines'] as num?)?.toInt() ?? 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: titleAlignment,
+                style: sectionTitleStyle(),
+              ),
+            )
+          : const SizedBox.shrink();
+
+      if (layout == 'stack') {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4)
+                .clamp(0, 60).toDouble(),
+          ),
+          child: Column(
+            crossAxisAlignment: titleAlignment == TextAlign.center
+                ? CrossAxisAlignment.center
+                : titleAlignment == TextAlign.right
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showTitle)
+                SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    title,
+                    maxLines: (config['title_max_lines'] as num?)?.toInt() ?? 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: titleAlignment,
+                    style: sectionTitleStyle(),
+                  ),
+                ),
+              if (showCountdown) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: switch ((config['countdown_alignment'] ?? 'left').toString()) {
+                    'center' => Alignment.center,
+                    'right' => Alignment.centerRight,
+                    _ => Alignment.centerLeft,
+                  },
+                  child: countdown,
+                ),
+              ],
+            ],
+          ),
+        );
+      }
+
+      final rowAlignment = switch (layout) {
+        'center' => MainAxisAlignment.center,
+        'right' => MainAxisAlignment.end,
+        _ => MainAxisAlignment.start,
+      };
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: ((config['title_bottom_spacing'] as num?)?.toDouble() ?? 4)
+              .clamp(0, 60).toDouble(),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.max,
+          mainAxisAlignment: rowAlignment,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (showTitle) titleWidget,
+            if (showTitle && showCountdown) const SizedBox(width: 8),
+            if (showCountdown) countdown,
+          ],
+        ),
+      );
+    }
     final padding = layoutSpec.padding.top;
     final paddingLeft = layoutSpec.padding.left;
     final paddingRight = layoutSpec.padding.right;
@@ -1305,17 +1602,8 @@ class _StoreHomeState extends State<StoreHome> {
               paddingRight,
               (config['padding_bottom'] as num?)?.toDouble() ?? 12,
             ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (showTitle) Padding(
-              padding: EdgeInsets.only(
-                bottom: (config['title_bottom_spacing'] as num?)?.toDouble() ?? 8,
-              ),
-              child: Row(children: [
-                Expanded(child: SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle()))),
-                if (countdownEnabled && countdownExpiry != null)
-                  _DesignerCountdownBadge(target: countdownExpiry),
-              ]),
-            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (showTitle || (countdownEnabled && countdownExpiry != null)) buildSectionHeading(),
             bannerGrid
                 ? SizedBox(
                     height: bannerGridHeight,
@@ -1567,16 +1855,7 @@ class _StoreHomeState extends State<StoreHome> {
           (config['padding_bottom'] as num?)?.toDouble() ?? 12,
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (showTitle) Padding(
-            padding: EdgeInsets.only(
-              bottom: (config['title_bottom_spacing'] as num?)?.toDouble() ?? 8,
-            ),
-            child: Row(children: [
-              Expanded(child: SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle()))),
-              if (countdownEnabled && countdownExpiry != null)
-                _DesignerCountdownBadge(target: countdownExpiry),
-            ]),
-          ),
+          if (showTitle || (countdownEnabled && countdownExpiry != null)) buildSectionHeading(),
           if (layout.contains('list_tile'))
             Column(children: rows.map((category) => ListTile(
               contentPadding: EdgeInsets.zero,
@@ -1666,14 +1945,7 @@ class _StoreHomeState extends State<StoreHome> {
           (config['padding_bottom'] as num?)?.toDouble() ?? 12,
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (showTitle) Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Row(children: [
-              Expanded(child: SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle()))),
-              if (countdownEnabled && countdownExpiry != null)
-                _DesignerCountdownBadge(target: countdownExpiry),
-            ]),
-          ),
+          if (showTitle || (countdownEnabled && countdownExpiry != null)) buildSectionHeading(),
           if (layout.contains('carousel') || layout.contains('slider') || layout.contains('scroll'))
             SizedBox(
               height: cardHeight,

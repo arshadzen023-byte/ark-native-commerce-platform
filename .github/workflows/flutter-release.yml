@@ -2,7 +2,7 @@ name: GlowHit Android CI and Release
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'fix/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -60,6 +60,91 @@ jobs:
               )
               styles.write_text(text, encoding="utf-8")
           print("Configured a non-black Android launch window; Flutter content paints immediately above it.")
+          PY
+      - name: Configure Android native launch splash on legacy and Android 12+ devices
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          res = Path("android/app/src/main/res")
+          legacy = res / "drawable" / "launch_background.xml"
+          legacy.parent.mkdir(parents=True, exist_ok=True)
+          legacy.write_text("""<?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item android:drawable="@android:color/white" />
+          </layer-list>
+          """, encoding="utf-8")
+
+          # Android 11 and earlier use the launch window background.
+          for folder in ("values", "values-night"):
+              styles = res / folder / "styles.xml"
+              if not styles.exists():
+                  continue
+              text = styles.read_text(encoding="utf-8")
+              item = '<item name="android:windowBackground">@drawable/launch_background</item>'
+              pattern = r'<item name="android:windowBackground">.*?</item>'
+              if re.search(pattern, text, flags=re.S):
+                  text = re.sub(pattern, item, text, count=1, flags=re.S)
+              else:
+                  match = re.search(r'<style name="LaunchTheme"[^>]*>', text)
+                  if not match:
+                      raise SystemExit(f"LaunchTheme missing in {styles}")
+                  text = text[:match.end()] + "\n        " + item + text[match.end():]
+              styles.write_text(text, encoding="utf-8")
+
+          # Android 12+ owns a system launch window before Flutter starts.
+          # Keep that OS-owned frame neutral and icon-free; the only branded
+          # splash shown by the app is the image selected in Designer settings.
+          transparent_icon = res / "drawable" / "ark_splash_transparent.xml"
+          transparent_icon.parent.mkdir(parents=True, exist_ok=True)
+          transparent_icon.write_text("""<?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="1dp"
+              android:height="1dp"
+              android:viewportWidth="1"
+              android:viewportHeight="1">
+              <path android:fillColor="#00000000" android:pathData="M0,0h1v1h-1z" />
+          </vector>
+          """, encoding="utf-8")
+
+          v31 = res / "values-v31" / "styles.xml"
+          if not v31.exists():
+              # Flutter's generated Android template does not create a v31
+              # qualifier on every Flutter/Gradle version. Derive it from the
+              # standard launch theme and add API-31-only splash attributes.
+              base_styles = res / "values" / "styles.xml"
+              if not base_styles.exists():
+                  raise SystemExit("Base Android styles.xml was not generated")
+              v31.parent.mkdir(parents=True, exist_ok=True)
+              v31.write_text(base_styles.read_text(encoding="utf-8"), encoding="utf-8")
+          text = v31.read_text(encoding="utf-8")
+          launch_match = re.search(r'<style name="LaunchTheme"[^>]*>(.*?)</style>', text, flags=re.S)
+          if not launch_match:
+              raise SystemExit("Android 12+ LaunchTheme not found")
+          block = launch_match.group(1)
+          items = {
+              "android:windowSplashScreenBackground": "#FFFFFFFF",
+              "android:windowSplashScreenAnimatedIcon": "@drawable/ark_splash_transparent",
+              "android:windowSplashScreenIconBackgroundColor": "#00FFFFFF",
+          }
+          for name, value in items.items():
+              item = f'<item name="{name}">{value}</item>'
+              pattern = rf'<item name="{re.escape(name)}">.*?</item>'
+              if re.search(pattern, block, flags=re.S):
+                  block = re.sub(pattern, item, block, count=1, flags=re.S)
+              else:
+                  block += "\n        " + item
+          text = text[:launch_match.start(1)] + block + text[launch_match.end(1):]
+          v31.write_text(text, encoding="utf-8")
+
+          for path in (res / "values" / "styles.xml", res / "values-night" / "styles.xml", v31):
+              if path.exists():
+                  data = path.read_text(encoding="utf-8")
+                  if "LaunchTheme" not in data:
+                      raise SystemExit(f"LaunchTheme validation failed: {path}")
+          print("Configured a neutral, icon-free Android launch hand-off; Designer upload is the only branded splash.")
           PY
       - name: Preserve GlowHit Android identity and Firebase
         shell: bash
@@ -282,7 +367,7 @@ jobs:
           set -o pipefail
           for attempt in 1 2 3 4; do
             log_file="$(mktemp)"
-            if flutter build apk --release 2>&1 | tee "$log_file"; then
+            if flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols 2>&1 | tee "$log_file"; then
               rm -f "$log_file"
               exit 0
             fi
@@ -304,10 +389,21 @@ jobs:
             fi
           done
           exit 1
+      - name: Report per-ABI APK sizes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for apk in build/app/outputs/flutter-apk/*-release.apk; do
+            test -f "$apk"
+            du -h "$apk"
+          done
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: glowhit-${{ github.run_number }}-${{ github.run_attempt }}
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
           if-no-files-found: error
           retention-days: 14

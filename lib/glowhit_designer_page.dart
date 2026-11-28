@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'customer_account_page.dart';
 import 'designer_banner_carousel.dart';
 import 'designer_layout_contract.dart';
+import 'designer_countdown.dart';
 import 'designer_navigation_bar.dart';
 import 'designer_floating_action.dart';
 import 'designer_app_bar.dart';
@@ -789,13 +790,16 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
             'card_aspect_ratio', 'card_depth', 'elevation', 'card_image_fit',
             'margin_top', 'margin_bottom', 'margin_left', 'margin_right',
             'padding_top', 'padding_bottom', 'padding_left', 'padding_right',
-            'title_bottom_spacing',
+            'title_bottom_spacing', 'show_title', 'title_text_align', 'title_max_lines',
+            'countdown_enabled', 'countdown_time', 'countdown_auto_hide',
             'section_background', 'text_color', 'title_color', 'title_background_color',
             'card_background', 'background_image_url', 'background_image_fit',
             'background_image_alignment', 'background_image_position',
             'background_position', 'background_size', 'background_repeat',
             'font_family', 'title_font_size', 'title_font_weight', 'italic',
             'letter_spacing', 'word_spacing', 'text_style',
+            'countdown_size', 'countdown_alignment', 'title_countdown_layout', 'countdown_background_color',
+            'countdown_text_color', 'countdown_label_color',
           ];
           // Compatibility aliases (for example item_gap) may be normalized by
           // WordPress from their canonical field. Verify canonical design
@@ -959,6 +963,13 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
         'show_title': true,
         'countdown_enabled': false,
         'countdown_time': '',
+        'countdown_size': 18.0,
+        'countdown_alignment': 'left',
+        'title_countdown_layout': 'left',
+        'countdown_background_color': '#51408F',
+        'countdown_text_color': '#FFFFFF',
+        'countdown_label_color': '#EDE7F8',
+        'title_bottom_spacing': 4.0,
         'title_font_size': 18.0,
         'title_font_weight': 'bold',
         'title_text_align': 'left',
@@ -1697,6 +1708,14 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
     }
 
     final title = (properties['show_title'] == false) ? '' : component.title;
+    final countdownEnabled = properties['countdown_enabled'] == true;
+    final countdownExpiry = DateTime.tryParse((properties['countdown_time'] ?? '').toString());
+    final titleFontSize = compact ? 12.0 : (properties['title_font_size'] as num?)?.toDouble() ?? 18.0;
+    final titleAlignment = switch ((properties['title_text_align'] ?? 'left').toString()) {
+      'center' => TextAlign.center,
+      'right' => TextAlign.right,
+      _ => TextAlign.left,
+    };
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: onEdit == null || (isBanner && isSlider) ? null : (event) {
@@ -1745,66 +1764,115 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (title.isNotEmpty)
+                  if (title.isNotEmpty || (countdownEnabled && countdownExpiry != null))
                     Padding(
                       padding: EdgeInsets.only(
-                        bottom: ((properties['title_bottom_spacing'] as num?)
-                                ?.toDouble() ??
-                            8),
+                        bottom: ((properties['title_bottom_spacing'] as num?)?.toDouble() ?? 4).clamp(0, 60).toDouble(),
                       ),
-                      child: GestureDetector(
-                        onTap: isBanner && isSlider ? onEdit : null,
-                        child: Text(
-                          title,
-                          maxLines: ((properties['title_max_lines'] as num?)
-                                  ?.toInt() ??
-                              2)
-                              .clamp(1, 4)
-                              .toInt(),
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: (properties['title_text_align'] ?? 'left') ==
-                                  'center'
-                              ? TextAlign.center
-                              : (properties['title_text_align'] ?? 'left') ==
-                                      'right'
-                                  ? TextAlign.right
-                                  : TextAlign.left,
-                          style: _designerFontStyle(
-                            (properties['font_family'] ?? 'Roboto').toString(),
-                            TextStyle(
-                            color: titleColor,
-                            backgroundColor: _color((properties['title_background_color'] ?? '#00000000').toString()),
-                            fontSize: compact
-                                ? 12
-                                : ((properties['title_font_size'] as num?)
-                                        ?.toDouble() ??
-                                    18),
-                            fontWeight:
-                                (properties['title_font_weight'] ?? 'bold') ==
-                                        'normal'
-                                    ? FontWeight.normal
-                                    : (properties['title_font_weight'] ??
-                                                'bold') ==
-                                            'medium'
-                                        ? FontWeight.w500
-                                        : FontWeight.bold,
-                            fontFamily:
-                                (properties['font_family'] ?? 'Roboto')
-                                    .toString(),
-                            fontStyle: properties['italic'] == true
-                                ? FontStyle.italic
-                                : FontStyle.normal,
-                            letterSpacing:
-                                (properties['letter_spacing'] as num?)
-                                        ?.toDouble() ??
-                                    0,
-                            wordSpacing:
-                                (properties['word_spacing'] as num?)
-                                        ?.toDouble() ??
-                                    0,
-                          )),
-                        ),
-                      ),
+                      child: (properties['title_countdown_layout'] ?? 'left').toString() == 'stack'
+                          ? Column(
+                              crossAxisAlignment: titleAlignment == TextAlign.center
+                                  ? CrossAxisAlignment.center
+                                  : titleAlignment == TextAlign.right
+                                      ? CrossAxisAlignment.end
+                                      : CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (title.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: isBanner && isSlider ? onEdit : null,
+                                    child: SizedBox(
+                                      width: double.infinity,
+                                      child: Text(
+                                        title,
+                                        maxLines: ((properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4).toInt(),
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: titleAlignment,
+                                        style: _designerFontStyle(
+                                          (properties['font_family'] ?? 'Roboto').toString(),
+                                          TextStyle(
+                                            color: titleColor,
+                                            backgroundColor: _color((properties['title_background_color'] ?? '#00000000').toString()),
+                                            fontSize: titleFontSize,
+                                            fontWeight: (properties['title_font_weight'] ?? 'bold') == 'normal'
+                                                ? FontWeight.normal
+                                                : (properties['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
+                                            fontFamily: (properties['font_family'] ?? 'Roboto').toString(),
+                                            fontStyle: properties['italic'] == true ? FontStyle.italic : FontStyle.normal,
+                                            letterSpacing: (properties['letter_spacing'] as num?)?.toDouble() ?? 0,
+                                            wordSpacing: (properties['word_spacing'] as num?)?.toDouble() ?? 0,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                if (countdownEnabled && countdownExpiry != null) ...[
+                                  const SizedBox(height: 4),
+                                  Align(
+                                    alignment: switch ((properties['countdown_alignment'] ?? 'left').toString()) {
+                                      'center' => Alignment.center,
+                                      'right' => Alignment.centerRight,
+                                      _ => Alignment.centerLeft,
+                                    },
+                                    child: DesignerCountdownCard(
+                                      target: countdownExpiry,
+                                      size: (properties['countdown_size'] as num?)?.toDouble() ?? 18,
+                                      backgroundColor: _color((properties['countdown_background_color'] ?? '#51408F').toString()),
+                                      textColor: _color((properties['countdown_text_color'] ?? '#FFFFFF').toString()),
+                                      labelColor: _color((properties['countdown_label_color'] ?? '#EDE7F8').toString()),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            )
+                          : Row(
+                              mainAxisAlignment: switch ((properties['title_countdown_layout'] ?? 'left').toString()) {
+                                'center' => MainAxisAlignment.center,
+                                'right' => MainAxisAlignment.end,
+                                _ => MainAxisAlignment.start,
+                              },
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                if (title.isNotEmpty)
+                                  Flexible(
+                                    fit: FlexFit.loose,
+                                    child: GestureDetector(
+                                      onTap: isBanner && isSlider ? onEdit : null,
+                                      child: Text(
+                                        title,
+                                        maxLines: ((properties['title_max_lines'] as num?)?.toInt() ?? 2).clamp(1, 4).toInt(),
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: titleAlignment,
+                                        style: _designerFontStyle(
+                                          (properties['font_family'] ?? 'Roboto').toString(),
+                                          TextStyle(
+                                            color: titleColor,
+                                            backgroundColor: _color((properties['title_background_color'] ?? '#00000000').toString()),
+                                            fontSize: titleFontSize,
+                                            fontWeight: (properties['title_font_weight'] ?? 'bold') == 'normal'
+                                                ? FontWeight.normal
+                                                : (properties['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
+                                            fontFamily: (properties['font_family'] ?? 'Roboto').toString(),
+                                            fontStyle: properties['italic'] == true ? FontStyle.italic : FontStyle.normal,
+                                            letterSpacing: (properties['letter_spacing'] as num?)?.toDouble() ?? 0,
+                                            wordSpacing: (properties['word_spacing'] as num?)?.toDouble() ?? 0,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                if (title.isNotEmpty && countdownEnabled && countdownExpiry != null)
+                                  const SizedBox(width: 8),
+                                if (countdownEnabled && countdownExpiry != null)
+                                  DesignerCountdownCard(
+                                    target: countdownExpiry,
+                                    size: (properties['countdown_size'] as num?)?.toDouble() ?? 18,
+                                    backgroundColor: _color((properties['countdown_background_color'] ?? '#51408F').toString()),
+                                    textColor: _color((properties['countdown_text_color'] ?? '#FFFFFF').toString()),
+                                    labelColor: _color((properties['countdown_label_color'] ?? '#EDE7F8').toString()),
+                                  ),
+                              ],
+                            ),
                     ),
                   content,
                 ],
@@ -2395,6 +2463,7 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
   int _attachmentId = 0;
   String _fit = 'contain';
   double _imageScale = 1;
+  bool _enabled = false;
   bool _loading = true;
   bool _saving = false;
 
@@ -2418,6 +2487,7 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
         final data = Map<String, dynamic>.from(jsonDecode(raw) as Map);
         _imageUrl = (data['image_url'] ?? '').toString();
         _attachmentId = (data['attachment_id'] as num?)?.toInt() ?? 0;
+        _enabled = data['enabled'] == true && _imageUrl.isNotEmpty;
         _durationController.text = ((data['duration_seconds'] as num?)?.toInt() ?? 3).toString();
         _imageScale = ((data['image_scale'] as num?)?.toDouble() ?? 1).clamp(.25, 2.0).toDouble();
         _fit = (data['fit'] ?? 'contain').toString();
@@ -2438,7 +2508,7 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, jsonEncode({
-        'enabled': _imageUrl.isNotEmpty,
+        'enabled': _enabled && _imageUrl.isNotEmpty,
         'image_url': _imageUrl,
         'attachment_id': _attachmentId,
         'duration_seconds': seconds,
@@ -2525,6 +2595,16 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
               ),
             ),
             const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Enable launch splash screen',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(_imageUrl.isEmpty
+                  ? 'Choose an uploaded image first. No built-in GlowHit logo will be shown.'
+                  : 'Show only this uploaded image before the Home page opens.'),
+              value: _enabled && _imageUrl.isNotEmpty,
+              onChanged: _imageUrl.isEmpty ? null : (value) => setState(() => _enabled = value),
+            ),
             OutlinedButton.icon(
               onPressed: _chooseImage,
               icon: const Icon(Icons.photo_library_outlined),
@@ -2908,12 +2988,38 @@ class _DesignerComponentEditorState extends State<_DesignerComponentEditor> {
           onSelectionChanged: (selection) => _change('title_text_align', selection.first),
         ),
         const SizedBox(height: 10),
+        _slider('Title to Content Gap', 'title_bottom_spacing', min: 0, max: 60),
         _switch('Countdown Time', 'countdown_enabled'),
         if (item.properties['countdown_enabled'] == true) ...[
           _CountdownDateTimeSettings(
             initialValue: (item.properties['countdown_time'] ?? '').toString(),
             onChanged: (value) => _change('countdown_time', value),
           ),
+          _slider('Countdown Size', 'countdown_size', min: 10, max: 40),
+          const Text('Title + Countdown Layout', style: TextStyle(fontWeight: FontWeight.w700)),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'left', label: Text('Left'), icon: Icon(Icons.format_align_left)),
+              ButtonSegment(value: 'center', label: Text('Centre'), icon: Icon(Icons.format_align_center)),
+              ButtonSegment(value: 'right', label: Text('Right'), icon: Icon(Icons.format_align_right)),
+              ButtonSegment(value: 'stack', label: Text('Stack'), icon: Icon(Icons.view_agenda_outlined)),
+            ],
+            selected: {(item.properties['title_countdown_layout'] ?? 'left').toString()},
+            onSelectionChanged: (selection) => _change('title_countdown_layout', selection.first),
+          ),
+          const Text('Countdown Position (Stack mode)', style: TextStyle(fontWeight: FontWeight.w700)),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'left', label: Text('Left')),
+              ButtonSegment(value: 'center', label: Text('Centre')),
+              ButtonSegment(value: 'right', label: Text('Right')),
+            ],
+            selected: {['left', 'center', 'right'].contains((item.properties['countdown_alignment'] ?? 'left').toString()) ? (item.properties['countdown_alignment'] ?? 'left').toString() : 'left'},
+            onSelectionChanged: (selection) => _change('countdown_alignment', selection.first),
+          ),
+          _colorChoice('Countdown Box Colour', 'countdown_background_color', const ['#51408F', '#202033', '#16734A', '#B23B32', '#1B6CA8', '#FFFFFF']),
+          _colorChoice('Countdown Number Colour', 'countdown_text_color', const ['#FFFFFF', '#202033', '#51408F', '#16734A', '#B23B32', '#1B6CA8']),
+          _colorChoice('Countdown Label Colour', 'countdown_label_color', const ['#EDE7F8', '#FFFFFF', '#202033', '#51408F', '#FFF0E6', '#E8F6F0']),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Hide component when countdown ends'),

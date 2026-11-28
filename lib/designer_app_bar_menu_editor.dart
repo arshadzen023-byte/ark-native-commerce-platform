@@ -102,7 +102,7 @@ class _DesignerAppBarMenuEditorPageState extends State<DesignerAppBarMenuEditorP
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Menu Top Image · WordPress Media Library',
+                    'Menu Banner · Full Image · WordPress Media Library',
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 8),
@@ -112,8 +112,9 @@ class _DesignerAppBarMenuEditorPageState extends State<DesignerAppBarMenuEditorP
                       child: Image.network(
                         imageUrl,
                         width: double.infinity,
-                        height: 150,
-                        fit: BoxFit.cover,
+                        height: 180,
+                        cacheWidth: (MediaQuery.sizeOf(context).width * MediaQuery.devicePixelRatioOf(context)).round().clamp(320, 1600).toInt(),
+                        fit: BoxFit.contain,
                         gaplessPlayback: true,
                         errorBuilder: (_, __, ___) => const SizedBox(
                           height: 70,
@@ -121,6 +122,13 @@ class _DesignerAppBarMenuEditorPageState extends State<DesignerAppBarMenuEditorP
                         ),
                       ),
                     ),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 7, bottom: 4),
+                    child: Text(
+                      'The complete image is shown without cropping in the app menu.',
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
+                  ),
                   Row(
                     children: [
                       Expanded(
