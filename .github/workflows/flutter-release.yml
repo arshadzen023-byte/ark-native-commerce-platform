@@ -73,7 +73,7 @@ jobs:
           legacy.parent.mkdir(parents=True, exist_ok=True)
           legacy.write_text("""<?xml version="1.0" encoding="utf-8"?>
           <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-              <item android:drawable="#51408F" />
+              <item android:drawable="@android:color/white" />
           </layer-list>
           """, encoding="utf-8")
 
@@ -94,10 +94,21 @@ jobs:
                   text = text[:match.end()] + "\n        " + item + text[match.end():]
               styles.write_text(text, encoding="utf-8")
 
-          # Android 12+ owns a system splash window before Flutter starts.
-          # Use the app launcher icon and a branded background; the published
-          # Designer splash takes over edge-to-edge immediately after Flutter's
-          # first frame, since Android's pre-activity screen cannot fetch remote media.
+          # Android 12+ owns a system launch window before Flutter starts.
+          # Keep that OS-owned frame neutral and icon-free; the only branded
+          # splash shown by the app is the image selected in Designer settings.
+          transparent_icon = res / "drawable" / "ark_splash_transparent.xml"
+          transparent_icon.parent.mkdir(parents=True, exist_ok=True)
+          transparent_icon.write_text("""<?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="1dp"
+              android:height="1dp"
+              android:viewportWidth="1"
+              android:viewportHeight="1">
+              <path android:fillColor="#00000000" android:pathData="M0,0h1v1h-1z" />
+          </vector>
+          """, encoding="utf-8")
+
           v31 = res / "values-v31" / "styles.xml"
           if not v31.exists():
               # Flutter's generated Android template does not create a v31
@@ -114,8 +125,9 @@ jobs:
               raise SystemExit("Android 12+ LaunchTheme not found")
           block = launch_match.group(1)
           items = {
-              "android:windowSplashScreenBackground": "#51408F",
-              "android:windowSplashScreenAnimatedIcon": "@mipmap/ic_launcher",
+              "android:windowSplashScreenBackground": "#FFFFFFFF",
+              "android:windowSplashScreenAnimatedIcon": "@drawable/ark_splash_transparent",
+              "android:windowSplashScreenIconBackgroundColor": "#00FFFFFF",
           }
           for name, value in items.items():
               item = f'<item name="{name}">{value}</item>'
@@ -132,7 +144,7 @@ jobs:
                   data = path.read_text(encoding="utf-8")
                   if "LaunchTheme" not in data:
                       raise SystemExit(f"LaunchTheme validation failed: {path}")
-          print("Configured branded Android launch splash for legacy and Android 12+.")
+          print("Configured a neutral, icon-free Android launch hand-off; Designer upload is the only branded splash.")
           PY
       - name: Preserve GlowHit Android identity and Firebase
         shell: bash
@@ -355,7 +367,7 @@ jobs:
           set -o pipefail
           for attempt in 1 2 3 4; do
             log_file="$(mktemp)"
-            if flutter build apk --release 2>&1 | tee "$log_file"; then
+            if flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols 2>&1 | tee "$log_file"; then
               rm -f "$log_file"
               exit 0
             fi
@@ -381,6 +393,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: glowhit-${{ github.run_number }}-${{ github.run_attempt }}
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
           if-no-files-found: error
           retention-days: 14
