@@ -335,6 +335,10 @@ class DesignerAppBarView extends StatelessWidget {
     final progress=collapseProgress.clamp(0.0,1.0).toDouble();
     final currentHeight=config.renderHeight-((config.renderHeight-config.compactRenderHeight)*progress);
     final bg=DesignerAppBarConfig.color((data['background_color']??'#FFFFFF').toString());
+    final searchIconColor = DesignerAppBarConfig.color(
+      (data['search_icon_color'] ?? '#5B3A9E').toString(),
+      fallback: const Color(0xFF5B3A9E),
+    );
     Widget iconButton(String key,VoidCallback action,{bool badge=false}) {
       final family=(data['${key}_icon_family']??'Material').toString();
       final name=(data['${key}_icon']??'').toString();
@@ -375,7 +379,7 @@ class DesignerAppBarView extends StatelessWidget {
           isDense:true,
           hint: _RotatingSearchHint(terms: config.searchTerms.isEmpty ? [(data['search_placeholder']??'Search products...').toString()] : config.searchTerms, style: const TextStyle(color:Colors.black54,fontSize:14)),
           hintStyle:const TextStyle(color:Colors.black54,fontSize:14),
-          prefixIcon:DesignerNavIcons.icon((data['search_icon_family']??'Material').toString(),(data['search_icon']??'search').toString(),color:iconColor,size:config.iconSize),
+          prefixIcon:DesignerNavIcons.icon((data['search_icon_family']??'Material').toString(),(data['search_icon']??'search').toString(),color:searchIconColor,size:config.iconSize),
           prefixIconConstraints:const BoxConstraints(minWidth:44,minHeight:46),
           suffixIcon:Row(
             mainAxisSize:MainAxisSize.min,
@@ -386,7 +390,7 @@ class DesignerAppBarView extends StatelessWidget {
                 padding:EdgeInsets.zero,
                 tooltip:'Voice Search',
                 onPressed:onVoiceSearch,
-                icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:iconColor,size:config.iconSize),
+                icon:DesignerNavIcons.icon((data['voice_icon_family']??'Material').toString(),(data['voice_icon']??'mic_none').toString(),color:searchIconColor,size:config.iconSize),
               ),
               IconButton(
                 visualDensity:VisualDensity.compact,
@@ -397,7 +401,7 @@ class DesignerAppBarView extends StatelessWidget {
                   searchController.clear();
                   searchFocusNode.unfocus();
                 },
-                icon:Icon(Icons.close,color:iconColor),
+                icon:Icon(Icons.close,color:searchIconColor),
               ),
             ],
           ),
@@ -406,7 +410,8 @@ class DesignerAppBarView extends StatelessWidget {
         ),
       ),
     );
-    final imageProvider=config.backgroundImageUrl.isEmpty?null:NetworkImage(config.backgroundImageUrl);
+    final pixelWidth = (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio).round().clamp(480, 1600);
+    final imageProvider = config.backgroundImageUrl.isEmpty ? null : ResizeImage(NetworkImage(config.backgroundImageUrl), width: pixelWidth);
     final topRow=Row(children:[
       if(config.show('show_menu')) IconButton(
         visualDensity:VisualDensity.compact,
@@ -417,7 +422,7 @@ class DesignerAppBarView extends StatelessWidget {
         icon:DesignerNavIcons.icon((data['menu_icon_family']??'Material').toString(),(data['menu_icon']??'menu').toString(),color:iconColor,size:config.iconSize),
       ),
       if(config.show('show_logo')) ...[
-        if(config.logoUrl.isNotEmpty) ClipRRect(borderRadius:BorderRadius.circular(6),child:Image.network(config.logoUrl,width:36,height:36,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const SizedBox.shrink())),
+        if(config.logoUrl.isNotEmpty) ClipRRect(borderRadius:BorderRadius.circular(6),child:Image.network(config.logoUrl,width:36,height:36,cacheWidth:160,fit:BoxFit.contain,gaplessPlayback:true,errorBuilder:(_,__,___)=>const SizedBox.shrink())),
         const SizedBox(width:8),
         Flexible(child:Text((data['menu_label']??'GlowHit').toString(),maxLines:1,overflow:TextOverflow.ellipsis,style:TextStyle(color:fg,fontSize:17,fontWeight:FontWeight.w800))),
       ],
