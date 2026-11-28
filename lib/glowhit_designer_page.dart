@@ -654,6 +654,25 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
       publishedConfig['navigation_bar'] = navigationConfig.toJson();
       publishedConfig['app_bar'] = appBarConfig.toJson();
       publishedConfig['floating_actions'] = floatingActions;
+      // Splash is a shared published setting, not merely a local preference.
+      final splashPrefs = await SharedPreferences.getInstance();
+      final splashRaw = splashPrefs.getString('glowhit_designer_splash_config');
+      if (splashRaw != null && splashRaw.isNotEmpty) {
+        try {
+          final splashLocal = Map<String, dynamic>.from(jsonDecode(splashRaw) as Map);
+          publishedConfig['splash'] = {
+            'enabled': (splashLocal['enabled'] ?? true) == true && (splashLocal['image_url'] ?? '').toString().trim().isNotEmpty,
+            'image_url': splashLocal['image_url'] ?? '',
+            'attachment_id': splashLocal['attachment_id'] ?? 0,
+            'duration_ms': (((splashLocal['duration_seconds'] as num?)?.toInt() ?? 3).clamp(1, 15).toInt()) * 1000,
+            'fit': splashLocal['fit'] ?? 'contain',
+            'image_scale': splashLocal['image_scale'] ?? 1,
+            'background': splashLocal['background_color'] ?? '#FFFFFF',
+          };
+        } catch (_) {
+          throw Exception('Splash settings are invalid. Reopen App Settings and save them before publishing.');
+        }
+      }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, localJson);
       try {
@@ -863,8 +882,27 @@ class _GlowHitDesignerPageState extends State<GlowHitDesignerPage> {
               }
             }
           }
+          final requestedSplash = publishedConfig['splash'];
+          if (requestedSplash is Map) {
+            final returnedSplash = serverConfig['splash'];
+            if (returnedSplash is! Map ||
+                (returnedSplash['image_url'] ?? '').toString() != (requestedSplash['image_url'] ?? '').toString()) {
+              throw Exception('WordPress did not confirm the published Splash image. Update the ARK App Designer plugin splash publish contract.');
+            }
+          }
           acceptedConfig = serverConfig;
           await prefs.setString('glowhit_published_designer_config', jsonEncode(acceptedConfig));
+          if (publish && requestedSplash is Map) {
+            await prefs.setString('glowhit_published_splash_config', jsonEncode({
+              'enabled': requestedSplash['enabled'] == true,
+              'image_url': requestedSplash['image_url'] ?? '',
+              'attachment_id': requestedSplash['attachment_id'] ?? 0,
+              'duration_seconds': (((requestedSplash['duration_ms'] as num?)?.toInt() ?? 3000) / 1000).round().clamp(1, 15),
+              'fit': requestedSplash['fit'] ?? 'contain',
+              'image_scale': requestedSplash['image_scale'] ?? 1,
+              'background_color': requestedSplash['background'] ?? '#FFFFFF',
+            }));
+          }
         }
         wordpressConfig = acceptedConfig;
         await prefs.setString('glowhit_designer_last_server_sync', DateTime.now().toUtc().toIso8601String());
@@ -2400,6 +2438,7 @@ class _DesignerAppSettingsPageState extends State<_DesignerAppSettingsPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_storageKey, jsonEncode({
+        'enabled': _imageUrl.isNotEmpty,
         'image_url': _imageUrl,
         'attachment_id': _attachmentId,
         'duration_seconds': seconds,
