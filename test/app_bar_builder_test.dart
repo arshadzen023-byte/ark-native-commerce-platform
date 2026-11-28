@@ -272,3 +272,24 @@ void main() {
     expect(properties['countdown_auto_hide'], isTrue);
   });
 }
+
+
+  test('compact app bar keeps only search and address rows after collapse', () {
+    final config = DesignerAppBarConfig(json: const {
+      'show_search': true,
+      'show_location': true,
+      'show_menu': true,
+      'show_logo': true,
+      'show_cart': true,
+    });
+    expect(config.compactRenderHeight, 104);
+    expect(config.renderHeight, greaterThan(config.compactRenderHeight));
+  });
+
+  test('app bar icon tint is independently configurable', () {
+    final config = DesignerAppBarConfig(json: const {
+      'foreground_color': '#111111',
+      'icon_color': '#FF3366',
+    });
+    expect(config.toJson()['icon_color'], '#FF3366');
+  });
