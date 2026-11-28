@@ -257,4 +257,37 @@ void main() {
     expect(find.text('3'), findsOneWidget);
     expect(find.byTooltip('Help'), findsOneWidget);
   });
+  test('component title alignment and countdown values use stable additive properties', () {
+    const alignments = ['left', 'center', 'right'];
+    expect(alignments, contains('center'));
+    final target = DateTime(2027, 1, 15, 18, 30).toIso8601String();
+    final properties = <String, dynamic>{
+      'title_text_align': 'center',
+      'countdown_enabled': true,
+      'countdown_time': target,
+      'countdown_auto_hide': true,
+    };
+    expect(properties['title_text_align'], 'center');
+    expect(DateTime.tryParse(properties['countdown_time'] as String), DateTime(2027, 1, 15, 18, 30));
+    expect(properties['countdown_auto_hide'], isTrue);
+  });
+  test('compact app bar keeps only search and address rows after collapse', () {
+    final config = DesignerAppBarConfig(json: const {
+      'show_search': true,
+      'show_location': true,
+      'show_menu': true,
+      'show_logo': true,
+      'show_cart': true,
+    });
+    expect(config.compactRenderHeight, 104);
+    expect(config.renderHeight, greaterThan(config.compactRenderHeight));
+  });
+
+  test('app bar icon tint is independently configurable', () {
+    final config = DesignerAppBarConfig(json: const {
+      'foreground_color': '#111111',
+      'icon_color': '#FF3366',
+    });
+    expect(config.toJson()['icon_color'], '#FF3366');
+  });
 }

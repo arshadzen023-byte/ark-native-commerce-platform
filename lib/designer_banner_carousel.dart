@@ -16,6 +16,10 @@ class ArkDesignerBannerCarousel extends StatefulWidget {
     this.fade = false,
     this.viewFraction = 1,
     this.elevation = 0,
+    this.titleAlignment = TextAlign.left,
+    this.titleFontSize = 16,
+    this.titleFontWeight = FontWeight.w700,
+    this.titleColor = Colors.white,
     this.onTap,
     this.onSlideTap,
   });
@@ -31,6 +35,10 @@ class ArkDesignerBannerCarousel extends StatefulWidget {
   final bool fade;
   final double viewFraction;
   final double elevation;
+  final TextAlign titleAlignment;
+  final double titleFontSize;
+  final FontWeight titleFontWeight;
+  final Color titleColor;
   final VoidCallback? onTap;
   final ValueChanged<Map<String, dynamic>>? onSlideTap;
 
@@ -64,7 +72,9 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
         MediaQuery.of(context).devicePixelRatio).round().clamp(320, 2048);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      for (final slide in widget.slides) {
+      // Preload the first visible slides only. The rest are loaded lazily as
+      // the user reaches them, keeping initial Home startup light.
+      for (final slide in widget.slides.take(3)) {
         final url = (slide['image_url'] ?? slide['source_url'] ?? slide['url'] ?? '').toString().trim();
         if (url.isNotEmpty) {
           precacheImage(ResizeImage(NetworkImage(url), width: width), context);
@@ -143,7 +153,16 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
       controller: _controller,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: widget.slides.length,
-      onPageChanged: (value) => setState(() => _index = value),
+      onPageChanged: (value) {
+        setState(() => _index = value);
+        final slide = widget.slides[value];
+        final url = (slide['image_url'] ?? slide['source_url'] ?? slide['url'] ?? '').toString().trim();
+        if (url.isNotEmpty) {
+          final width = (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio)
+              .round().clamp(320, 2048);
+          precacheImage(ResizeImage(NetworkImage(url), width: width), context);
+        }
+      },
       itemBuilder: (context, index) {
         final slide = widget.slides[index];
         final image = (slide['image_url'] ?? slide['source_url'] ?? slide['url'] ?? '').toString();
@@ -176,7 +195,7 @@ class _ArkDesignerBannerCarouselState extends State<ArkDesignerBannerCarousel> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   color: Colors.black.withValues(alpha: .38),
-                  child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  child: Text(title, textAlign: widget.titleAlignment, style: TextStyle(color: widget.titleColor, fontSize: widget.titleFontSize, fontWeight: widget.titleFontWeight)),
                 ),
               ),
           ]),

@@ -156,29 +156,179 @@ class StoreApi {
 
 void main() => runApp(const GlowHitApp());
 
+class GlowHitSplashGate extends StatefulWidget {
+  const GlowHitSplashGate({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<GlowHitSplashGate> createState() => _GlowHitSplashGateState();
+}
+
+class _GlowHitSplashGateState extends State<GlowHitSplashGate> {
+  Map<String, dynamic> _config = const {};
+  bool _showSplash = false;
+  bool _timerStarted = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSplashConfig();
+  }
+
+  Future<void> _loadSplashConfig() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Use cached published settings immediately, then refresh the public
+      // WordPress config so every installed phone receives Designer publishes.
+      final cached = prefs.getString('glowhit_published_splash_config') ??
+          prefs.getString('glowhit_designer_splash_config');
+      if (cached != null && cached.isNotEmpty) {
+        final decoded = jsonDecode(cached);
+        if (decoded is Map) {
+          final local = Map<String, dynamic>.from(decoded);
+          final localUrl = (local['image_url'] ?? '').toString().trim();
+          if (local['enabled'] != false && localUrl.isNotEmpty && mounted) {
+            setState(() { _config = local; _showSplash = true; });
+          }
+        }
+      }
+      try {
+        final response = await http.get(
+          Uri.parse('$storeUrl/wp-json/ark-designer/v1/config'),
+          headers: const {'Accept': 'application/json'},
+        ).timeout(const Duration(seconds: 7));
+        if (response.statusCode == 200) {
+          final payload = jsonDecode(response.body);
+          if (payload is Map && payload['splash'] is Map) {
+            final root = Map<String, dynamic>.from(payload);
+            final remote = Map<String, dynamic>.from(payload['splash'] as Map);
+            final config = <String, dynamic>{
+              'enabled': remote['enabled'] != false,
+              'image_url': (remote['image_url'] ?? '').toString(),
+              'attachment_id': remote['attachment_id'] ?? 0,
+              'duration_seconds': (((remote['duration_ms'] as num?)?.toInt() ?? 3000) / 1000).round().clamp(1, 15),
+              'fit': remote['fit'] ?? 'contain',
+              'image_scale': remote['image_scale'] ?? 1,
+              'background_color': remote['background'] ?? '#FFFFFF',
+              'version': root['version'] ?? root['updated_at'] ?? '',
+            };
+            await prefs.setString('glowhit_published_splash_config', jsonEncode(config));
+            if (!mounted) return;
+            setState(() {
+              _timer?.cancel();
+              _timerStarted = false;
+              _config = config;
+              _showSplash = config['enabled'] == true && config['image_url'].toString().trim().isNotEmpty;
+            });
+          }
+        }
+      } catch (_) {
+        // Previously published cache remains usable offline.
+      }
+    } catch (_) {
+      // The store remains usable if splash settings are missing or invalid.
+    }
+  }
+
+  void _startSplashTimerAfterFirstFrame() {
+    if (_timerStarted || !mounted) return;
+    _timerStarted = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final seconds = ((_config['duration_seconds'] as num?)?.toInt() ?? 3)
+          .clamp(1, 15).toInt();
+      _timer = Timer(Duration(seconds: seconds), () {
+        if (mounted) setState(() => _showSplash = false);
+      });
+    });
+  }
+
+  void _dismissSplash() {
+    if (!mounted) return;
+    _timer?.cancel();
+    setState(() => _showSplash = false);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fitName = (_config['fit'] ?? 'contain').toString();
+    final fit = fitName == 'cover'
+        ? BoxFit.cover
+        : fitName == 'fill' ? BoxFit.fill : BoxFit.contain;
+    final scale = ((_config['image_scale'] as num?)?.toDouble() ?? 1)
+        .clamp(.25, 2.0).toDouble();
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        widget.child,
+        if (_showSplash)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Image.network(
+                (_config['image_url'] ?? '').toString(),
+                fit: fit,
+                width: double.infinity,
+                height: double.infinity,
+                gaplessPlayback: true,
+                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                  if (frame != null || wasSynchronouslyLoaded) {
+                    _startSplashTimerAfterFirstFrame();
+                    return ColoredBox(
+                      color: DesignerAppBarConfig.color(
+                        (_config['background_color'] ?? '#FFFFFF').toString(),
+                      ),
+                      child: Transform.scale(scale: scale, child: child),
+                    );
+                  }
+                  // A transparent overlay leaves Home visible while the
+                  // remote image downloads; no blank/black loading page.
+                  return const SizedBox.expand();
+                },
+                errorBuilder: (_, __, ___) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) => _dismissSplash());
+                  return const SizedBox.expand();
+                },
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class SessionGate extends StatefulWidget {
   const SessionGate({super.key});
   @override State<SessionGate> createState() => _SessionGateState();
 }
 
 class _SessionGateState extends State<SessionGate> {
-  bool checking = true;
   String? token;
-  @override void initState() { super.initState(); _check(); }
-  Future<void> _check() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('glowhit_customer_session');
-    if (saved != null && saved.isNotEmpty) {
-      try { await ArkCustomerApi(saved).request('customer/me'); token = saved; }
-      catch (_) { await prefs.remove('glowhit_customer_session'); token = null; }
+  @override void initState() {
+    super.initState();
+    _restoreLocalSession();
+  }
+
+  Future<void> _restoreLocalSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('glowhit_customer_session');
+      if (mounted && saved != null && saved.isNotEmpty) {
+        setState(() => token = saved);
+      }
+    } catch (_) {
+      // A missing preferences store must not prevent the Home page from opening.
     }
-    if (mounted) setState(() => checking = false);
   }
-  @override Widget build(BuildContext context) {
-    if (checking) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (token == null) return LoginLandingPage(onLogin: (value) => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => StoreHome(initialToken: value))));
-    return StoreHome(initialToken: token);
-  }
+
+  @override
+  Widget build(BuildContext context) => StoreHome(initialToken: token);
 }
 
 class LoginLandingPage extends StatelessWidget {
@@ -216,8 +366,102 @@ class GlowHitApp extends StatelessWidget {
     title: 'GlowHit Shopping',
     debugShowCheckedModeBanner: false,
     theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: purple), scaffoldBackgroundColor: const Color(0xFFF7F6FA)),
-    home: const SessionGate(),
+    home: const GlowHitSplashGate(child: SessionGate()),
   );
+}
+
+
+/// Collapses the top App Bar row and keeps only Search + Delivery Address pinned.
+class _GlowHitPinnedSearchAddressHeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _GlowHitPinnedSearchAddressHeaderDelegate({
+    required this.minHeight,
+    required this.maxHeight,
+    required this.backgroundColor,
+    required this.childBuilder,
+  });
+
+  final double minHeight;
+  final double maxHeight;
+  final Color backgroundColor;
+  final Widget Function(double collapseProgress) childBuilder;
+
+  @override
+  double get minExtent => minHeight;
+
+  @override
+  double get maxExtent => maxHeight < minHeight ? minHeight : maxHeight;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final range = maxExtent - minExtent;
+    final progress = range <= 0
+        ? 1.0
+        : (shrinkOffset / range).clamp(0.0, 1.0).toDouble();
+    final currentHeight = maxExtent - (range * progress);
+    return ColoredBox(
+      color: backgroundColor,
+      child: ClipRect(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: SizedBox(
+            height: currentHeight,
+            width: double.infinity,
+            child: childBuilder(progress),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _GlowHitPinnedSearchAddressHeaderDelegate oldDelegate) =>
+      minHeight != oldDelegate.minHeight ||
+      maxHeight != oldDelegate.maxHeight ||
+      backgroundColor != oldDelegate.backgroundColor ||
+      childBuilder != oldDelegate.childBuilder;
+}
+
+class _DesignerCountdownBadge extends StatefulWidget {
+  const _DesignerCountdownBadge({required this.target});
+  final DateTime target;
+  @override State<_DesignerCountdownBadge> createState() => _DesignerCountdownBadgeState();
+}
+
+class _DesignerCountdownBadgeState extends State<_DesignerCountdownBadge> {
+  Timer? _ticker;
+  @override void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) { if (mounted) setState(() {}); });
+  }
+  @override void dispose() { _ticker?.cancel(); super.dispose(); }
+  @override Widget build(BuildContext context) {
+    final difference = widget.target.difference(DateTime.now());
+    final total = difference.isNegative ? 0 : difference.inSeconds;
+    final values = <(String, String)>[
+      ('${total ~/ 86400}', 'DAYS'),
+      (((total % 86400) ~/ 3600).toString().padLeft(2, '0'), 'HOURS'),
+      (((total % 3600) ~/ 60).toString().padLeft(2, '0'), 'MINUTES'),
+      ((total % 60).toString().padLeft(2, '0'), 'SECONDS'),
+    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(color: const Color(0xFF51408F), borderRadius: BorderRadius.circular(14),
+        boxShadow: const [BoxShadow(color: Color(0x2251408F), blurRadius: 8, offset: Offset(0, 3))]),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        for (var i = 0; i < values.length; i++) ...[
+          if (i > 0) const SizedBox(width: 5),
+          Container(constraints: const BoxConstraints(minWidth: 42),
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(.14), borderRadius: BorderRadius.circular(9)),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(values[i].$1, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800, height: 1.05)),
+              const SizedBox(height: 3),
+              Text(values[i].$2, style: const TextStyle(color: Colors.white70, fontSize: 7, fontWeight: FontWeight.w700, letterSpacing: .35)),
+            ])),
+        ],
+      ]),
+    );
+  }
 }
 
 class StoreHome extends StatefulWidget {
@@ -243,6 +487,7 @@ class _StoreHomeState extends State<StoreHome> {
   bool _designerAdminCheckComplete = false;
   DateTime? _designerAdminVerifiedAt;
   final Map<String, Future<Map<String, dynamic>>> _sliderFutures = {};
+  final Map<String, Timer> _componentCountdownTimers = {};
   final WooStoreApi woo = WooStoreApi();
   Map<String, dynamic> liveCart = {};
   bool cartBusy = false;
@@ -251,6 +496,20 @@ class _StoreHomeState extends State<StoreHome> {
   String? customerToken;
   late final GlowHitPushService push;
   int notificationCount = 0;
+  @override
+  void didUpdateWidget(covariant StoreHome oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialToken != widget.initialToken) {
+      customerToken = widget.initialToken;
+      if (customerToken != null && customerToken!.isNotEmpty) {
+        push.register(customerJwt: customerToken);
+        _checkDesignerAdminAccess(force: true);
+        _refreshCart();
+        _refreshNotificationCount();
+      }
+    }
+  }
+
   @override void initState() {
     super.initState();
     searchFocusNode.addListener(_handleSearchFocusChange);
@@ -425,7 +684,7 @@ class _StoreHomeState extends State<StoreHome> {
 
   void _handleSearchFocusChange() { if (mounted) setState(() {}); }
 
-  @override void dispose() { searchFocusNode.removeListener(_handleSearchFocusChange); searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
+  @override void dispose() { for (final timer in _componentCountdownTimers.values) { timer.cancel(); } _componentCountdownTimers.clear(); searchFocusNode.removeListener(_handleSearchFocusChange); searchController.dispose(); searchFocusNode.dispose(); super.dispose(); }
 
   bool _isNestedAppBarPage(String pageKey) => !const ['home','search','categories','wishlist','cart','account'].contains(pageKey);
 
@@ -764,6 +1023,9 @@ class _StoreHomeState extends State<StoreHome> {
         if (decoded is Map) {
           final value = Map<String, dynamic>.from(decoded);
           if (mounted) setState(() => designerConfig = value);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) unawaited(_precacheDesignerImages(value));
+          });
         }
       } catch (_) {}
     }
@@ -807,6 +1069,10 @@ class _StoreHomeState extends State<StoreHome> {
 
       // Cache only the same published shape that the public Home renderer reads.
       await prefs.setString('glowhit_published_designer_config', jsonEncode(value));
+      // Warm Home component assets after updating the published configuration.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_precacheDesignerImages(value));
+      });
       _sliderFutures.clear();
       if (mounted) setState(() => designerConfig = value);
       debugPrint('[ARK Designer Sync] Published Home v${value['version'] ?? value['published_version'] ?? 'unknown'}: ${sections.length} visible sections');
@@ -835,6 +1101,46 @@ class _StoreHomeState extends State<StoreHome> {
         setState(() => storeCategories = decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList());
       }
     } catch (_) {}
+  }
+
+  Future<void> _precacheDesignerImages(Map<String, dynamic> config) async {
+    final urls = <String>{};
+    final rawPages = config['pages'];
+    if (rawPages is Map) {
+      for (final rawPage in rawPages.values.whereType<Map>()) {
+        final rawSections = rawPage['sections'];
+        if (rawSections is! List) continue;
+        for (final rawSection in rawSections.whereType<Map>()) {
+          final nested = rawSection['properties'] is Map
+              ? Map<String, dynamic>.from(rawSection['properties'] as Map)
+              : <String, dynamic>{};
+          final section = <String, dynamic>{...rawSection, ...nested};
+          for (final key in const ['background_image_url','image_url','source_url','thumbnail_url']) {
+            final url = (section[key] ?? '').toString().trim();
+            if (url.startsWith('https://') || url.startsWith('http://')) urls.add(url);
+          }
+          for (final key in const ['children','slides']) {
+            final children = section[key];
+            if (children is! List) continue;
+            for (final child in children.whereType<Map>()) {
+              final url = (child['image_url'] ?? child['source_url'] ?? child['url'] ?? '').toString().trim();
+              if (url.startsWith('https://') || url.startsWith('http://')) urls.add(url);
+            }
+          }
+        }
+      }
+    }
+    final cacheWidth = (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio)
+        .round().clamp(320, 1600);
+    for (final url in urls.take(12)) {
+      if (!mounted) return;
+      try {
+        await precacheImage(ResizeImage(NetworkImage(url), width: cacheWidth), context)
+            .timeout(const Duration(seconds: 5));
+      } catch (_) {
+        // An unavailable image must not block the Home screen.
+      }
+    }
   }
 
   Future<Map<String, dynamic>> _loadDesignerSlider(String key) async {
@@ -898,10 +1204,29 @@ class _StoreHomeState extends State<StoreHome> {
     if (config['visible'] == false) return const SizedBox.shrink();
     final layoutSpec = DesignerLayoutSpec.fromMap(config);
     final title = (config['title'] ?? '').toString();
+    final countdownEnabled = config['countdown_enabled'] == true;
+    final countdownExpiry = DateTime.tryParse((config['countdown_time'] ?? '').toString());
+    if (countdownEnabled && config['countdown_auto_hide'] == true && countdownExpiry != null) {
+      final timerKey = (config['id'] ?? section['id'] ?? title).toString();
+      _componentCountdownTimers.remove(timerKey)?.cancel();
+      final remaining = countdownExpiry.difference(DateTime.now());
+      if (remaining <= Duration.zero) return const SizedBox.shrink();
+      _componentCountdownTimers[timerKey] = Timer(remaining, () {
+        if (mounted) {
+          _componentCountdownTimers.remove(timerKey);
+          setState(() {});
+        }
+      });
+    }
     final showTitle = config['show_title'] != false && title.isNotEmpty;
     final background = (config['section_background'] ?? 'transparent').toString();
     final backgroundImageUrl = (config['background_image_url'] ?? '').toString().trim();
     final textColor = (config['text_color'] ?? config['title_color'] ?? '#202733').toString();
+    final titleAlignment = switch ((config['title_text_align'] ?? 'left').toString()) {
+      'center' => TextAlign.center,
+      'right' => TextAlign.right,
+      _ => TextAlign.left,
+    };
     TextStyle sectionTitleStyle() {
       final weight = (config['title_font_weight'] ?? 'bold').toString();
       final titleBackground = (config['title_background_color'] ?? '').toString();
@@ -985,7 +1310,11 @@ class _StoreHomeState extends State<StoreHome> {
               padding: EdgeInsets.only(
                 bottom: (config['title_bottom_spacing'] as num?)?.toDouble() ?? 8,
               ),
-              child: Text(title, style: sectionTitleStyle()),
+              child: Row(children: [
+                Expanded(child: SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle()))),
+                if (countdownEnabled && countdownExpiry != null)
+                  _DesignerCountdownBadge(target: countdownExpiry),
+              ]),
             ),
             bannerGrid
                 ? SizedBox(
@@ -1072,7 +1401,14 @@ class _StoreHomeState extends State<StoreHome> {
                                         slide['title'].toString(),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                        textAlign: titleAlignment,
+                                        style: TextStyle(
+                                          color: _safeColor((config['title_color'] ?? '#FFFFFF').toString()),
+                                          fontSize: (config['title_font_size'] as num?)?.toDouble() ?? 11,
+                                          fontWeight: (config['title_font_weight'] ?? 'bold') == 'normal'
+                                              ? FontWeight.normal
+                                              : (config['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -1128,6 +1464,12 @@ class _StoreHomeState extends State<StoreHome> {
                           fade: config['transition'] == 'fade',
                           viewFraction: carouselFraction,
                           elevation: childElevation.clamp(0, 12).toDouble(),
+                          titleAlignment: titleAlignment,
+                          titleFontSize: (config['title_font_size'] as num?)?.toDouble() ?? 16,
+                          titleFontWeight: (config['title_font_weight'] ?? 'bold') == 'normal'
+                              ? FontWeight.normal
+                              : (config['title_font_weight'] ?? 'bold') == 'medium' ? FontWeight.w500 : FontWeight.bold,
+                          titleColor: _safeColor((config['title_color'] ?? '#FFFFFF').toString()),
                           onSlideTap: _openDesignerChildLink,
                         ),
                       ),
@@ -1229,7 +1571,11 @@ class _StoreHomeState extends State<StoreHome> {
             padding: EdgeInsets.only(
               bottom: (config['title_bottom_spacing'] as num?)?.toDouble() ?? 8,
             ),
-            child: Text(title, style: sectionTitleStyle()),
+            child: Row(children: [
+              Expanded(child: SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle()))),
+              if (countdownEnabled && countdownExpiry != null)
+                _DesignerCountdownBadge(target: countdownExpiry),
+            ]),
           ),
           if (layout.contains('list_tile'))
             Column(children: rows.map((category) => ListTile(
@@ -1322,7 +1668,11 @@ class _StoreHomeState extends State<StoreHome> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (showTitle) Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Text(title, style: sectionTitleStyle()),
+            child: Row(children: [
+              Expanded(child: SizedBox(width: double.infinity, child: Text(title, textAlign: titleAlignment, style: sectionTitleStyle()))),
+              if (countdownEnabled && countdownExpiry != null)
+                _DesignerCountdownBadge(target: countdownExpiry),
+            ]),
           ),
           if (layout.contains('carousel') || layout.contains('slider') || layout.contains('scroll'))
             SizedBox(
@@ -1538,22 +1888,44 @@ class _StoreHomeState extends State<StoreHome> {
             .map((section) => Map<String, dynamic>.from(section)).toList()
         : const <Map<String, dynamic>>[];
     final sectionWidgets = sections.map(_designerSection).toList();
-    return Column(children: [
-      Expanded(child: RefreshIndicator(
-        onRefresh: _loadDesignerConfig,
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 20),
-          children: [
-            if (designerConfigLoading && sections.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ...sectionWidgets,
-          ],
-        ),
-      )),
-    ]);
+    final config = DesignerAppBarConfig(json: designerConfig['app_bar'] is Map
+        ? Map<String, dynamic>.from(designerConfig['app_bar'] as Map)
+        : const {});
+    // The App Bar collapses its top action/logo row during Home scrolling,
+    // while Search and Delivery Address remain visible as pinned rows.
+    final statusInset = MediaQuery.paddingOf(context).top;
+    final pinnedRowsHeight = statusInset + config.compactRenderHeight;
+    final fullHeaderHeight = (statusInset + config.renderHeight)
+        .clamp(pinnedRowsHeight, 280.0).toDouble();
+    return RefreshIndicator(
+      onRefresh: _loadDesignerConfig,
+      child: CustomScrollView(
+        key: const PageStorageKey<String>('glowhit-home-scroll'),
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _GlowHitPinnedSearchAddressHeaderDelegate(
+              minHeight: pinnedRowsHeight,
+              maxHeight: fullHeaderHeight,
+              backgroundColor: DesignerAppBarConfig.color(config.backgroundColor),
+              childBuilder: (progress) => _buildConfiguredAppBar(
+                'home',
+                collapseProgress: progress,
+              ) ?? const SizedBox.shrink(),
+            ),
+          ),
+          if (sectionWidgets.isNotEmpty)
+            SliverList(delegate: SliverChildBuilderDelegate(
+              (context, index) => sectionWidgets[index],
+              childCount: sectionWidgets.length,
+            )),
+          if (sectionWidgets.isEmpty && !designerConfigLoading)
+            const SliverFillRemaining(hasScrollBody: false, child: Center(child: Text('No components on this page.'))),
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+        ],
+      ),
+    );
   }
 
   Widget catalog() => designerConfig['pages'] is Map && ((designerConfig['pages'] as Map)['home'] is Map) && (((designerConfig['pages'] as Map)['home'] as Map)['sections'] is List)
@@ -1564,7 +1936,7 @@ class _StoreHomeState extends State<StoreHome> {
       for (final item in [('For You','date',false),('Deals','date',true),('Top Rated','rating',false),('Featured','popularity',false)])
         Padding(padding: const EdgeInsets.only(right: 8), child: OutlinedButton(onPressed: () => load(order: item.$2, sale: item.$3), child: Text(item.$1))),
     ])),
-    if (loading) const Expanded(child: Center(child: CircularProgressIndicator()))
+    if (loading) const Expanded(child: SizedBox.shrink())
     else if (error != null) Expanded(child: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.cloud_off, size: 42, color: Colors.deepOrange), const SizedBox(height: 12), Text(error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.deepOrange)), const SizedBox(height: 12), FilledButton.icon(onPressed: load, icon: const Icon(Icons.refresh), label: const Text('Retry'))]))))
     else if (products.isEmpty) const Expanded(child: Center(child: Text('No products found. Try another search.')))
     else Expanded(child: GridView.builder(padding: const EdgeInsets.fromLTRB(12, 0, 12, 18), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .66, crossAxisSpacing: 10, mainAxisSpacing: 10), itemCount: products.length, itemBuilder: (_, i) => productCard(products[i]))),
@@ -1706,7 +2078,7 @@ class _StoreHomeState extends State<StoreHome> {
     ));
   }
 
-  PreferredSizeWidget? _buildConfiguredAppBar(String pageKey) {
+  PreferredSizeWidget? _buildConfiguredAppBar(String pageKey, {double collapseProgress = 0}) {
     final rawAppBar = designerConfig['app_bar'] is Map
         ? Map<String, dynamic>.from(designerConfig['app_bar'] as Map)
         : <String, dynamic>{};
@@ -1723,8 +2095,11 @@ class _StoreHomeState extends State<StoreHome> {
       systemNavigationBarColor: Colors.black,
       systemNavigationBarIconBrightness: Brightness.light,
     );
+    final progress = collapseProgress.clamp(0.0, 1.0).toDouble();
+    final renderedHeight = config.renderHeight -
+        ((config.renderHeight - config.compactRenderHeight) * progress);
     return PreferredSize(
-      preferredSize: Size.fromHeight(config.renderHeight + topInset),
+      preferredSize: Size.fromHeight(renderedHeight + topInset),
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: systemStyle,
         child: Column(
@@ -1740,9 +2115,10 @@ class _StoreHomeState extends State<StoreHome> {
             ]),
           ),
           SizedBox(
-            height: config.renderHeight,
+            height: renderedHeight,
             child: DesignerAppBarView(
         config: config,
+        collapseProgress: progress,
         pageKey: pageKey,
         cartCount: cartCount,
         searchController: searchController,
@@ -1833,7 +2209,13 @@ class _StoreHomeState extends State<StoreHome> {
     else if (tab == 3) page = _cartPage();
     else page = account();
     final currentPageKey = tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home') : tab == 1 ? 'categories' : tab == 2 ? 'wishlist' : tab == 3 ? 'cart' : 'account';
-    final PreferredSizeWidget activeAppBar = _buildConfiguredAppBar(currentPageKey) ?? AppBar(title: Text(titles[tab]), actions: [
+    final configuredAppBar = _buildConfiguredAppBar(currentPageKey);
+    final hasHomeDesignerSections = designerConfig['pages'] is Map &&
+        (designerConfig['pages'] as Map)['home'] is Map &&
+        ((designerConfig['pages'] as Map)['home'] as Map)['sections'] is List;
+    final useHomeSliverHeader = tab == 0 && hasHomeDesignerSections &&
+        configuredAppBar != null;
+    final PreferredSizeWidget activeAppBar = configuredAppBar ?? AppBar(title: Text(titles[tab]), actions: [
       if (tab == 0) IconButton(tooltip: 'ARK Designer', onPressed: _openDesigner, icon: const Icon(Icons.design_services_rounded)),
       if (tab == 0) IconButton(tooltip: 'Sync published layout', onPressed: _loadDesignerConfig, icon: const Icon(Icons.sync_rounded)),
       if (tab == 0) IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
@@ -1857,7 +2239,7 @@ class _StoreHomeState extends State<StoreHome> {
         if (tab != 0) setState(() => tab = 0);
       },
       child: Scaffold(
-      appBar: activeAppBar,
+      appBar: useHomeSliverHeader ? null : activeAppBar,
       body: SafeArea(top: false, child: page),
       floatingActionButton: _buildDesignerFloatingAction(
         tab == 0 ? (searchFocusNode.hasFocus ? 'search' : 'home')
